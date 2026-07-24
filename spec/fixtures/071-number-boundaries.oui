@@ -1,0 +1,16 @@
+root = Card([
+  CardHeader("Number boundaries"),
+  KVList([
+    {label: "2^53", value: 9007199254740992},
+    {label: "2^53+1", value: 9007199254740993},
+    {label: "2^55", value: 36028797018963968},
+    {label: "2^56", value: 72057594037927936},
+    {label: "2^60", value: 1152921504606846976},
+    {label: "2^62", value: 4611686018427387904},
+    {label: "int64-min-minus-1", value: -9223372036854775809},
+    {label: "2^64", value: 18446744073709551616},
+    {label: "neg-2^56-minus-1", value: -72057594037927937},
+    {label: "neg-2^60-minus-1", value: -1152921504606846977}
+  ], "BOUNDARIES"),
+  TextContent("concat: " + 72057594037927936 + " vs " + (-9223372036854775809))
+])

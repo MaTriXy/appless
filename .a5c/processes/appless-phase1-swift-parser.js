@@ -231,9 +231,10 @@ export const coverageGateTask = defineTask('fixture-coverage-gate', (args, taskC
   kind: 'shell',
   title: `all 84 fixtures exercised (iteration ${args.iteration})`,
   shell: {
-    // Corpus grew 84 -> 85 in iteration 2 (fixture 070 pins the isAstNode
-    // duck-typing quirk found by differential probing).
-    command: `${SWIFT} && cd ${PKG} && swift test 2>&1 | grep -oE 'fixtures exercised: [0-9]+' | tail -1 | grep -q 'fixtures exercised: 85'`,
+    // Corpus growth: 84 -> 85 (fixture 070, isAstNode duck-typing quirk),
+    // 85 -> 86 (fixture 071, number-formatting boundary band) - both found
+    // by judge differential probing.
+    command: `${SWIFT} && cd ${PKG} && swift test 2>&1 | grep -oE 'fixtures exercised: [0-9]+' | tail -1 | grep -q 'fixtures exercised: 86'`,
     expectedExitCode: 0,
     timeout: 900000,
   },

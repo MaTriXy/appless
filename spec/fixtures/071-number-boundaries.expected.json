@@ -1,0 +1,76 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "Number boundaries"
+        }
+      },
+      {
+        "component": "KVList",
+        "props": {
+          "header": "BOUNDARIES",
+          "rows": [
+            {
+              "label": "2^53",
+              "value": 9007199254740992
+            },
+            {
+              "label": "2^53+1",
+              "value": 9007199254740992
+            },
+            {
+              "label": "2^55",
+              "value": 36028797018963970
+            },
+            {
+              "label": "2^56",
+              "value": 72057594037927940
+            },
+            {
+              "label": "2^60",
+              "value": 1152921504606847000
+            },
+            {
+              "label": "2^62",
+              "value": 4611686018427388000
+            },
+            {
+              "label": "int64-min-minus-1",
+              "value": -9223372036854776000
+            },
+            {
+              "label": "2^64",
+              "value": 18446744073709552000
+            },
+            {
+              "label": "neg-2^56-minus-1",
+              "value": -72057594037927940
+            },
+            {
+              "label": "neg-2^60-minus-1",
+              "value": -1152921504606847000
+            }
+          ]
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "concat: 72057594037927940 vs -9223372036854776000"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

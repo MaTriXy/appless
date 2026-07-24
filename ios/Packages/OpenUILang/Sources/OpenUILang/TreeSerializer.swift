@@ -223,22 +223,31 @@ public enum TreeSerializer {
     static func formatNumber(_ d: Double) -> String {
         precondition(d.isFinite)
         if d == 0 { return "0" } // JSON.stringify(-0) === "0"
-        if let i = Int64(exactly: d) {
+        // Integer fast path, valid only below 2^53: there every integer is
+        // exactly representable, so the exact decimal expansion IS the
+        // shortest round-trip form. At |d| >= 2^53 that no longer holds —
+        // ECMAScript renders SHORTEST round-trip digits, not the exact
+        // expansion (`String(2 ** 56)` is `"72057594037927940"`, not
+        // `"72057594037927936"`), so those magnitudes fall through to the
+        // shortest-repr re-rendering below even when they fit Int64.
+        if abs(d) < 9007199254740992, let i = Int64(exactly: d) { // 2^53
             return String(i)
         }
-        // Everything else — including integer-valued doubles beyond Int64 but
-        // below 1e21, which ECMAScript renders positionally from the SHORTEST
-        // round-trip digits (`String(12345678901234567168)` is
+        // Everything else — including integer-valued doubles at or beyond
+        // 2^53 but below 1e21, which ECMAScript renders positionally from the
+        // SHORTEST round-trip digits (`String(12345678901234567168)` is
         // `"12345678901234567000"`, not the exact expansion
         // `"12345678901234567168"`) — is derived from Swift's own shortest
         // round-trip representation and re-rendered under the Number::toString
         // positional/exponential rules below.
         let repr = "\(d)" // Swift's shortest round-trip representation
         guard let eIndex = repr.firstIndex(where: { $0 == "e" || $0 == "E" }) else {
-            // Positional shortest form matches JS in the positional range.
-            // (Integer-valued doubles here would carry Swift's ".0" suffix,
-            // but they are unreachable: every integer-valued double that
-            // Swift prints positionally fits Int64 and returned above.)
+            // Positional shortest form matches JS in the positional range,
+            // except that Swift prints integer-valued doubles with a ".0"
+            // suffix (reachable now that |d| >= 2^53 integers land here).
+            if repr.hasSuffix(".0") {
+                return String(repr.dropLast(2))
+            }
             return repr
         }
         // Re-render Swift's exponential form under JS rules.

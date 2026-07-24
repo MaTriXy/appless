@@ -66,14 +66,14 @@ enum FixtureCorpus {
 }
 
 @Suite struct FixtureOracleTests {
-    /// CI gate: exactly 85 fixtures must be discovered, and the exact line
-    /// "fixtures exercised: 85" must reach stdout.
+    /// CI gate: exactly 86 fixtures must be discovered, and the exact line
+    /// "fixtures exercised: 86" must reach stdout.
     @Test func corpusSize() {
         let fixtures = FixtureCorpus.discover()
         print("fixtures exercised: \(fixtures.count)")
         #expect(
-            fixtures.count == 85,
-            "expected 85 fixtures under \(FixtureCorpus.fixturesRoot.path), found \(fixtures.count)"
+            fixtures.count == 86,
+            "expected 86 fixtures under \(FixtureCorpus.fixturesRoot.path), found \(fixtures.count)"
         )
     }
 
