@@ -114,7 +114,7 @@ enum Pipeline {
         case .array(let items):
             return .array(items.map { convertAstPlain($0) })
         case .object(let o):
-            var out: [String: PropValue] = [:]
+            var out = PropObject()
             for (key, value) in o.entries {
                 if case .undefined = value { continue }
                 out[key] = convertAstPlain(value)
@@ -122,7 +122,7 @@ enum Pipeline {
             return .object(out)
         case .element(let el):
             // In JS an ElementNode is itself a plain object of its fields.
-            var out: [String: PropValue] = [
+            var out: PropObject = [
                 "type": .string("element"),
                 "typeName": .string(el.typeName),
                 "props": convertAstPlain(.object(el.props)),
@@ -138,8 +138,8 @@ enum Pipeline {
         }
     }
 
-    private static func convertPlainObject(_ o: RTObject) -> [String: PropValue] {
-        var out: [String: PropValue] = [:]
+    private static func convertPlainObject(_ o: RTObject) -> PropObject {
+        var out = PropObject()
         for (key, value) in o.entries {
             if case .undefined = value { continue }
             out[key] = convertValue(value)
@@ -156,7 +156,7 @@ enum Pipeline {
             return .object(convertPlainObject(o))
         case .element(let el):
             // JS serializeStep iterates the element's own fields.
-            var out: [String: PropValue] = [
+            var out: PropObject = [
                 "type": .string("element"),
                 "typeName": .string(el.typeName),
                 "props": .object(convertPlainObject(el.props)),
@@ -195,13 +195,13 @@ enum Pipeline {
                 }),
             ])
         case .comp(let name, let args, let mappedProps):
-            var out: [String: PropValue] = [
+            var out: PropObject = [
                 "k": .string("Comp"),
                 "name": .string(name),
                 "args": .array(args.map { convertAST($0) }),
             ]
             if let mapped = mappedProps {
-                var m: [String: PropValue] = [:]
+                var m = PropObject()
                 for (key, value) in mapped {
                     m[key] = convertAST(value)
                 }

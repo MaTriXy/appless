@@ -8,10 +8,18 @@ func stripFences(_ input: String) -> String {
     let chars = Array(input)
     let n = chars.count
 
+    // Code-unit-exact backtick test: Swift `Character == "`"` matches
+    // canonically, so U+1FEF GREEK VARIA (canonically "`") would count as a
+    // fence character — the JS reference compares UTF-16 code units and
+    // does not.
+    func isBacktick(_ c: Character) -> Bool { c.isASCII && c == "`" }
+
     func indexOfFence(from: Int) -> Int? {
         var i = from
         while i + 2 < n {
-            if chars[i] == "`" && chars[i + 1] == "`" && chars[i + 2] == "`" { return i }
+            if isBacktick(chars[i]) && isBacktick(chars[i + 1]) && isBacktick(chars[i + 2]) {
+                return i
+            }
             i += 1
         }
         return nil
@@ -58,7 +66,9 @@ func stripFences(_ input: String) -> String {
                 k += 1
                 continue
             }
-            if c == "`" && k + 1 < n && chars[k + 1] == "`" && k + 2 < n && chars[k + 2] == "`" {
+            if isBacktick(c) && k + 1 < n && isBacktick(chars[k + 1]) && k + 2 < n
+                && isBacktick(chars[k + 2])
+            {
                 closePos = k
                 break
             }
@@ -75,7 +85,8 @@ func stripFences(_ input: String) -> String {
     if !blocks.isEmpty { return blocks.joined(separator: "\n") }
 
     // Fallback: input starts with ``` but wasn't matched.
-    if input.hasPrefix("```") {
+    // (jsStringHasPrefix: Swift's hasPrefix matches canonically.)
+    if jsStringHasPrefix(input, "```") {
         var j = 3
         while j < n && chars[j] != "\n" { j += 1 }
         let start = j < n ? j + 1 : 3
@@ -85,7 +96,7 @@ func stripFences(_ input: String) -> String {
         if body.count >= 3 {
             var k = body.count - 3
             while k >= 0 {
-                if body[k] == "`" && body[k + 1] == "`" && body[k + 2] == "`" {
+                if isBacktick(body[k]) && isBacktick(body[k + 1]) && isBacktick(body[k + 2]) {
                     trailing = k
                     break
                 }

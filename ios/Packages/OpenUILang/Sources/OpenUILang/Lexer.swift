@@ -40,9 +40,13 @@ func tokenize(_ src: [Character]) -> [Token] {
     var i = 0
     let n = src.count
 
-    func isDigit(_ c: Character) -> Bool { c >= "0" && c <= "9" }
+    // The `isASCII` guards matter: Swift Character range checks use canonical
+    // equivalence, so e.g. U+212A KELVIN SIGN (canonically "K") would satisfy
+    // `c >= "A" && c <= "Z"` — but the JS lexer compares UTF-16 code units
+    // and treats it as a plain skippable character.
+    func isDigit(_ c: Character) -> Bool { c.isASCII && c >= "0" && c <= "9" }
     func isAlpha(_ c: Character) -> Bool {
-        (c >= "a" && c <= "z") || (c >= "A" && c <= "Z") || c == "_"
+        c.isASCII && ((c >= "a" && c <= "z") || (c >= "A" && c <= "Z") || c == "_")
     }
     func isWordChar(_ c: Character) -> Bool { isAlpha(c) || isDigit(c) }
 

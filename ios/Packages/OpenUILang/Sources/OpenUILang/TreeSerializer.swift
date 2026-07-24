@@ -150,7 +150,7 @@ public enum TreeSerializer {
             out += "\n" + pad(indent) + "]"
             return out
         case .object(let entries):
-            return serializeObjectBody(entries, indent: indent)
+            return serializePropObject(entries, indent: indent)
         case .element(let element):
             return serializeElement(element, indent: indent)
         case .action(let plan):
@@ -168,16 +168,37 @@ public enum TreeSerializer {
         }
     }
 
-    /// Serializes a dictionary as an object with sorted keys.
+    /// Serializes a dictionary as an object with sorted keys. Key order is
+    /// UTF-16 code-unit order (`Object.keys(...).sort()` in the reference
+    /// serializer) — Swift's `String` ordering is canonical and can place
+    /// NFC/NFD keys differently.
     private static func serializeObjectBody(
         _ entries: [String: PropValue], indent: Int
     ) -> String {
         if entries.isEmpty { return "{}" }
         var out = "{\n"
-        out += entries.keys.sorted()
+        out += entries.keys.sorted(by: jsStringLess)
             .map { key in
                 pad(indent + 1) + quote(key) + ": "
                     + serializeValue(entries[key]!, indent: indent + 1)
+            }
+            .joined(separator: ",\n")
+        out += "\n" + pad(indent) + "}"
+        return out
+    }
+
+    /// Serializes a `PropObject` (code-unit-exact keys) with keys sorted by
+    /// UTF-16 code units, matching `Object.keys(...).sort()`.
+    private static func serializePropObject(
+        _ object: PropObject, indent: Int
+    ) -> String {
+        if object.isEmpty { return "{}" }
+        var out = "{\n"
+        out += object.entries
+            .sorted { jsStringLess($0.key, $1.key) }
+            .map { entry in
+                pad(indent + 1) + quote(entry.key) + ": "
+                    + serializeValue(entry.value, indent: indent + 1)
             }
             .joined(separator: ",\n")
         out += "\n" + pad(indent) + "}"

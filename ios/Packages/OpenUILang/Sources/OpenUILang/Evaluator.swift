@@ -354,9 +354,11 @@ final class Evaluator {
                 case ">=": return dslToNumber(v) >= dslToNumber(value)
                 case "<=": return dslToNumber(v) <= dslToNumber(value)
                 case "contains":
+                    // JS `String.prototype.includes` — UTF-16 code-unit
+                    // subsequence, NOT Swift's canonical `contains`.
                     let hay = v.isNullish ? "" : jsToString(v)
                     let needle = value.isNullish ? "" : jsToString(value)
-                    return needle.isEmpty || hay.contains(needle)
+                    return jsStringContains(hay, needle)
                 default:
                     return false
                 }
@@ -399,6 +401,9 @@ final class Evaluator {
         // KNOWN-DEVIATION (README.md #1): approximates JS `localeCompare`
         // (V8 ICU collation) with Foundation's en_US comparison; agrees for
         // ASCII, may differ for locale-sensitive orderings.
+        // Canonical equivalence is NOT a hazard here: `localeCompare` itself
+        // normalizes, so NFC/NFD variants compare equal (return 0) in BOTH
+        // implementations — unlike `==`, which is code-unit exact in JS.
         let result = a.compare(b, options: [], range: nil, locale: Locale(identifier: "en_US"))
         switch result {
         case .orderedAscending: return -1
@@ -407,16 +412,19 @@ final class Evaluator {
         }
     }
 
-    /// Dot-path field resolution (port of `resolveField`).
+    /// Dot-path field resolution (port of `resolveField`). Splitting happens
+    /// over UTF-16 code units like JS `path.split(".")` — Character-based
+    /// splitting would let a combining mark glue onto the "." and hide it.
     private func resolveField(_ obj: RTValue, _ path: String) -> RTValue {
         if path.isEmpty || obj.isNullish { return .undefined }
-        if !path.contains(".") {
+        let parts = jsStringSplit(path, separator: ".")
+        if parts.count == 1 {
             return propertyGet(obj, path)
         }
         var cur = obj
-        for p in path.split(separator: ".", omittingEmptySubsequences: false) {
+        for p in parts {
             if cur.isNullish { return .undefined }
-            cur = propertyGet(cur, String(p))
+            cur = propertyGet(cur, p)
         }
         return cur
     }
@@ -519,7 +527,9 @@ final class Evaluator {
             let childCtx = EvalContext(
                 getState: context.getState,
                 resolveRef: { refName in
-                    refName == varName ? item : context.resolveRef(refName)
+                    // JS `refName === varName` — code-unit exact (varName can
+                    // come from a string literal and be non-ASCII).
+                    jsStringEquals(refName, varName) ? item : context.resolveRef(refName)
                 }
             )
             let result = evaluate(substituted, childCtx)
@@ -571,11 +581,15 @@ final class Evaluator {
     private func substituteRef(_ node: ASTNode, varName: String, value: ASTNode) -> ASTNode {
         switch node {
         case .ref(let n):
-            return n == varName ? value : node
+            // JS `node.n === varName` — code-unit exact.
+            return jsStringEquals(n, varName) ? value : node
         case .member(let obj, let field):
             let subObj = substituteRef(obj, varName: varName, value: value)
             if case .obj(let entries) = subObj {
-                if let entry = entries.first(where: { $0.key == field }) {
+                // JS `entries.find(([k]) => k === node.field)` — code-unit
+                // exact (object keys and member fields can both be
+                // string-literal-derived).
+                if let entry = entries.first(where: { jsStringEquals($0.key, field) }) {
                     return entry.value
                 }
             }

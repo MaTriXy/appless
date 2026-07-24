@@ -12,14 +12,76 @@ public indirect enum PropValue: Sendable, Equatable {
     case string(String)
     /// Element order preserved; the parser has already applied array-drop rules.
     case array([PropValue])
-    /// Plain object; keys are sorted at serialization time.
-    case object([String: PropValue])
+    /// Plain object; keys are sorted (by UTF-16 code units, like
+    /// `Object.keys(...).sort()`) at serialization time.
+    case object(PropObject)
     case element(ElementNode)
     /// Deferred click-time value: serializes as `{"$action": {"steps": [...]}}`.
     case action(ActionPlan)
     /// Leftover AST node in a deferred slot: serializes as `{"$ast": <node>}`
     /// with keys sorted deep.
     case ast(PropValue)
+}
+
+/// A plain JS-like object with UTF-16 code-unit key identity and insertion
+/// order. A Swift `[String: PropValue]` cannot represent JS objects
+/// faithfully: `String` dictionary keys use Unicode canonical equivalence,
+/// so program-derived keys that differ only in normalization (precomposed
+/// "café" vs decomposed "cafe\u{301}") would collide even though JS keeps
+/// them as two distinct properties.
+public struct PropObject: Sendable, Equatable, ExpressibleByDictionaryLiteral {
+    public private(set) var keys: [String]
+    private var storedValues: [PropValue]
+
+    public init() {
+        keys = []
+        storedValues = []
+    }
+
+    public init(dictionaryLiteral elements: (String, PropValue)...) {
+        self.init()
+        for (key, value) in elements { self[key] = value }
+    }
+
+    public init(_ pairs: [(String, PropValue)]) {
+        self.init()
+        for (key, value) in pairs { self[key] = value }
+    }
+
+    private func indexOf(_ key: String) -> Int? {
+        keys.firstIndex { jsStringEquals($0, key) }
+    }
+
+    /// Code-unit-exact lookup / last-write-wins insertion that keeps the
+    /// original key position (JS object assignment semantics).
+    public subscript(key: String) -> PropValue? {
+        get { indexOf(key).map { storedValues[$0] } }
+        set {
+            if let i = indexOf(key) {
+                if let newValue {
+                    storedValues[i] = newValue
+                } else {
+                    keys.remove(at: i)
+                    storedValues.remove(at: i)
+                }
+            } else if let newValue {
+                keys.append(key)
+                storedValues.append(newValue)
+            }
+        }
+    }
+
+    public var entries: [(key: String, value: PropValue)] {
+        zip(keys, storedValues).map { ($0, $1) }
+    }
+    public var isEmpty: Bool { keys.isEmpty }
+    public var count: Int { keys.count }
+
+    public static func == (l: PropObject, r: PropObject) -> Bool {
+        l.keys.count == r.keys.count
+            && zip(l.keys, r.keys).allSatisfy { jsStringEquals($0, $1) }
+            && l.storedValues == r.storedValues
+    }
 }
 
 /// An element in the resolved tree.

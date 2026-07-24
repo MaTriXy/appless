@@ -14,7 +14,7 @@ contract: [`../contract/genos.schema.json`](../contract/genos.schema.json)
 
 ```
 spec/fixtures/
-├── NNN-name.oui            complete-program fixtures (001–069)
+├── NNN-name.oui            complete-program fixtures (001–072)
 ├── NNN-name.expected.json  GENERATED — never edit by hand
 ├── partial/                prefix-truncated streaming snapshots (101–115)
 │   ├── NNN-name.oui        NO trailing newline — the cut point is the last byte
@@ -145,6 +145,7 @@ Notes for implementers:
 | 062–063 | `@OS` command responses → empty program (`root: null`), incl. fenced |
 | 064 | kitchen sink: realistic screen combining most of the surface |
 | 065–069 | single-fixture-component hardening: ImageBlock explicit `null` caption vs omitted; Bubbles messages with `me`/`time` omitted per-message; AreaChart `"step"` + single series; LineChart `"natural"` + xLabel/yLabel; HorizontalBarChart `"stacked"`. All five positional args are passed on the charts, so the `variant` **prop** is actually populated (in 054 the 3rd positional lands in `xLabel` — contract order is labels, series, xLabel, yLabel, variant) |
+| 070–072 | serializer/runtime edge cases: `{k: ...}` data object duck-typed as `$ast` (070); `Number::toString` boundaries (071); Unicode NFC/NFD code-unit semantics — `==`/`!=` on canonically-equivalent strings, `@Filter` `contains`, distinct precomposed/decomposed object keys surviving into `state`, code-unit key sort (072) |
 | partial/101–115 | streaming snapshots: cut mid-string, mid-call, mid-array, before root, mid-escape (lone `\`), inside a comment, partial/unclosed fence, mid-object, mid-ternary, mid-statement-name, pending duplicate id (ignored), mid-action message, mid-number exponent (NaN), comment-with-apostrophe glue hazard |
 
 ## Coverage matrix (33 contract components × fixtures)

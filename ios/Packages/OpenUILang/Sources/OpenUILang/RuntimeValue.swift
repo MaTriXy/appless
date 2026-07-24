@@ -4,7 +4,11 @@ import Foundation
 /// original key position, like JS object assignment).
 struct RTObject {
     private(set) var keys: [String] = []
-    private var storage: [String: RTValue] = [:]
+    /// Keyed on `JSKey` (UTF-16 code-unit identity): JS object properties are
+    /// code-unit exact, and program text can produce canonically-equal but
+    /// code-unit-different keys (string-literal object keys, e.g. NFC vs NFD
+    /// "café") that must stay distinct.
+    private var storage: [JSKey: RTValue] = [:]
 
     init() {}
     init(_ pairs: [(String, RTValue)]) {
@@ -12,24 +16,25 @@ struct RTObject {
     }
 
     subscript(key: String) -> RTValue? {
-        get { storage[key] }
+        get { storage[JSKey(key)] }
         set {
+            let k = JSKey(key)
             guard let newValue else {
-                if storage.removeValue(forKey: key) != nil {
-                    keys.removeAll { $0 == key }
+                if storage.removeValue(forKey: k) != nil {
+                    keys.removeAll { jsStringEquals($0, key) }
                 }
                 return
             }
-            if storage[key] == nil { keys.append(key) }
-            storage[key] = newValue
+            if storage[k] == nil { keys.append(key) }
+            storage[k] = newValue
         }
     }
 
     var entries: [(key: String, value: RTValue)] {
-        keys.map { ($0, storage[$0]!) }
+        keys.map { ($0, storage[JSKey($0)]!) }
     }
-    var values: [RTValue] { keys.map { storage[$0]! } }
-    func has(_ key: String) -> Bool { storage[key] != nil }
+    var values: [RTValue] { keys.map { storage[JSKey($0)]! } }
+    func has(_ key: String) -> Bool { storage[JSKey(key)] != nil }
     var isEmpty: Bool { keys.isEmpty }
 }
 
@@ -233,7 +238,9 @@ func jsLooseEquals(_ a: RTValue, _ b: RTValue) -> Bool {
     case (.number(let x), .number(let y)):
         return x == y
     case (.string(let x), .string(let y)):
-        return x == y
+        // JS compares strings by UTF-16 code units — canonically equivalent
+        // NFC/NFD variants are NOT equal (Swift's `==` would say they are).
+        return jsStringEquals(x, y)
     case (.bool(let x), .bool(let y)):
         return x == y
     case (.bool(let x), _):

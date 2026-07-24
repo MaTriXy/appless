@@ -1,0 +1,18 @@
+$brand = "cafe\u0301"
+$forms = {"caf\u00e9": "precomposed", "cafe\u0301": "decomposed"}
+places = [{name: "Caf\u00e9 Uno", tag: "nfc"}, {name: "Cafe\u0301 Dos", tag: "nfd"}, {name: "tea house", tag: "plain"}]
+nfc_hits = @Filter(places, "name", "contains", "af\u00e9")
+nfd_hits = @Filter(places, "name", "contains", "afe\u0301")
+root = Card([
+  CardHeader("Normalization"),
+  KVList([
+    {label: "eq", value: "caf\u00e9" == "cafe\u0301" ? "canonical" : "code-units"},
+    {label: "neq", value: "caf\u00e9" != "cafe\u0301" ? "distinct" : "same"},
+    {label: "state-nfc", value: $brand == "caf\u00e9" ? "collided" : "held-apart"},
+    {label: "state-nfd", value: $brand == "cafe\u0301" ? "exact" : "broken"},
+    {label: "pick-nfc", value: $forms["caf\u00e9"]},
+    {label: "pick-nfd", value: $forms["cafe\u0301"]}
+  ], "CHECKS"),
+  TextContent("nfc contains: " + @Count(nfc_hits) + ", nfd contains: " + @Count(nfd_hits)),
+  TextContent(@First(nfc_hits).tag + "/" + @First(nfd_hits).tag)
+])

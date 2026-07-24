@@ -2,22 +2,26 @@ import Foundation
 
 /// Insertion-ordered map used for statement caches and state declarations.
 /// `set` on an existing key overwrites the value but keeps the original key
-/// position (JS `Map.set` semantics).
+/// position (JS `Map.set` semantics). Keyed on `JSKey` (UTF-16 code-unit
+/// identity) to mirror JS `Map` — statement ids and `$state` names are
+/// ASCII-only under the current lexer, so this is defense-in-depth rather
+/// than an observable fix.
 struct OrderedMap<Value> {
     private(set) var keys: [String] = []
-    private var storage: [String: Value] = [:]
+    private var storage: [JSKey: Value] = [:]
 
     subscript(key: String) -> Value? {
-        get { storage[key] }
+        get { storage[JSKey(key)] }
         set {
             guard let newValue else { return }
-            if storage[key] == nil { keys.append(key) }
-            storage[key] = newValue
+            let k = JSKey(key)
+            if storage[k] == nil { keys.append(key) }
+            storage[k] = newValue
         }
     }
 
-    func has(_ key: String) -> Bool { storage[key] != nil }
-    var values: [Value] { keys.map { storage[$0]! } }
+    func has(_ key: String) -> Bool { storage[JSKey(key)] != nil }
+    var values: [Value] { keys.map { storage[JSKey($0)]! } }
     var count: Int { keys.count }
     var isEmpty: Bool { keys.isEmpty }
 }
@@ -156,11 +160,21 @@ final class StreamCore {
 
     @discardableResult
     func set(_ fullText: String) -> InternalResult {
-        if fullText.count < bufString.count || !fullText.hasPrefix(bufString) {
+        // JS: `fullText.length < buf.length || !fullText.startsWith(buf)` and
+        // `fullText.slice(buf.length)` — all in UTF-16 code units. Swift's
+        // `count`/`hasPrefix`/`dropFirst` work on grapheme clusters with
+        // canonical matching, which would (a) accept an NFC/NFD variant as a
+        // prefix-extension where JS resets, and (b) mis-slice the delta when
+        // a combining mark merges into the previous cluster.
+        let newUnits = Array(fullText.utf16)
+        if newUnits.count < bufString.utf16.count
+            || !newUnits.starts(with: bufString.utf16)
+        {
             reset()
         }
-        if fullText.count > bufString.count {
-            let delta = fullText.dropFirst(bufString.count)
+        let prefixCount = bufString.utf16.count
+        if newUnits.count > prefixCount {
+            let delta = String(decoding: newUnits[prefixCount...], as: UTF16.self)
             buf.append(contentsOf: delta)
             bufString = fullText
         }
@@ -178,7 +192,7 @@ final class StreamCore {
 
     private func addStmt(_ text: String) {
         let cleaned = stripComments(text).jsTrim()
-        if cleaned.isEmpty || cleaned.hasPrefix("```") { return }
+        if cleaned.isEmpty || jsStringHasPrefix(cleaned, "```") { return }
         for s in splitStatements(tokenize(Array(cleaned))) {
             let expr = parseExpression(s.tokens)
             let stmt = classifyStatement(s, expr)

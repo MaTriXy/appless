@@ -2,7 +2,7 @@
 
 Swift port of the `@openuidev/lang-core` openui-lang parser + runtime
 evaluator, oracle-verified byte-for-byte against the JS reference
-implementation over the golden fixture corpus in `spec/fixtures/` (85
+implementation over the golden fixture corpus in `spec/fixtures/` (87
 fixtures) plus multi-`set()` streaming scenarios.
 
 - Normative spec: `spec/openui-lang.md`

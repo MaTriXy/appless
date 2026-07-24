@@ -110,7 +110,7 @@ private func resolveRefExpr(_ name: String, _ ctx: MaterializeContext) -> ASTNod
 /// If node is a lazy builtin like Each(arr, varName, template), scope the
 /// iterator variable during materialization. Returns nil if not applicable.
 private func materializeLazyBuiltin(
-    name: String, args: [ASTNode], ctx: MaterializeContext, scopedRefs: Set<String>
+    name: String, args: [ASTNode], ctx: MaterializeContext, scopedRefs: Set<JSKey>
 ) -> ASTNode? {
     guard Builtins.lazyBuiltins.contains(name), args.count >= 3 else { return nil }
     let varName: String?
@@ -121,7 +121,9 @@ private func materializeLazyBuiltin(
     }
     guard let varName else { return nil }
     var nextScoped = scopedRefs
-    nextScoped.insert(varName)
+    // JSKey: the iterator name can come from a string literal (non-ASCII);
+    // JS `Set` membership is code-unit exact.
+    nextScoped.insert(JSKey(varName))
     let recursed = args.enumerated().map { (i, a) in
         i == 1 ? a : materializeExprInternal(a, ctx, nextScoped)
     }
@@ -129,11 +131,11 @@ private func materializeLazyBuiltin(
 }
 
 private func materializeExprInternal(
-    _ node: ASTNode, _ ctx: MaterializeContext, _ scopedRefs: Set<String>
+    _ node: ASTNode, _ ctx: MaterializeContext, _ scopedRefs: Set<JSKey>
 ) -> ASTNode {
     switch node {
     case .ref(let n):
-        return scopedRefs.contains(n) ? node : resolveRefExpr(n, ctx)
+        return scopedRefs.contains(JSKey(n)) ? node : resolveRefExpr(n, ctx)
     case .ph:
         return node
     case .comp(let name, let args, _):

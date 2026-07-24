@@ -1,0 +1,72 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "Normalization"
+        }
+      },
+      {
+        "component": "KVList",
+        "props": {
+          "header": "CHECKS",
+          "rows": [
+            {
+              "label": "eq",
+              "value": "code-units"
+            },
+            {
+              "label": "neq",
+              "value": "distinct"
+            },
+            {
+              "label": "state-nfc",
+              "value": "held-apart"
+            },
+            {
+              "label": "state-nfd",
+              "value": "exact"
+            },
+            {
+              "label": "pick-nfc",
+              "value": "precomposed"
+            },
+            {
+              "label": "pick-nfd",
+              "value": "decomposed"
+            }
+          ]
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "nfc contains: 1, nfd contains: 1"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "nfc/nfd"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {
+    "$brand": "café",
+    "$forms": {
+      "café": "decomposed",
+      "café": "precomposed"
+    }
+  },
+  "runtimeErrors": []
+}
