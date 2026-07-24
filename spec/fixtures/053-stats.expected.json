@@ -1,0 +1,60 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "subtitle": "This week",
+          "title": "Business"
+        }
+      },
+      {
+        "component": "HeroStat",
+        "props": {
+          "label": "Balance",
+          "sublabel": "as of today",
+          "value": "$4,820"
+        }
+      },
+      {
+        "component": "StatTiles",
+        "props": {
+          "items": [
+            {
+              "delta": "+8%",
+              "icon": "trending-up",
+              "label": "Revenue",
+              "value": "$12.4k"
+            },
+            {
+              "delta": "-2%",
+              "icon": "shopping-cart",
+              "label": "Orders",
+              "value": "312"
+            },
+            {
+              "label": "Visitors",
+              "value": "8.1k"
+            },
+            {
+              "delta": "+1",
+              "icon": "rotate-ccw",
+              "label": "Refunds",
+              "value": "4"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

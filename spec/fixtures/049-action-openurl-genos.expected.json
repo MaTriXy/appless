@@ -1,0 +1,113 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "Deep links"
+        }
+      },
+      {
+        "component": "Buttons",
+        "props": {
+          "buttons": [
+            {
+              "component": "Button",
+              "props": {
+                "action": {
+                  "$action": {
+                    "steps": [
+                      {
+                        "type": "open_url",
+                        "url": "genos://open?app=music&request=Now+playing"
+                      }
+                    ]
+                  }
+                },
+                "label": "Open Music",
+                "variant": "primary"
+              }
+            },
+            {
+              "component": "Button",
+              "props": {
+                "action": {
+                  "$action": {
+                    "steps": [
+                      {
+                        "type": "open_url",
+                        "url": "genos://toast?text=Saved%20%E2%9C%93"
+                      }
+                    ]
+                  }
+                },
+                "label": "Toast"
+              }
+            },
+            {
+              "component": "Button",
+              "props": {
+                "action": {
+                  "$action": {
+                    "steps": [
+                      {
+                        "type": "open_url",
+                        "url": "genos://back"
+                      }
+                    ]
+                  }
+                },
+                "label": "Back",
+                "variant": "tertiary"
+              }
+            },
+            {
+              "component": "Button",
+              "props": {
+                "action": {
+                  "$action": {
+                    "steps": [
+                      {
+                        "type": "open_url",
+                        "url": "genos://home"
+                      }
+                    ]
+                  }
+                },
+                "label": "Home",
+                "variant": "tertiary"
+              }
+            },
+            {
+              "component": "Button",
+              "props": {
+                "action": {
+                  "$action": {
+                    "steps": [
+                      {
+                        "type": "open_url",
+                        "url": "https://example.com/docs"
+                      }
+                    ]
+                  }
+                },
+                "label": "Website"
+              }
+            }
+          ],
+          "direction": "column"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

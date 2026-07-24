@@ -1,0 +1,4 @@
+root = Card([
+  CardHeader("Extra", "args", "are", "silently", "ignored"),
+  HeroStat("42", "Answer", "to everything", "ignored", 99)
+])

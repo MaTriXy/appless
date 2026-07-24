@@ -1,0 +1,53 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "subtitle": "Sushi",
+          "title": "Nearby"
+        }
+      },
+      {
+        "component": "MapView",
+        "props": {
+          "placeName": "Sakura Sushi, Indiranagar, Bengaluru",
+          "zoom": 15
+        }
+      },
+      {
+        "component": "MapView",
+        "props": {
+          "placeName": "Tokyo Station"
+        }
+      },
+      {
+        "component": "ListBlock",
+        "props": {
+          "header": "RESULTS",
+          "items": [
+            {
+              "component": "ListItem",
+              "props": {
+                "leading": "map-pin",
+                "subtitle": "0.4 km away",
+                "title": "Sakura Sushi",
+                "trailing": "4.8"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

@@ -1,0 +1,1 @@
+root = Card([Buttons([Button("Go", Action([@ToAssistant("Ope

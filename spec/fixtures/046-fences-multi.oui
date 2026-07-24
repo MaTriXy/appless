@@ -1,0 +1,8 @@
+```openui-lang
+root = Card([header, footer])
+header = CardHeader("Fenced")
+```
+The model also wrote this prose between blocks
+```openui-lang
+footer = TextContent("Second block")
+```

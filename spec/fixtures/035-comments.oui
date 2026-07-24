@@ -1,0 +1,6 @@
+// leading comment line
+# hash comment line
+root = Card([header, body]) // trailing comment after a statement
+header = CardHeader("Comments") # trailing hash comment
+// a comment containing "quotes" and (brackets) is still a comment
+body = TextContent("visible text")

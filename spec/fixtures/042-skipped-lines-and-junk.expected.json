@@ -1,0 +1,35 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "statementId": "header",
+        "props": {
+          "title": "Junk tolerance"
+        }
+      },
+      {
+        "component": "KVList",
+        "props": {
+          "header": "DETAILS",
+          "rows": [
+            {
+              "label": "ok",
+              "value": "yes"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

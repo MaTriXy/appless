@@ -1,0 +1,2 @@
+```openui-lang
+root = Card([CardHeader("Unclosed fence"), TextContent("still parses")])

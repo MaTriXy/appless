@@ -1,0 +1,3 @@
+items = [{name: "Coffee", price: "$4"}, {name: "Tea", price: "$3"}, {name: "Juice", price: "$5"}]
+rows = @Each(items, item, ListItem(item.name, null, null, item.price, Action([@ToAssistant("Reorder " + item.name)])))
+root = Card([CardHeader("Menu"), ListBlock(rows, "DRINKS")])

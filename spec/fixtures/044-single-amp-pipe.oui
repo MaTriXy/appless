@@ -1,0 +1,7 @@
+a = true & false
+b = 0 | "fallback"
+root = Card([
+  CardHeader("Lexer hazards"),
+  TextContent(a ? "and-true" : "and-false"),
+  TextContent("" + b)
+])

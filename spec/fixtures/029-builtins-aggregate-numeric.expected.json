@@ -1,0 +1,66 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "Builtins"
+        }
+      },
+      {
+        "component": "KVList",
+        "props": {
+          "header": "RESULTS",
+          "rows": [
+            {
+              "label": "count",
+              "value": "6"
+            },
+            {
+              "label": "sum",
+              "value": "23"
+            },
+            {
+              "label": "avg",
+              "value": "3.8333333333333335"
+            },
+            {
+              "label": "min",
+              "value": "1"
+            },
+            {
+              "label": "max",
+              "value": "9"
+            },
+            {
+              "label": "round",
+              "value": "3.14"
+            },
+            {
+              "label": "abs",
+              "value": "7"
+            },
+            {
+              "label": "floor",
+              "value": "2"
+            },
+            {
+              "label": "ceil",
+              "value": "3"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

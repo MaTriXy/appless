@@ -1,0 +1,99 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "subtitle": "Device",
+          "title": "Settings"
+        }
+      },
+      {
+        "component": "ListBlock",
+        "props": {
+          "header": "CONNECTIVITY",
+          "items": [
+            {
+              "component": "ListItem",
+              "props": {
+                "action": {
+                  "$action": {
+                    "steps": [
+                      {
+                        "message": "Open Wi-Fi settings",
+                        "type": "continue_conversation"
+                      }
+                    ]
+                  }
+                },
+                "leading": "wifi",
+                "subtitle": "HomeNet-5G",
+                "title": "Wi-Fi",
+                "trailing": "Connected"
+              }
+            },
+            {
+              "component": "ListItem",
+              "props": {
+                "leading": {
+                  "alt": "avatar",
+                  "src": "/api/img?q=portrait&seed=7&w=80&h=80"
+                },
+                "subtitle": null,
+                "title": "Profile photo",
+                "trailing": null
+              }
+            },
+            {
+              "component": "Toggle",
+              "props": {
+                "icon": "bluetooth",
+                "on": true,
+                "title": "Bluetooth"
+              }
+            },
+            {
+              "component": "Toggle",
+              "props": {
+                "icon": "plane",
+                "on": false,
+                "subtitle": "Disables all radios",
+                "title": "Aeroplane mode"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "component": "KVList",
+        "props": {
+          "header": "ABOUT",
+          "rows": [
+            {
+              "label": "Model",
+              "value": "Phone 16"
+            },
+            {
+              "label": "Storage",
+              "value": "256 GB"
+            },
+            {
+              "label": "Battery",
+              "value": "87%"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

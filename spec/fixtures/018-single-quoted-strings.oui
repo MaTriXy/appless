@@ -1,0 +1,1 @@
+root = Card([CardHeader('Single quotes', 'LLM tolerance'), TextContent('It\'s escaped \n newline \t tab \z passthrough')])

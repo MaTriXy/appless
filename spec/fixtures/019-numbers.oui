@@ -1,0 +1,12 @@
+root = Card([
+  CardHeader("Numbers"),
+  KVList([
+    {label: "int", value: 42},
+    {label: "negative", value: -17},
+    {label: "decimal", value: 3.5},
+    {label: "exponent", value: 12.5e1},
+    {label: "neg-exponent", value: 1e-2},
+    {label: "zero", value: 0}
+  ], "LITERALS"),
+  Slider("amount", "continuous", -10, 99.5, 0.5)
+])

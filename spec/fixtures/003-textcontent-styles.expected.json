@@ -1,0 +1,56 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "Typography"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "style": "large-heavy",
+          "text": "Section title"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "style": "large",
+          "text": "Large text"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "Body copy with default style"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "style": "small-heavy",
+          "text": "Emphasised footnote"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "style": "small",
+          "text": "Footnote"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

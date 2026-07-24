@@ -1,0 +1,74 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "Actions"
+        }
+      },
+      {
+        "component": "ListBlock",
+        "props": {
+          "header": "ORDERS",
+          "items": [
+            {
+              "component": "ListItem",
+              "props": {
+                "action": {
+                  "$action": {
+                    "steps": [
+                      {
+                        "message": "Show details for order #1042",
+                        "type": "continue_conversation"
+                      }
+                    ]
+                  }
+                },
+                "leading": "package",
+                "subtitle": "Delivered",
+                "title": "Order #1042",
+                "trailing": "Jul 20"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "component": "Buttons",
+        "props": {
+          "buttons": [
+            {
+              "component": "Button",
+              "props": {
+                "action": {
+                  "$action": {
+                    "steps": [
+                      {
+                        "context": "User tapped the more button on the orders screen",
+                        "message": "Show me more",
+                        "type": "continue_conversation"
+                      }
+                    ]
+                  }
+                },
+                "label": "More",
+                "variant": "secondary"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

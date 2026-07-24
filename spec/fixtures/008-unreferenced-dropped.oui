@@ -1,0 +1,5 @@
+root = Card([used])
+used = TextContent("I am referenced")
+orphan = TextContent("I am never referenced and silently dropped")
+also_orphan = CardHeader("Unused header")
+plain = 42

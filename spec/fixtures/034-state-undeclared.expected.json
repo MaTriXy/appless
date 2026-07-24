@@ -1,0 +1,36 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "Undeclared state"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "Value: []"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "falsy"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {
+    "$never_declared": null
+  },
+  "runtimeErrors": []
+}

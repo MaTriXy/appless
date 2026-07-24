@@ -1,0 +1,161 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "subtitle": "Every input type",
+          "title": "Bindings"
+        }
+      },
+      {
+        "component": "Form",
+        "props": {
+          "buttons": {
+            "component": "Buttons",
+            "props": {
+              "buttons": [
+                {
+                  "component": "Button",
+                  "props": {
+                    "action": {
+                      "$action": {
+                        "steps": [
+                          {
+                            "message": "Save profile",
+                            "type": "continue_conversation"
+                          }
+                        ]
+                      }
+                    },
+                    "label": "Save",
+                    "variant": "primary"
+                  }
+                }
+              ]
+            }
+          },
+          "fields": [
+            {
+              "component": "FormControl",
+              "props": {
+                "input": {
+                  "component": "Input",
+                  "props": {
+                    "name": "email",
+                    "placeholder": "you@example.com",
+                    "rules": null,
+                    "type": "email",
+                    "value": "you@example.com"
+                  }
+                },
+                "label": "Email"
+              }
+            },
+            {
+              "component": "FormControl",
+              "props": {
+                "input": {
+                  "component": "TextArea",
+                  "props": {
+                    "name": "bio",
+                    "placeholder": "About you",
+                    "rows": 4,
+                    "rules": null,
+                    "value": null
+                  }
+                },
+                "label": "Bio"
+              }
+            },
+            {
+              "component": "FormControl",
+              "props": {
+                "input": {
+                  "component": "Select",
+                  "props": {
+                    "items": [
+                      {
+                        "component": "SelectItem",
+                        "props": {
+                          "label": "Basic",
+                          "value": "basic"
+                        }
+                      },
+                      {
+                        "component": "SelectItem",
+                        "props": {
+                          "label": "Pro",
+                          "value": "pro"
+                        }
+                      }
+                    ],
+                    "name": "plan",
+                    "placeholder": "Choose a plan",
+                    "rules": null,
+                    "value": "basic"
+                  }
+                },
+                "label": "Plan"
+              }
+            },
+            {
+              "component": "FormControl",
+              "props": {
+                "input": {
+                  "component": "DatePicker",
+                  "props": {
+                    "mode": "single",
+                    "name": "when",
+                    "rules": null,
+                    "value": "2026-07-24"
+                  }
+                },
+                "label": "Date"
+              }
+            },
+            {
+              "component": "FormControl",
+              "props": {
+                "input": {
+                  "component": "Slider",
+                  "props": {
+                    "defaultValue": [
+                      50
+                    ],
+                    "label": "Preferred",
+                    "max": 100,
+                    "min": 0,
+                    "name": "temp",
+                    "rules": null,
+                    "step": 5,
+                    "value": 50,
+                    "variant": "continuous"
+                  }
+                },
+                "label": "Temperature"
+              }
+            }
+          ],
+          "name": "profile"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {
+    "$bio": null,
+    "$email": "you@example.com",
+    "$plan": "basic",
+    "$temp": 50,
+    "$when": "2026-07-24"
+  },
+  "runtimeErrors": []
+}

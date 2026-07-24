@@ -1,0 +1,52 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "Share"
+        }
+      },
+      {
+        "component": "PieChart",
+        "props": {
+          "labels": [
+            "iOS",
+            "Android",
+            "Other"
+          ],
+          "values": [
+            58,
+            39,
+            3
+          ]
+        }
+      },
+      {
+        "component": "PieChart",
+        "props": {
+          "appearance": "semiCircular",
+          "labels": [
+            "Won",
+            "Lost"
+          ],
+          "values": [
+            7,
+            3
+          ],
+          "variant": "donut"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

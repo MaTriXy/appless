@@ -1,0 +1,43 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "statementId": "header",
+        "props": {
+          "title": "Streams"
+        }
+      },
+      {
+        "component": "ListBlock",
+        "statementId": "list",
+        "props": {
+          "items": [
+            {
+              "component": "ListItem",
+              "props": {
+                "title": "Row one"
+              }
+            },
+            {
+              "component": "ListItem",
+              "props": {
+                "title": "Row tw"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": true,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

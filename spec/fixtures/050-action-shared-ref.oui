@@ -1,0 +1,6 @@
+onGo = Action([@ToAssistant("Go tapped")])
+root = Card([
+  CardHeader("Shared action"),
+  Buttons([Button("Go", onGo, "primary"), Button("Also Go", onGo, "secondary")]),
+  ListBlock([ListItem("Row uses it too", null, null, null, onGo)])
+])

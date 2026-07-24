@@ -1,0 +1,31 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "StatTiles",
+        "props": {
+          "items": [
+            {
+              "delta": "+8%",
+              "label": "Revenue",
+              "value": "$12k"
+            },
+            {
+              "label": "Or"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": true,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

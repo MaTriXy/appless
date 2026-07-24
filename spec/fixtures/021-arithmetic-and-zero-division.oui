@@ -1,0 +1,12 @@
+root = Card([
+  CardHeader("Arithmetic"),
+  KVList([
+    {label: "add", value: "" + (1 + 2)},
+    {label: "sub", value: "" + (10 - 4)},
+    {label: "mul", value: "" + (6 * 7)},
+    {label: "div", value: "" + (9 / 2)},
+    {label: "mod", value: "" + (9 % 4)},
+    {label: "div-by-zero", value: "" + (5 / 0)},
+    {label: "mod-by-zero", value: "" + (5 % 0)}
+  ], "RESULTS")
+])

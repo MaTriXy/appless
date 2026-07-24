@@ -1,0 +1,58 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "Arithmetic"
+        }
+      },
+      {
+        "component": "KVList",
+        "props": {
+          "header": "RESULTS",
+          "rows": [
+            {
+              "label": "add",
+              "value": "3"
+            },
+            {
+              "label": "sub",
+              "value": "6"
+            },
+            {
+              "label": "mul",
+              "value": "42"
+            },
+            {
+              "label": "div",
+              "value": "4.5"
+            },
+            {
+              "label": "mod",
+              "value": "1"
+            },
+            {
+              "label": "div-by-zero",
+              "value": "0"
+            },
+            {
+              "label": "mod-by-zero",
+              "value": "0"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

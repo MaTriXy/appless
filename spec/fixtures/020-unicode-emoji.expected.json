@@ -1,0 +1,35 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "subtitle": "日本語 テスト",
+          "title": "Café ☕️"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "Emoji inside strings: 🚀🌍🎉 stay intact"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "Accents: naïve résumé über"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

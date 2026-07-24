@@ -1,0 +1,9 @@
+revenue = Series("Revenue", [12, 18, 15, 22])
+costs = Series("Costs", [8, 9, 11, 10])
+root = Card([
+  CardHeader("Quarterly", "2026"),
+  BarChart(["Q1", "Q2", "Q3", "Q4"], [revenue, costs], "grouped", "Quarter", "USD k"),
+  LineChart(["Q1", "Q2", "Q3", "Q4"], [revenue], "natural"),
+  AreaChart(["Q1", "Q2", "Q3", "Q4"], [Series("Cumulative", [12, 30, 45, 67])], "step"),
+  HorizontalBarChart(["North", "South"], [Series("Sales", [40, 25])], "stacked")
+])

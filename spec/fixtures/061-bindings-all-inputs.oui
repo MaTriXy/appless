@@ -1,0 +1,15 @@
+$email = "you@example.com"
+$bio = null
+$when = "2026-07-24"
+$plan = "basic"
+$temp = 50
+root = Card([
+  CardHeader("Bindings", "Every input type"),
+  Form("profile", Buttons([Button("Save", Action([@ToAssistant("Save profile")]), "primary")]), [
+    FormControl("Email", Input("email", "you@example.com", "email", null, $email)),
+    FormControl("Bio", TextArea("bio", "About you", 4, null, $bio)),
+    FormControl("Plan", Select("plan", [SelectItem("basic", "Basic"), SelectItem("pro", "Pro")], "Choose a plan", null, $plan)),
+    FormControl("Date", DatePicker("when", "single", null, $when)),
+    FormControl("Temperature", Slider("temp", "continuous", 0, 100, 5, [50], "Preferred", null, $temp))
+  ])
+])

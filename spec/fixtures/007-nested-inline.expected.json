@@ -1,0 +1,83 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "subtitle": "3 unread",
+          "title": "Inbox"
+        }
+      },
+      {
+        "component": "ListBlock",
+        "props": {
+          "header": "MESSAGES",
+          "items": [
+            {
+              "component": "ListItem",
+              "props": {
+                "action": {
+                  "$action": {
+                    "steps": [
+                      {
+                        "message": "Open the message from Alice",
+                        "type": "continue_conversation"
+                      }
+                    ]
+                  }
+                },
+                "leading": "user",
+                "subtitle": "Lunch tomorrow?",
+                "title": "Alice",
+                "trailing": "9:41"
+              }
+            },
+            {
+              "component": "ListItem",
+              "props": {
+                "leading": "paperclip",
+                "subtitle": "Sent the file",
+                "title": "Bob",
+                "trailing": "8:15"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "component": "Buttons",
+        "props": {
+          "buttons": [
+            {
+              "component": "Button",
+              "props": {
+                "action": {
+                  "$action": {
+                    "steps": [
+                      {
+                        "message": "Compose a new message",
+                        "type": "continue_conversation"
+                      }
+                    ]
+                  }
+                },
+                "label": "Compose",
+                "variant": "primary"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

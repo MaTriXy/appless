@@ -1,0 +1,11 @@
+$count = 5
+$name = "Ada"
+$flag = true
+$empty = null
+root = Card([
+  CardHeader("State"),
+  TextContent("Count: " + $count),
+  TextContent("Name: " + $name),
+  TextContent($flag ? "flag on" : "flag off"),
+  Form("draft", Buttons([Button("Send")]), [FormControl("Message", Input("msg", "Type here", "text", null, $name))])
+])

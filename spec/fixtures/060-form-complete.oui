@@ -1,0 +1,13 @@
+root = Card([
+  CardHeader("Book a table", "Sakura Sushi"),
+  Form("booking", Buttons([
+    Button("Reserve", Action([@ToAssistant("Submit the booking form")]), "primary"),
+    Button("Cancel", Action([@OpenUrl("genos://back")]), "tertiary", "destructive")
+  ]), [
+    FormControl("Name", Input("guest", "Full name", "text", {required: true}), "As on your ID"),
+    FormControl("Party size", Select("size", [SelectItem("2", "Two"), SelectItem("4", "Four"), SelectItem("6", "Six")], "Choose", null, null, "medium")),
+    FormControl("Date", DatePicker("when", "single")),
+    FormControl("Requests", TextArea("notes", "Allergies, seating...", 3)),
+    FormControl("Budget", Slider("budget", "discrete", 20, 200, 10, [80], "Per person"))
+  ])
+])

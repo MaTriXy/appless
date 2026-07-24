@@ -1,0 +1,17 @@
+{
+  "root": {
+    "component": "CardHeader",
+    "statementId": "header",
+    "props": {
+      "subtitle": "First component statement becomes the root",
+      "title": "Standalone"
+    }
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

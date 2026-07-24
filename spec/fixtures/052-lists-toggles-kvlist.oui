@@ -1,0 +1,14 @@
+root = Card([
+  CardHeader("Settings", "Device"),
+  ListBlock([
+    ListItem("Wi-Fi", "HomeNet-5G", "wifi", "Connected", Action([@ToAssistant("Open Wi-Fi settings")])),
+    ListItem("Profile photo", null, {src: "/api/img?q=portrait&seed=7&w=80&h=80", alt: "avatar"}, null),
+    Toggle("Bluetooth", true, "bluetooth"),
+    Toggle("Aeroplane mode", false, "plane", "Disables all radios")
+  ], "CONNECTIVITY"),
+  KVList([
+    {label: "Model", value: "Phone 16"},
+    {label: "Storage", value: "256 GB"},
+    {label: "Battery", value: "87%"}
+  ], "ABOUT")
+])

@@ -1,0 +1,3 @@
+root = Card([header, body])
+header = CardHeader("Forward", "Root streams first, children hoist in")
+body = TextContent("Order does not matter for the final tree")

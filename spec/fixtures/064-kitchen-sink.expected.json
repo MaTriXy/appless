@@ -1,0 +1,198 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "statementId": "header",
+        "props": {
+          "subtitle": "Weekly report",
+          "title": "Fitness"
+        }
+      },
+      {
+        "component": "HeroStat",
+        "statementId": "hero",
+        "props": {
+          "label": "Total steps",
+          "sublabel": "this week",
+          "value": "24700"
+        }
+      },
+      {
+        "component": "BarChart",
+        "statementId": "chart",
+        "props": {
+          "labels": [
+            "Mon",
+            "Tue",
+            "Wed"
+          ],
+          "series": [
+            {
+              "component": "Series",
+              "props": {
+                "category": "Steps",
+                "values": [
+                  8200,
+                  10400,
+                  6100
+                ]
+              }
+            }
+          ],
+          "variant": "Steps",
+          "xLabel": "grouped",
+          "yLabel": "Day"
+        }
+      },
+      {
+        "component": "StatTiles",
+        "statementId": "tiles",
+        "props": {
+          "items": [
+            {
+              "icon": "award",
+              "label": "Best day",
+              "value": "Tue"
+            },
+            {
+              "delta": "+5%",
+              "label": "Average",
+              "value": "8233"
+            }
+          ]
+        }
+      },
+      {
+        "component": "TextCallout",
+        "statementId": "callout",
+        "props": {
+          "description": "You beat your weekly target",
+          "title": "Goal reached",
+          "variant": "success"
+        }
+      },
+      {
+        "component": "Chips",
+        "props": {
+          "labels": [
+            "Week",
+            "Month",
+            "Year"
+          ]
+        }
+      },
+      {
+        "component": "ListBlock",
+        "statementId": "rows",
+        "props": {
+          "header": "ACTIVITIES",
+          "items": [
+            {
+              "component": "ListItem",
+              "props": {
+                "action": {
+                  "$action": {
+                    "steps": [
+                      {
+                        "message": "Show the morning run details",
+                        "type": "continue_conversation"
+                      }
+                    ]
+                  }
+                },
+                "leading": "footprints",
+                "subtitle": "5.2 km · 31 min",
+                "title": "Morning run",
+                "trailing": "Mon"
+              }
+            },
+            {
+              "component": "Toggle",
+              "props": {
+                "icon": "bell",
+                "on": true,
+                "title": "Daily reminders"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "component": "PhotoGrid",
+        "statementId": "gallery",
+        "props": {
+          "images": [
+            {
+              "alt": "Run",
+              "src": "/api/img?q=morning+run&seed=4&w=400&h=400"
+            }
+          ]
+        }
+      },
+      {
+        "component": "MapView",
+        "statementId": "map",
+        "props": {
+          "placeName": "Cubbon Park, Bengaluru",
+          "zoom": 15
+        }
+      },
+      {
+        "component": "Buttons",
+        "statementId": "actions",
+        "props": {
+          "buttons": [
+            {
+              "component": "Button",
+              "props": {
+                "action": {
+                  "$action": {
+                    "steps": [
+                      {
+                        "context": "From the fitness summary screen",
+                        "message": "Share my weekly report",
+                        "type": "continue_conversation"
+                      }
+                    ]
+                  }
+                },
+                "label": "Share",
+                "variant": "primary"
+              }
+            },
+            {
+              "component": "Button",
+              "props": {
+                "action": {
+                  "$action": {
+                    "steps": [
+                      {
+                        "type": "open_url",
+                        "url": "https://example.com/fitness"
+                      }
+                    ]
+                  }
+                },
+                "label": "Open site",
+                "variant": "secondary"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {
+    "$view": "week"
+  },
+  "runtimeErrors": []
+}

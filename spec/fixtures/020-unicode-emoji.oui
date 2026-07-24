@@ -1,0 +1,5 @@
+root = Card([
+  CardHeader("Café ☕️", "日本語 テスト"),
+  TextContent("Emoji inside strings: 🚀🌍🎉 stay intact"),
+  TextContent("Accents: naïve résumé über")
+])

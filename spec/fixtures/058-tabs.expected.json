@@ -1,0 +1,76 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "Stocks"
+        }
+      },
+      {
+        "component": "Tabs",
+        "props": {
+          "items": [
+            {
+              "component": "TabItem",
+              "props": {
+                "label": "Watchlist"
+              },
+              "children": [
+                {
+                  "component": "ListBlock",
+                  "props": {
+                    "header": "TODAY",
+                    "items": [
+                      {
+                        "component": "ListItem",
+                        "props": {
+                          "leading": null,
+                          "subtitle": "+2.4%",
+                          "title": "ACME",
+                          "trailing": "$120.50"
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "component": "TabItem",
+              "props": {
+                "label": "News"
+              },
+              "children": [
+                {
+                  "component": "TextContent",
+                  "props": {
+                    "style": "default",
+                    "text": "Markets rallied on earnings"
+                  }
+                }
+              ]
+            },
+            {
+              "component": "TabItem",
+              "props": {
+                "label": "Empty"
+              },
+              "children": []
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

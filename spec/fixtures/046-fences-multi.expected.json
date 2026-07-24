@@ -1,0 +1,30 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "statementId": "header",
+        "props": {
+          "title": "Fenced"
+        }
+      },
+      {
+        "component": "TextContent",
+        "statementId": "footer",
+        "props": {
+          "text": "Second block"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

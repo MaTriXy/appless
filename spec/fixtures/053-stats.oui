@@ -1,0 +1,10 @@
+root = Card([
+  CardHeader("Business", "This week"),
+  HeroStat("$4,820", "Balance", "as of today"),
+  StatTiles([
+    {label: "Revenue", value: "$12.4k", delta: "+8%", icon: "trending-up"},
+    {label: "Orders", value: "312", delta: "-2%", icon: "shopping-cart"},
+    {label: "Visitors", value: "8.1k"},
+    {label: "Refunds", value: "4", delta: "+1", icon: "rotate-ccw"}
+  ])
+])

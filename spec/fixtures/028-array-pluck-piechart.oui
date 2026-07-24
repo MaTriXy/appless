@@ -1,0 +1,6 @@
+data = [{category: "Rent", amount: 1200}, {category: "Food", amount: 450}, {category: "Fun", amount: 200}]
+root = Card([
+  CardHeader("Budget", "July"),
+  PieChart(data.category, data.amount, "donut"),
+  TextContent("Categories tracked: " + data.length)
+])

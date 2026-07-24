@@ -1,0 +1,6 @@
+root = Card([
+  CardHeader("Nearby", "Sushi"),
+  MapView("Sakura Sushi, Indiranagar, Bengaluru", 15),
+  MapView("Tokyo Station"),
+  ListBlock([ListItem("Sakura Sushi", "0.4 km away", "map-pin", "4.8")], "RESULTS")
+])

@@ -1,0 +1,89 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "Shared action"
+        }
+      },
+      {
+        "component": "Buttons",
+        "props": {
+          "buttons": [
+            {
+              "component": "Button",
+              "props": {
+                "action": {
+                  "$action": {
+                    "steps": [
+                      {
+                        "message": "Go tapped",
+                        "type": "continue_conversation"
+                      }
+                    ]
+                  }
+                },
+                "label": "Go",
+                "variant": "primary"
+              }
+            },
+            {
+              "component": "Button",
+              "props": {
+                "action": {
+                  "$action": {
+                    "steps": [
+                      {
+                        "message": "Go tapped",
+                        "type": "continue_conversation"
+                      }
+                    ]
+                  }
+                },
+                "label": "Also Go",
+                "variant": "secondary"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "component": "ListBlock",
+        "props": {
+          "items": [
+            {
+              "component": "ListItem",
+              "props": {
+                "action": {
+                  "$action": {
+                    "steps": [
+                      {
+                        "message": "Go tapped",
+                        "type": "continue_conversation"
+                      }
+                    ]
+                  }
+                },
+                "leading": null,
+                "subtitle": null,
+                "title": "Row uses it too",
+                "trailing": null
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

@@ -1,0 +1,5 @@
+root = Card([
+  CardHeader("Undeclared state"),
+  TextContent("Value: [" + $never_declared + "]"),
+  TextContent($never_declared ? "truthy" : "falsy")
+])

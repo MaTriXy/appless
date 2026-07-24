@@ -1,0 +1,146 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "Thermostat"
+        }
+      },
+      {
+        "component": "HeroStat",
+        "props": {
+          "label": "Target",
+          "sublabel": "degrees",
+          "value": "72"
+        }
+      },
+      {
+        "component": "Buttons",
+        "props": {
+          "buttons": [
+            {
+              "component": "Button",
+              "props": {
+                "action": {
+                  "$action": {
+                    "steps": [
+                      {
+                        "target": "$fahrenheit",
+                        "type": "set",
+                        "valueAST": {
+                          "$ast": {
+                            "k": "BinOp",
+                            "left": {
+                              "k": "StateRef",
+                              "n": "$fahrenheit"
+                            },
+                            "op": "+",
+                            "right": {
+                              "k": "Num",
+                              "v": 1
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                },
+                "label": "Warmer",
+                "variant": "primary"
+              }
+            },
+            {
+              "component": "Button",
+              "props": {
+                "action": {
+                  "$action": {
+                    "steps": [
+                      {
+                        "target": "$fahrenheit",
+                        "type": "set",
+                        "valueAST": {
+                          "$ast": {
+                            "k": "BinOp",
+                            "left": {
+                              "k": "StateRef",
+                              "n": "$fahrenheit"
+                            },
+                            "op": "-",
+                            "right": {
+                              "k": "Num",
+                              "v": 1
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                },
+                "label": "Cooler",
+                "variant": "secondary"
+              }
+            },
+            {
+              "component": "Button",
+              "props": {
+                "action": {
+                  "$action": {
+                    "steps": [
+                      {
+                        "targets": [
+                          "$fahrenheit"
+                        ],
+                        "type": "reset"
+                      }
+                    ]
+                  }
+                },
+                "label": "Reset",
+                "variant": "tertiary"
+              }
+            },
+            {
+              "component": "Button",
+              "props": {
+                "action": {
+                  "$action": {
+                    "steps": [
+                      {
+                        "target": "$fahrenheit",
+                        "type": "set",
+                        "valueAST": {
+                          "$ast": {
+                            "k": "Num",
+                            "v": 68
+                          }
+                        }
+                      },
+                      {
+                        "message": "Save thermostat settings",
+                        "type": "continue_conversation"
+                      }
+                    ]
+                  }
+                },
+                "label": "Save"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {
+    "$fahrenheit": 72
+  },
+  "runtimeErrors": []
+}

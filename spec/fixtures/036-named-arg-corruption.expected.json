@@ -1,0 +1,47 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "ListBlock",
+        "props": {
+          "header": null,
+          "items": [
+            {
+              "component": "ListItem",
+              "props": {
+                "title": "Alpha"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "component": "ListBlock",
+        "props": {
+          "header": null,
+          "items": [
+            {
+              "component": "ListItem",
+              "props": {
+                "title": "Beta"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [
+      "header",
+      "header"
+    ],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

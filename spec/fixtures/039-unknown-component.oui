@@ -1,0 +1,5 @@
+root = Card([
+  CardHeader("Unknown component"),
+  Carousel(["a", "b"]),
+  TextContent("Known survivor")
+])

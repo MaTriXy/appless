@@ -1,0 +1,9 @@
+root = Card([
+  CardHeader("Actions"),
+  ListBlock([
+    ListItem("Order #1042", "Delivered", "package", "Jul 20", Action([@ToAssistant("Show details for order #1042")]))
+  ], "ORDERS"),
+  Buttons([
+    Button("More", Action([@ToAssistant("Show me more", "User tapped the more button on the orders screen")]), "secondary")
+  ])
+])

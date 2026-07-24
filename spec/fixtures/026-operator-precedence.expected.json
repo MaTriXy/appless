@@ -1,0 +1,50 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "Precedence"
+        }
+      },
+      {
+        "component": "KVList",
+        "props": {
+          "header": "CASES",
+          "rows": [
+            {
+              "label": "mul-before-add",
+              "value": "14"
+            },
+            {
+              "label": "grouping",
+              "value": "20"
+            },
+            {
+              "label": "cmp-binds-tighter-than-eq",
+              "value": "yes"
+            },
+            {
+              "label": "and-before-or",
+              "value": "or-wins"
+            },
+            {
+              "label": "unary-vs-mul",
+              "value": "-6"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

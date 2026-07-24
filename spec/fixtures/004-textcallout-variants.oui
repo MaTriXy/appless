@@ -1,0 +1,8 @@
+root = Card([
+  CardHeader("Alerts"),
+  TextCallout("neutral", "Heads up", "A neutral note"),
+  TextCallout("info", "Did you know?", "Info body"),
+  TextCallout("success", "Saved", "Everything synced"),
+  TextCallout("warning", "Storage almost full"),
+  TextCallout("danger", "Payment failed", "Card was declined")
+])

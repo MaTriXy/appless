@@ -1,0 +1,54 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "Comparisons"
+        }
+      },
+      {
+        "component": "KVList",
+        "props": {
+          "header": "CHECKS",
+          "rows": [
+            {
+              "label": "5 == \"5\"",
+              "value": "true"
+            },
+            {
+              "label": "5 != \"5\"",
+              "value": "false"
+            },
+            {
+              "label": "gt",
+              "value": "true"
+            },
+            {
+              "label": "lt-string",
+              "value": "true"
+            },
+            {
+              "label": "ge",
+              "value": "true"
+            },
+            {
+              "label": "le",
+              "value": "false"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

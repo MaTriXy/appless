@@ -1,0 +1,10 @@
+people = [{name: "Zoe", age: 34}, {name: "Al", age: 19}, {name: "Mia", age: 27}]
+oldest_first = @Sort(people, "age", "desc")
+adults = @Filter(people, "age", ">=", 21)
+root = Card([
+  CardHeader("Roster"),
+  TextContent("Oldest: " + @First(oldest_first).name),
+  TextContent("Youngest: " + @Last(oldest_first).name),
+  TextContent("Adults: " + @Count(adults)),
+  ListBlock([ListItem(@First(adults).name, "top adult")], "PEOPLE")
+])

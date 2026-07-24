@@ -1,0 +1,29 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "screen",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "Tier 3"
+        }
+      },
+      {
+        "component": "TextContent",
+        "statementId": "first",
+        "props": {
+          "text": "defined first, but not a Card call"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

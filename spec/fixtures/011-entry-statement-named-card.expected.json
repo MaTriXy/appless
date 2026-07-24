@@ -1,0 +1,16 @@
+{
+  "root": {
+    "component": "CardHeader",
+    "statementId": "Card",
+    "props": {
+      "title": "I am a statement literally named Card"
+    }
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

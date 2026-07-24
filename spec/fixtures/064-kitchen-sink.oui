@@ -1,0 +1,21 @@
+$view = "week"
+data = [{day: "Mon", steps: 8200}, {day: "Tue", steps: 10400}, {day: "Wed", steps: 6100}]
+header = CardHeader("Fitness", "Weekly report")
+hero = HeroStat("" + @Sum(data.steps), "Total steps", "this week")
+chart = BarChart(data.day, [Series("Steps", data.steps)], "grouped", "Day", "Steps")
+tiles = StatTiles([
+  {label: "Best day", value: @First(@Sort(data, "steps", "desc")).day, icon: "award"},
+  {label: "Average", value: "" + @Round(@Avg(data.steps)), delta: "+5%"}
+])
+gallery = PhotoGrid([{src: "/api/img?q=morning+run&seed=4&w=400&h=400", alt: "Run"}])
+rows = ListBlock([
+  ListItem("Morning run", "5.2 km · 31 min", "footprints", "Mon", Action([@ToAssistant("Show the morning run details")])),
+  Toggle("Daily reminders", true, "bell")
+], "ACTIVITIES")
+callout = TextCallout("success", "Goal reached", "You beat your weekly target")
+map = MapView("Cubbon Park, Bengaluru", 15)
+actions = Buttons([
+  Button("Share", Action([@ToAssistant("Share my weekly report", "From the fitness summary screen")]), "primary"),
+  Button("Open site", Action([@OpenUrl("https://example.com/fitness")]), "secondary")
+])
+root = Card([header, hero, chart, tiles, callout, Chips(["Week", "Month", "Year"]), rows, gallery, map, actions])

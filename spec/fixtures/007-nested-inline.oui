@@ -1,0 +1,1 @@
+root = Card([CardHeader("Inbox", "3 unread"), ListBlock([ListItem("Alice", "Lunch tomorrow?", "user", "9:41", Action([@ToAssistant("Open the message from Alice")])), ListItem("Bob", "Sent the file", "paperclip", "8:15")], "MESSAGES"), Buttons([Button("Compose", Action([@ToAssistant("Compose a new message")]), "primary")])])

@@ -1,0 +1,34 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "Ternary"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "Hot outside"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "hot"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

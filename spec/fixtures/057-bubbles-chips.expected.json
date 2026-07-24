@@ -1,0 +1,55 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "subtitle": "Alice",
+          "title": "Chat"
+        }
+      },
+      {
+        "component": "Chips",
+        "props": {
+          "labels": [
+            "All",
+            "Unread",
+            "Starred",
+            "Archived"
+          ]
+        }
+      },
+      {
+        "component": "Bubbles",
+        "props": {
+          "messages": [
+            {
+              "me": false,
+              "text": "Lunch tomorrow?",
+              "time": "9:41"
+            },
+            {
+              "me": true,
+              "text": "Sure, noon at the usual place",
+              "time": "9:43"
+            },
+            {
+              "me": false,
+              "text": "Perfect 👌"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

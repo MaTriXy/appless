@@ -1,0 +1,10 @@
+root = Card([
+  CardHeader("Precedence"),
+  KVList([
+    {label: "mul-before-add", value: "" + (2 + 3 * 4)},
+    {label: "grouping", value: "" + ((2 + 3) * 4)},
+    {label: "cmp-binds-tighter-than-eq", value: 2 + 3 * 4 == 14 ? "yes" : "no"},
+    {label: "and-before-or", value: "" + (false && true || "or-wins")},
+    {label: "unary-vs-mul", value: "" + (-2 * 3)}
+  ], "CASES")
+])

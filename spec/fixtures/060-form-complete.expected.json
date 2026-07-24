@@ -1,0 +1,177 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "subtitle": "Sakura Sushi",
+          "title": "Book a table"
+        }
+      },
+      {
+        "component": "Form",
+        "props": {
+          "buttons": {
+            "component": "Buttons",
+            "props": {
+              "buttons": [
+                {
+                  "component": "Button",
+                  "props": {
+                    "action": {
+                      "$action": {
+                        "steps": [
+                          {
+                            "message": "Submit the booking form",
+                            "type": "continue_conversation"
+                          }
+                        ]
+                      }
+                    },
+                    "label": "Reserve",
+                    "variant": "primary"
+                  }
+                },
+                {
+                  "component": "Button",
+                  "props": {
+                    "action": {
+                      "$action": {
+                        "steps": [
+                          {
+                            "type": "open_url",
+                            "url": "genos://back"
+                          }
+                        ]
+                      }
+                    },
+                    "label": "Cancel",
+                    "type": "destructive",
+                    "variant": "tertiary"
+                  }
+                }
+              ]
+            }
+          },
+          "fields": [
+            {
+              "component": "FormControl",
+              "props": {
+                "hint": "As on your ID",
+                "input": {
+                  "component": "Input",
+                  "props": {
+                    "name": "guest",
+                    "placeholder": "Full name",
+                    "rules": {
+                      "required": true
+                    },
+                    "type": "text"
+                  }
+                },
+                "label": "Name"
+              }
+            },
+            {
+              "component": "FormControl",
+              "props": {
+                "input": {
+                  "component": "Select",
+                  "props": {
+                    "items": [
+                      {
+                        "component": "SelectItem",
+                        "props": {
+                          "label": "Two",
+                          "value": "2"
+                        }
+                      },
+                      {
+                        "component": "SelectItem",
+                        "props": {
+                          "label": "Four",
+                          "value": "4"
+                        }
+                      },
+                      {
+                        "component": "SelectItem",
+                        "props": {
+                          "label": "Six",
+                          "value": "6"
+                        }
+                      }
+                    ],
+                    "name": "size",
+                    "placeholder": "Choose",
+                    "rules": null,
+                    "size": "medium",
+                    "value": null
+                  }
+                },
+                "label": "Party size"
+              }
+            },
+            {
+              "component": "FormControl",
+              "props": {
+                "input": {
+                  "component": "DatePicker",
+                  "props": {
+                    "mode": "single",
+                    "name": "when"
+                  }
+                },
+                "label": "Date"
+              }
+            },
+            {
+              "component": "FormControl",
+              "props": {
+                "input": {
+                  "component": "TextArea",
+                  "props": {
+                    "name": "notes",
+                    "placeholder": "Allergies, seating...",
+                    "rows": 3
+                  }
+                },
+                "label": "Requests"
+              }
+            },
+            {
+              "component": "FormControl",
+              "props": {
+                "input": {
+                  "component": "Slider",
+                  "props": {
+                    "defaultValue": [
+                      80
+                    ],
+                    "label": "Per person",
+                    "max": 200,
+                    "min": 20,
+                    "name": "budget",
+                    "step": 10,
+                    "variant": "discrete"
+                  }
+                },
+                "label": "Budget"
+              }
+            }
+          ],
+          "name": "booking"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

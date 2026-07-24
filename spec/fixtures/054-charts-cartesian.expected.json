@@ -1,0 +1,140 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "subtitle": "2026",
+          "title": "Quarterly"
+        }
+      },
+      {
+        "component": "BarChart",
+        "props": {
+          "labels": [
+            "Q1",
+            "Q2",
+            "Q3",
+            "Q4"
+          ],
+          "series": [
+            {
+              "component": "Series",
+              "statementId": "revenue",
+              "props": {
+                "category": "Revenue",
+                "values": [
+                  12,
+                  18,
+                  15,
+                  22
+                ]
+              }
+            },
+            {
+              "component": "Series",
+              "statementId": "costs",
+              "props": {
+                "category": "Costs",
+                "values": [
+                  8,
+                  9,
+                  11,
+                  10
+                ]
+              }
+            }
+          ],
+          "variant": "USD k",
+          "xLabel": "grouped",
+          "yLabel": "Quarter"
+        }
+      },
+      {
+        "component": "LineChart",
+        "props": {
+          "labels": [
+            "Q1",
+            "Q2",
+            "Q3",
+            "Q4"
+          ],
+          "series": [
+            {
+              "component": "Series",
+              "statementId": "revenue",
+              "props": {
+                "category": "Revenue",
+                "values": [
+                  12,
+                  18,
+                  15,
+                  22
+                ]
+              }
+            }
+          ],
+          "xLabel": "natural"
+        }
+      },
+      {
+        "component": "AreaChart",
+        "props": {
+          "labels": [
+            "Q1",
+            "Q2",
+            "Q3",
+            "Q4"
+          ],
+          "series": [
+            {
+              "component": "Series",
+              "props": {
+                "category": "Cumulative",
+                "values": [
+                  12,
+                  30,
+                  45,
+                  67
+                ]
+              }
+            }
+          ],
+          "xLabel": "step"
+        }
+      },
+      {
+        "component": "HorizontalBarChart",
+        "props": {
+          "labels": [
+            "North",
+            "South"
+          ],
+          "series": [
+            {
+              "component": "Series",
+              "props": {
+                "category": "Sales",
+                "values": [
+                  40,
+                  25
+                ]
+              }
+            }
+          ],
+          "xLabel": "stacked"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

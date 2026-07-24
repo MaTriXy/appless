@@ -1,0 +1,54 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "Logic"
+        }
+      },
+      {
+        "component": "KVList",
+        "props": {
+          "header": "RESULTS",
+          "rows": [
+            {
+              "label": "and",
+              "value": "right"
+            },
+            {
+              "label": "and-short",
+              "value": "0"
+            },
+            {
+              "label": "or",
+              "value": "fallback"
+            },
+            {
+              "label": "or-short",
+              "value": "kept"
+            },
+            {
+              "label": "not",
+              "value": "true"
+            },
+            {
+              "label": "neg",
+              "value": "-7"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

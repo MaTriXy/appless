@@ -1,0 +1,9 @@
+root = Card([
+  CardHeader("Chat", "Alice"),
+  Chips(["All", "Unread", "Starred", "Archived"]),
+  Bubbles([
+    {text: "Lunch tomorrow?", me: false, time: "9:41"},
+    {text: "Sure, noon at the usual place", me: true, time: "9:43"},
+    {text: "Perfect 👌", me: false}
+  ])
+])

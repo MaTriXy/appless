@@ -1,0 +1,8 @@
+root = Card([
+  CardHeader("Typography"),
+  TextContent("Section title", "large-heavy"),
+  TextContent("Large text", "large"),
+  TextContent("Body copy with default style"),
+  TextContent("Emphasised footnote", "small-heavy"),
+  TextContent("Footnote", "small")
+])

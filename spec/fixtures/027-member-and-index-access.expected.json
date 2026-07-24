@@ -1,0 +1,52 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "Ada"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "Wins: 12"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "First: 10, third: 30"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "Length: 3"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "By key: Ada"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "Null-safe: "
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

@@ -1,0 +1,61 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "Alerts"
+        }
+      },
+      {
+        "component": "TextCallout",
+        "props": {
+          "description": "A neutral note",
+          "title": "Heads up",
+          "variant": "neutral"
+        }
+      },
+      {
+        "component": "TextCallout",
+        "props": {
+          "description": "Info body",
+          "title": "Did you know?",
+          "variant": "info"
+        }
+      },
+      {
+        "component": "TextCallout",
+        "props": {
+          "description": "Everything synced",
+          "title": "Saved",
+          "variant": "success"
+        }
+      },
+      {
+        "component": "TextCallout",
+        "props": {
+          "title": "Storage almost full",
+          "variant": "warning"
+        }
+      },
+      {
+        "component": "TextCallout",
+        "props": {
+          "description": "Card was declined",
+          "title": "Payment failed",
+          "variant": "danger"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

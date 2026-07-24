@@ -1,0 +1,22 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "He said \\"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": true,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

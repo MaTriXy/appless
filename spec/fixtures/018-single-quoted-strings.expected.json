@@ -1,0 +1,29 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "subtitle": "LLM tolerance",
+          "title": "Single quotes"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "It's escaped \n newline \t tab z passthrough"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

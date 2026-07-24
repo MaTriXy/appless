@@ -1,0 +1,55 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "Roster"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "Oldest: Zoe"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "Youngest: Al"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "Adults: 2"
+        }
+      },
+      {
+        "component": "ListBlock",
+        "props": {
+          "header": "PEOPLE",
+          "items": [
+            {
+              "component": "ListItem",
+              "props": {
+                "subtitle": "top adult",
+                "title": "Zoe"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

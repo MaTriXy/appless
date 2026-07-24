@@ -1,0 +1,6 @@
+Loading your dashboard now
+root = Card([header, KVList([{label: "ok", value: "yes"}] "DETAILS")])
+= 5
+just some prose without an equals
+header = CardHeader("Junk tolerance") ;;; 🚀
+123 = TextContent("numeric id is not a statement")

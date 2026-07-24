@@ -1,0 +1,23 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": []
+  },
+  "meta": {
+    "incomplete": true,
+    "unresolved": [],
+    "errors": [
+      {
+        "code": "missing-required",
+        "component": "CardHeader",
+        "path": "/title",
+        "message": "missing required field \"title\"",
+        "statementId": "root"
+      }
+    ]
+  },
+  "state": {},
+  "runtimeErrors": []
+}

@@ -1,0 +1,3 @@
+temp = 31
+root = Card([TextContent(temp > 30
+  ? "Hot"

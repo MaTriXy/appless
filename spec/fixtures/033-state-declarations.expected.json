@@ -1,0 +1,82 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "State"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "Count: 5"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "Name: Ada"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "flag on"
+        }
+      },
+      {
+        "component": "Form",
+        "props": {
+          "buttons": {
+            "component": "Buttons",
+            "props": {
+              "buttons": [
+                {
+                  "component": "Button",
+                  "props": {
+                    "label": "Send"
+                  }
+                }
+              ]
+            }
+          },
+          "fields": [
+            {
+              "component": "FormControl",
+              "props": {
+                "input": {
+                  "component": "Input",
+                  "props": {
+                    "name": "msg",
+                    "placeholder": "Type here",
+                    "rules": null,
+                    "type": "text",
+                    "value": "Ada"
+                  }
+                },
+                "label": "Message"
+              }
+            }
+          ],
+          "name": "draft"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {
+    "$count": 5,
+    "$empty": null,
+    "$flag": true,
+    "$name": "Ada"
+  },
+  "runtimeErrors": []
+}

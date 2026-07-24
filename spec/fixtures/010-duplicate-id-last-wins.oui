@@ -1,0 +1,2 @@
+root = Card([TextContent("first definition")])
+root = Card([CardHeader("Duplicate"), TextContent("last definition wins")])

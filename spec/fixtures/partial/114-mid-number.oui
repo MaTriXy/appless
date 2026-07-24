@@ -1,0 +1,1 @@
+root = Card([Slider("n", "continuous", 0, 12.5e

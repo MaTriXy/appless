@@ -1,0 +1,87 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "Menu"
+        }
+      },
+      {
+        "component": "ListBlock",
+        "props": {
+          "header": "DRINKS",
+          "items": [
+            {
+              "component": "ListItem",
+              "props": {
+                "action": {
+                  "$action": {
+                    "steps": [
+                      {
+                        "message": "Reorder Coffee",
+                        "type": "continue_conversation"
+                      }
+                    ]
+                  }
+                },
+                "leading": null,
+                "subtitle": null,
+                "title": "Coffee",
+                "trailing": "$4"
+              }
+            },
+            {
+              "component": "ListItem",
+              "props": {
+                "action": {
+                  "$action": {
+                    "steps": [
+                      {
+                        "message": "Reorder Tea",
+                        "type": "continue_conversation"
+                      }
+                    ]
+                  }
+                },
+                "leading": null,
+                "subtitle": null,
+                "title": "Tea",
+                "trailing": "$3"
+              }
+            },
+            {
+              "component": "ListItem",
+              "props": {
+                "action": {
+                  "$action": {
+                    "steps": [
+                      {
+                        "message": "Reorder Juice",
+                        "type": "continue_conversation"
+                      }
+                    ]
+                  }
+                },
+                "leading": null,
+                "subtitle": null,
+                "title": "Juice",
+                "trailing": "$5"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

@@ -1,0 +1,45 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "subtitle": "July",
+          "title": "Budget"
+        }
+      },
+      {
+        "component": "PieChart",
+        "props": {
+          "labels": [
+            "Rent",
+            "Food",
+            "Fun"
+          ],
+          "values": [
+            1200,
+            450,
+            200
+          ],
+          "variant": "donut"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "Categories tracked: 3"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

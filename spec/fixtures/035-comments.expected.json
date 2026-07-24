@@ -1,0 +1,30 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "statementId": "header",
+        "props": {
+          "title": "Comments"
+        }
+      },
+      {
+        "component": "TextContent",
+        "statementId": "body",
+        "props": {
+          "text": "visible text"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

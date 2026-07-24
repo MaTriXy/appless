@@ -1,0 +1,6 @@
+root = Card([
+  CardHeader("Inline reserved"),
+  Query("weather"),
+  Mutation("save"),
+  TextContent("Queries cannot be inline values")
+])

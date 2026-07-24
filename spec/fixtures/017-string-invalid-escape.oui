@@ -1,0 +1,5 @@
+root = Card([
+  CardHeader("Invalid escape fallback"),
+  TextContent("a\"b\\c\nd\te\u0041 \x!"),
+  TextContent("bad \q escape keeps \n and \t literal too")
+])

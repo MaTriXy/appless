@@ -1,0 +1,23 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "TextContent",
+        "props": {
+          "style": null,
+          "text": "Hot"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": true,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

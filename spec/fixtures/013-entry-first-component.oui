@@ -1,0 +1,2 @@
+title = "Standalone"
+header = CardHeader(title, "First component statement becomes the root")

@@ -1,0 +1,34 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "Invalid escape fallback"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "a\\\"b\\\\c\\nd\\te\\u0041 \\x!"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "bad \\q escape keeps \\n and \\t literal too"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

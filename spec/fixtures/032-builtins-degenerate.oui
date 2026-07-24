@@ -1,0 +1,10 @@
+root = Card([
+  CardHeader("Degenerate builtins"),
+  KVList([
+    {label: "count-of-string", value: "" + @Count("nope")},
+    {label: "sum-of-number", value: "" + @Sum(42)},
+    {label: "first-of-number", value: "" + @First(7)},
+    {label: "filter-of-number", value: "" + @Count(@Filter(5, "x", "==", 1))},
+    {label: "sort-of-string", value: "" + @Sort("abc", "x")}
+  ], "EDGE CASES")
+])

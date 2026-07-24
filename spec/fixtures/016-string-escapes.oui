@@ -1,0 +1,5 @@
+root = Card([
+  CardHeader("Escapes"),
+  TextContent("Line1\nLine2\tTabbed \"quoted\" back\\slash"),
+  TextContent("Unicode: \u0041\u00e9 slash: \/ bell-ish: \b\f\r end")
+])

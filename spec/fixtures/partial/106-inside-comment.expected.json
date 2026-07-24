@@ -1,0 +1,17 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": []
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [
+      "header"
+    ],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

@@ -1,0 +1,34 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "Escapes"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "Line1\nLine2\tTabbed \"quoted\" back\\slash"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "Unicode: Aé slash: / bell-ish: \b\f\r end"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

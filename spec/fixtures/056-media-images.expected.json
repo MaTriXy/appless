@@ -1,0 +1,55 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "ImageBlock",
+        "props": {
+          "caption": "Omakase night",
+          "src": "/api/img?q=sushi+platter&seed=3&w=800&h=440"
+        }
+      },
+      {
+        "component": "CardHeader",
+        "props": {
+          "subtitle": "Tokyo trip",
+          "title": "Gallery"
+        }
+      },
+      {
+        "component": "PhotoGrid",
+        "props": {
+          "images": [
+            {
+              "alt": "Street",
+              "src": "/api/img?q=tokyo+street&seed=1&w=400&h=400"
+            },
+            {
+              "alt": "Crossing",
+              "src": "/api/img?q=shibuya+crossing&seed=2&w=400&h=400"
+            },
+            {
+              "alt": "Ramen",
+              "src": "/api/img?q=ramen+bowl&seed=3&w=400&h=400"
+            }
+          ]
+        }
+      },
+      {
+        "component": "ImageBlock",
+        "props": {
+          "src": "https://example.com/direct.jpg"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

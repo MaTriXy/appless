@@ -1,0 +1,10 @@
+root = Card([
+  CardHeader("Deep links"),
+  Buttons([
+    Button("Open Music", Action([@OpenUrl("genos://open?app=music&request=Now+playing")]), "primary"),
+    Button("Toast", Action([@OpenUrl("genos://toast?text=Saved%20%E2%9C%93")])),
+    Button("Back", Action([@OpenUrl("genos://back")]), "tertiary"),
+    Button("Home", Action([@OpenUrl("genos://home")]), "tertiary"),
+    Button("Website", Action([@OpenUrl("https://example.com/docs")]))
+  ], "column")
+])

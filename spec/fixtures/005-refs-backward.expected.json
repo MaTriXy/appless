@@ -1,0 +1,31 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "statementId": "header",
+        "props": {
+          "subtitle": "Refs defined before root",
+          "title": "Backward"
+        }
+      },
+      {
+        "component": "TextContent",
+        "statementId": "body",
+        "props": {
+          "text": "The root statement comes last"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

@@ -1,0 +1,6 @@
+temp = 31
+verdict = temp > 30
+  ? "Hot outside"
+  : "Mild outside"
+nested = temp > 35 ? "scorching" : temp > 30 ? "hot" : "fine"
+root = Card([CardHeader("Ternary"), TextContent(verdict), TextContent(nested)])

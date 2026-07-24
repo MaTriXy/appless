@@ -1,0 +1,7 @@
+root = Card([
+  CardHeader("Dropped components"),
+  Toggle("Wi-Fi"),
+  MapView(),
+  BarChart(["Q1", "Q2"]),
+  TextContent("I survive")
+])

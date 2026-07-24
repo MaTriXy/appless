@@ -1,0 +1,46 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "Concat"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "Hello, Ada!"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "Null becomes empty: []"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "Number glue: 42"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "3 after numeric add"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

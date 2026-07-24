@@ -1,0 +1,8 @@
+root = Card([
+  CardHeader("Stocks"),
+  Tabs([
+    TabItem("Watchlist", [ListBlock([ListItem("ACME", "+2.4%", null, "$120.50")], "TODAY")]),
+    TabItem("News", [TextContent("Markets rallied on earnings", "default")]),
+    TabItem("Empty", [])
+  ])
+])

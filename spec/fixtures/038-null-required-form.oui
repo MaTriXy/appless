@@ -1,0 +1,6 @@
+root = Card([
+  CardHeader("Null required"),
+  Form("checkout", null),
+  Toggle("Dark mode", null),
+  TextContent("Still here")
+])

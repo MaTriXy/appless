@@ -1,0 +1,2 @@
+root = Card([loop])
+loop = Tabs([TabItem("Loop", [loop, TextContent("cycle stops here")])])

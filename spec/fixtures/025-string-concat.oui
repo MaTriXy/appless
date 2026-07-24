@@ -1,0 +1,9 @@
+name = "Ada"
+missing = null
+root = Card([
+  CardHeader("Concat"),
+  TextContent("Hello, " + name + "!"),
+  TextContent("Null becomes empty: [" + missing + "]"),
+  TextContent("Number glue: " + 4 + 2),
+  TextContent(1 + 2 + " after numeric add")
+])

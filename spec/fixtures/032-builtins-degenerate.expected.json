@@ -1,0 +1,50 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "Degenerate builtins"
+        }
+      },
+      {
+        "component": "KVList",
+        "props": {
+          "header": "EDGE CASES",
+          "rows": [
+            {
+              "label": "count-of-string",
+              "value": "0"
+            },
+            {
+              "label": "sum-of-number",
+              "value": "0"
+            },
+            {
+              "label": "first-of-number",
+              "value": ""
+            },
+            {
+              "label": "filter-of-number",
+              "value": "0"
+            },
+            {
+              "label": "sort-of-string",
+              "value": "abc"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

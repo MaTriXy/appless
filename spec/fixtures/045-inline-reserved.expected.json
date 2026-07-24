@@ -1,0 +1,43 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "Inline reserved"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "Queries cannot be inline values"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": [
+      {
+        "code": "inline-reserved",
+        "component": "Query",
+        "path": "",
+        "message": "Query() must be declared as a top-level statement, not used inline as a value",
+        "statementId": "root"
+      },
+      {
+        "code": "inline-reserved",
+        "component": "Mutation",
+        "path": "",
+        "message": "Mutation() must be declared as a top-level statement, not used inline as a value",
+        "statementId": "root"
+      }
+    ]
+  },
+  "state": {},
+  "runtimeErrors": []
+}

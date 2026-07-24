@@ -1,0 +1,11 @@
+root = Card([
+  CardHeader("Logic"),
+  KVList([
+    {label: "and", value: "" + (true && "right")},
+    {label: "and-short", value: "" + (0 && "never")},
+    {label: "or", value: "" + (false || "fallback")},
+    {label: "or-short", value: "" + ("kept" || "never")},
+    {label: "not", value: !false ? "true" : "false"},
+    {label: "neg", value: "" + (-(3 + 4))}
+  ], "RESULTS")
+])

@@ -1,0 +1,11 @@
+root = Card([
+  CardHeader("Comparisons"),
+  KVList([
+    {label: "5 == \"5\"", value: 5 == "5" ? "true" : "false"},
+    {label: "5 != \"5\"", value: 5 != "5" ? "true" : "false"},
+    {label: "gt", value: 3 > 2 ? "true" : "false"},
+    {label: "lt-string", value: "abc" < 2 ? "true" : "false"},
+    {label: "ge", value: 2 >= 2 ? "true" : "false"},
+    {label: "le", value: 2 <= 1 ? "true" : "false"}
+  ], "CHECKS")
+])

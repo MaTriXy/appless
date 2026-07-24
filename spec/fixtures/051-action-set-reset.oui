@@ -1,0 +1,11 @@
+$fahrenheit = 72
+root = Card([
+  CardHeader("Thermostat"),
+  HeroStat("" + $fahrenheit, "Target", "degrees"),
+  Buttons([
+    Button("Warmer", Action([@Set($fahrenheit, $fahrenheit + 1)]), "primary"),
+    Button("Cooler", Action([@Set($fahrenheit, $fahrenheit - 1)]), "secondary"),
+    Button("Reset", Action([@Reset($fahrenheit)]), "tertiary"),
+    Button("Save", Action([@Set($fahrenheit, 68), @ToAssistant("Save thermostat settings")]))
+  ])
+])

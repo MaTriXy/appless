@@ -1,0 +1,43 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "Null required"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "Still here"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": [
+      {
+        "code": "null-required",
+        "component": "Form",
+        "path": "/buttons",
+        "message": "required field \"buttons\" cannot be null",
+        "statementId": "root"
+      },
+      {
+        "code": "null-required",
+        "component": "Toggle",
+        "path": "/on",
+        "message": "required field \"on\" cannot be null",
+        "statementId": "root"
+      }
+    ]
+  },
+  "state": {},
+  "runtimeErrors": []
+}

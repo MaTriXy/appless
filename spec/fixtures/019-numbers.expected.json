@@ -1,0 +1,64 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "Numbers"
+        }
+      },
+      {
+        "component": "KVList",
+        "props": {
+          "header": "LITERALS",
+          "rows": [
+            {
+              "label": "int",
+              "value": 42
+            },
+            {
+              "label": "negative",
+              "value": -17
+            },
+            {
+              "label": "decimal",
+              "value": 3.5
+            },
+            {
+              "label": "exponent",
+              "value": 125
+            },
+            {
+              "label": "neg-exponent",
+              "value": 0.01
+            },
+            {
+              "label": "zero",
+              "value": 0
+            }
+          ]
+        }
+      },
+      {
+        "component": "Slider",
+        "props": {
+          "max": 99.5,
+          "min": -10,
+          "name": "amount",
+          "step": 0.5,
+          "variant": "continuous"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

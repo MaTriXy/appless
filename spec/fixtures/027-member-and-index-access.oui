@@ -1,0 +1,10 @@
+profile = {name: "Ada", stats: {wins: 12, losses: 3}}
+nums = [10, 20, 30]
+root = Card([
+  CardHeader(profile.name),
+  TextContent("Wins: " + profile.stats.wins),
+  TextContent("First: " + nums[0] + ", third: " + nums[2]),
+  TextContent("Length: " + nums.length),
+  TextContent("By key: " + profile["name"]),
+  TextContent("Null-safe: " + profile.missing)
+])

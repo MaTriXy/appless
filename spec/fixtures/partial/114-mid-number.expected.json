@@ -1,0 +1,27 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "Slider",
+        "props": {
+          "max": {
+            "$number": "NaN"
+          },
+          "min": 0,
+          "name": "n",
+          "variant": "continuous"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": true,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

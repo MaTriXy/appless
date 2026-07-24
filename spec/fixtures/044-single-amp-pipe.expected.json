@@ -1,0 +1,34 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "Lexer hazards"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "and-false"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "fallback"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

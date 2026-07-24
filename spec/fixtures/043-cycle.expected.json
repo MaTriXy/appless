@@ -1,0 +1,40 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "Tabs",
+        "statementId": "loop",
+        "props": {
+          "items": [
+            {
+              "component": "TabItem",
+              "props": {
+                "label": "Loop"
+              },
+              "children": [
+                {
+                  "component": "TextContent",
+                  "props": {
+                    "text": "cycle stops here"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [
+      "loop"
+    ],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

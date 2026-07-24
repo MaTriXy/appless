@@ -1,0 +1,50 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "Dropped components"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "I survive"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": [
+      {
+        "code": "missing-required",
+        "component": "Toggle",
+        "path": "/on",
+        "message": "missing required field \"on\"",
+        "statementId": "root"
+      },
+      {
+        "code": "missing-required",
+        "component": "MapView",
+        "path": "/placeName",
+        "message": "missing required field \"placeName\"",
+        "statementId": "root"
+      },
+      {
+        "code": "missing-required",
+        "component": "BarChart",
+        "path": "/series",
+        "message": "missing required field \"series\"",
+        "statementId": "root"
+      }
+    ]
+  },
+  "state": {},
+  "runtimeErrors": []
+}
