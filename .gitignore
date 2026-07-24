@@ -36,9 +36,10 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
-# generated native folders
-/ios
-/android
+# Native apps are first-class source (docs/NATIVE_MIGRATION_PLAN.md) - do not
+# ignore /ios and /android. Expo Go is used for the RN reference app, so
+# `expo prebuild` output never lands here; build artifacts are ignored by the
+# per-package .gitignore files (e.g. ios/Packages/*/.build).
 
 # local env (contains API keys)
 .env

@@ -1,0 +1,53 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "Duck-typed rows"
+        }
+      },
+      {
+        "component": "KVList",
+        "props": {
+          "header": "META",
+          "rows": [
+            {
+              "$ast": {
+                "k": "a",
+                "v": 1
+              }
+            },
+            {
+              "label": "plain",
+              "value": "row"
+            }
+          ]
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "n=42"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {
+    "$meta": {
+      "$ast": {
+        "k": "state-tag",
+        "n": 42
+      }
+    }
+  },
+  "runtimeErrors": []
+}

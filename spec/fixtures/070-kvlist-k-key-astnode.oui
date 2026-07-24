@@ -1,0 +1,9 @@
+# A plain data object whose `k` entry is a string is duck-typed as an AST
+# node by the serializer (isAstNode) and wrapped as {"$ast": ...} — both in
+# props (KVList row) and in state declarations.
+$meta = {k: "state-tag", n: 42}
+root = Card([
+  CardHeader("Duck-typed rows"),
+  KVList([{k: "a", v: 1}, {label: "plain", value: "row"}], "META"),
+  TextContent("n=" + $meta.n)
+])
