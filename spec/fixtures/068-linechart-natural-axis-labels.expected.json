@@ -1,0 +1,52 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "subtitle": "H1 2026",
+          "title": "Revenue"
+        }
+      },
+      {
+        "component": "LineChart",
+        "props": {
+          "labels": [
+            "Mar",
+            "Apr",
+            "May",
+            "Jun"
+          ],
+          "series": [
+            {
+              "component": "Series",
+              "statementId": "rev",
+              "props": {
+                "category": "Revenue",
+                "values": [
+                  1180,
+                  1420,
+                  1390,
+                  1610
+                ]
+              }
+            }
+          ],
+          "variant": "natural",
+          "xLabel": "Month",
+          "yLabel": "USD"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

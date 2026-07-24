@@ -1,0 +1,61 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "Sales by region"
+        }
+      },
+      {
+        "component": "HorizontalBarChart",
+        "props": {
+          "labels": [
+            "North",
+            "Central",
+            "South"
+          ],
+          "series": [
+            {
+              "component": "Series",
+              "statementId": "online",
+              "props": {
+                "category": "Online",
+                "values": [
+                  42,
+                  31,
+                  18
+                ]
+              }
+            },
+            {
+              "component": "Series",
+              "statementId": "retail",
+              "props": {
+                "category": "Retail",
+                "values": [
+                  25,
+                  29,
+                  12
+                ]
+              }
+            }
+          ],
+          "variant": "stacked",
+          "xLabel": "Region",
+          "yLabel": "Units"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

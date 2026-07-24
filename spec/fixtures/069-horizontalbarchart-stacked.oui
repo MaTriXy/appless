@@ -1,0 +1,6 @@
+online = Series("Online", [42, 31, 18])
+retail = Series("Retail", [25, 29, 12])
+root = Card([
+  CardHeader("Sales by region"),
+  HorizontalBarChart(["North", "Central", "South"], [online, retail], "Region", "Units", "stacked")
+])

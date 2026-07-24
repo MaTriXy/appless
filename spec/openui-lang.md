@@ -684,7 +684,11 @@ non-genos URL → null. *Source: GenOS.tsx.*
 
 Only srcs starting with `/api/img` are semantic; anything else passes through
 untouched. Query parsing: split on `&`, first-`=` split, values
-`decodeURIComponent`ed (raw on failure), keys not decoded.
+`decodeURIComponent`ed (raw on failure), keys not decoded. Unlike
+`parseGenosUrl` (§11.4), a key-only pair with no `=` is **skipped entirely**
+(`indexOf("=") === -1` → `continue`), not mapped to `""` — e.g. in
+`/api/img?q&seed=2`, `q` is absent from the params and defaults apply.
+**[verified]**
 
 - `q`: default `"abstract gradient"`; `+`→space; strip everything but
   `[a-zA-Z0-9, -]`; trim. (So `caf%C3%A9 "neon"!` → `caf neon`.) **[verified]**

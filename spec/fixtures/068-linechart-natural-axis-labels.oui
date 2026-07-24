@@ -1,0 +1,5 @@
+rev = Series("Revenue", [1180, 1420, 1390, 1610])
+root = Card([
+  CardHeader("Revenue", "H1 2026"),
+  LineChart(["Mar", "Apr", "May", "Jun"], [rev], "Month", "USD", "natural")
+])

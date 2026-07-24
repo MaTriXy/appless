@@ -1,0 +1,9 @@
+root = Card([
+  CardHeader("Support", "Case #4821"),
+  Bubbles([
+    {text: "My order hasn't arrived yet"},
+    {text: "Sorry about that - checking now", time: "10:02"},
+    {text: "Thanks!", me: true},
+    {text: "It ships tomorrow morning", me: false, time: "10:05"}
+  ])
+])

@@ -1,0 +1,46 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "subtitle": "Case #4821",
+          "title": "Support"
+        }
+      },
+      {
+        "component": "Bubbles",
+        "props": {
+          "messages": [
+            {
+              "text": "My order hasn't arrived yet"
+            },
+            {
+              "text": "Sorry about that - checking now",
+              "time": "10:02"
+            },
+            {
+              "me": true,
+              "text": "Thanks!"
+            },
+            {
+              "me": false,
+              "text": "It ships tomorrow morning",
+              "time": "10:05"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

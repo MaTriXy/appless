@@ -1,0 +1,52 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "subtitle": "This week",
+          "title": "Running"
+        }
+      },
+      {
+        "component": "AreaChart",
+        "props": {
+          "labels": [
+            "Mon",
+            "Tue",
+            "Wed",
+            "Thu"
+          ],
+          "series": [
+            {
+              "component": "Series",
+              "statementId": "dist",
+              "props": {
+                "category": "Distance",
+                "values": [
+                  3.2,
+                  0,
+                  5.1,
+                  4.4
+                ]
+              }
+            }
+          ],
+          "variant": "step",
+          "xLabel": "Day",
+          "yLabel": "km"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

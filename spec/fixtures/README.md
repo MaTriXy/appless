@@ -14,7 +14,7 @@ contract: [`../contract/genos.schema.json`](../contract/genos.schema.json)
 
 ```
 spec/fixtures/
-├── NNN-name.oui            complete-program fixtures (001–064)
+├── NNN-name.oui            complete-program fixtures (001–069)
 ├── NNN-name.expected.json  GENERATED — never edit by hand
 ├── partial/                prefix-truncated streaming snapshots (101–115)
 │   ├── NNN-name.oui        NO trailing newline — the cut point is the last byte
@@ -144,6 +144,7 @@ Notes for implementers:
 | 052–061 | component deep-dives: lists/toggles/KVList, stats, cartesian charts + Series, PieChart, media, Bubbles/Chips, Tabs/TabItem, MapView, full Form, `$bindings` on every input type |
 | 062–063 | `@OS` command responses → empty program (`root: null`), incl. fenced |
 | 064 | kitchen sink: realistic screen combining most of the surface |
+| 065–069 | single-fixture-component hardening: ImageBlock explicit `null` caption vs omitted; Bubbles messages with `me`/`time` omitted per-message; AreaChart `"step"` + single series; LineChart `"natural"` + xLabel/yLabel; HorizontalBarChart `"stacked"`. All five positional args are passed on the charts, so the `variant` **prop** is actually populated (in 054 the 3rd positional lands in `xLabel` — contract order is labels, series, xLabel, yLabel, variant) |
 | partial/101–115 | streaming snapshots: cut mid-string, mid-call, mid-array, before root, mid-escape (lone `\`), inside a comment, partial/unclosed fence, mid-object, mid-ternary, mid-statement-name, pending duplicate id (ignored), mid-action message, mid-number exponent (NaN), comment-with-apostrophe glue hazard |
 
 ## Coverage matrix (33 contract components × fixtures)
@@ -153,8 +154,8 @@ its **dropping** rules (e.g. Toggle in 037 is dropped with `missing-required`).
 
 | Component | Fixtures |
 |---|---|
-| Card | 001–010, 012, 016–064 (all but 011, 013–015, 062–063), p101–p103, p105, p106, p108–p115 |
-| CardHeader | 001–007, 009–013, 016–035, 037–040, 042, 044–061, 064, p101–p103, p108, p115 |
+| Card | 001–010, 012, 016–061, 064–069 (all but 011, 013–015, 062–063), p101–p103, p105, p106, p108–p115 |
+| CardHeader | 001–007, 009–013, 016–035, 037–040, 042, 044–061, 064–069, p101–p103, p108, p115 |
 | TextContent | 003, 005, 006, 008, 010, 012, 016–018, 020, 024, 025, 027, 028, 030, 033–035, 037–039, 041, 043–047, 058, p105, p110, p112 |
 | TextCallout | 004, 064 |
 | ListItem | 007, 030, 031, 036, 048, 050, 052, 058, 059, 064, p103, p115 |
@@ -163,19 +164,19 @@ its **dropping** rules (e.g. Toggle in 037 is dropped with `missing-required`).
 | KVList | 019, 021, 022, 023, 026, 029, 032, 042, 052 |
 | HeroStat | 040, 051, 053, 064 |
 | StatTiles | 053, 064, p109 |
-| ImageBlock | 056 |
+| ImageBlock | 056, 065 (explicit `null` caption vs omitted) |
 | PhotoGrid | 056, 064 |
-| Bubbles | 057 |
+| Bubbles | 057, 066 (messages with `me`/`time` omitted) |
 | Chips | 057, 064 |
 | TabItem | 043, 058 |
 | Tabs | 043, 058 |
 | MapView | 037, 059, 064 |
 | BarChart | 037, 054, 064 |
-| LineChart | 054 |
-| AreaChart | 054 |
+| LineChart | 054, 068 (`variant: "natural"` + xLabel/yLabel) |
+| AreaChart | 054, 067 (`variant: "step"`, single series) |
 | PieChart | 028, 055 |
-| HorizontalBarChart | 054 |
-| Series | 054, 064 |
+| HorizontalBarChart | 054, 069 (`variant: "stacked"`) |
+| Series | 054, 064, 067–069 |
 | Form | 033, 038, 060, 061 |
 | FormControl | 033, 060, 061 |
 | Input | 033, 060, 061 |

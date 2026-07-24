@@ -1,0 +1,12 @@
+Example 2 - a media-first screen (hero image, chips, thumbnail rows, standalone button):
+
+root = Card([hero, chips, title, list, cta])
+hero = ImageBlock("/api/img?q=sushi+platter&seed=1&w=800&h=440", "Tonight's pick: Sakura Sushi")
+chips = Chips(["All", "Sushi", "Pizza", "Thai", "Under 30 min"])
+title = TextContent("Popular near you", "large-heavy")
+list = ListBlock([r1, r2, r3])
+r1 = ListItem("Sakura Sushi", "4.8 ★ · 25 min · $$", {src: "/api/img?q=sushi&seed=2&w=200&h=200", alt: "Sakura Sushi"}, null, Action([@ToAssistant("Open the Sakura Sushi restaurant screen: hero photo, a KVList of rating, delivery time and minimum order, and a menu list of 6 dishes with prices")]))
+r2 = ListItem("Napoli Slice", "4.6 ★ · 18 min · $", {src: "/api/img?q=pizza&seed=3&w=200&h=200", alt: "Napoli Slice"}, null, Action([@ToAssistant("Open the Napoli Slice restaurant screen: hero photo, rating KVList, and a menu list of 6 pizzas with prices")]))
+r3 = ListItem("Bangkok Bowl", "4.7 ★ · 30 min · $$", {src: "/api/img?q=thai+curry&seed=4&w=200&h=200", alt: "Bangkok Bowl"}, null, Action([@ToAssistant("Open the Bangkok Bowl restaurant screen: hero photo, rating KVList, and a menu list of 6 Thai dishes with prices")]))
+cta = Buttons([track])
+track = Button("Track current order", Action([@ToAssistant("Open the order tracking screen: courier row with photo, ETA HeroStat, a MapView of the delivery route, and a KVList order summary")]), "secondary")

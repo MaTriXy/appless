@@ -1,0 +1,35 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "Wallpapers"
+        }
+      },
+      {
+        "component": "ImageBlock",
+        "props": {
+          "caption": null,
+          "src": "/api/img?q=mountain+dawn&seed=7&w=800&h=440"
+        }
+      },
+      {
+        "component": "ImageBlock",
+        "props": {
+          "src": "/api/img?q=ocean+wave&seed=8&w=800&h=440"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

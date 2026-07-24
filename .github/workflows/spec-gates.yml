@@ -1,0 +1,77 @@
+# Phase 0 spec gates — keep spec/ (grammar, fixtures, contract schema, prompt)
+# in lockstep with the RN reference implementation.
+#
+# Gates:
+#   1. Fixture generator: patch applies, expected trees regenerate
+#      deterministically, tests pass, committed trees are fresh.
+#   2. Contract schema: spec/contract/genos.schema.json matches contract.tsx.
+#   3. Prompt: spec/prompt/ assembles BYTE-IDENTICAL to the shipped
+#      SYSTEM_PROMPT (Phase 0 exit criterion, docs/NATIVE_MIGRATION_PLAN.md §9).
+#   4. Fixture pairing: every .oui has a valid-JSON .expected.json twin,
+#      corpus size floors hold (>=60 complete, >=12 partial).
+name: spec-gates
+
+on:
+  push:
+    paths:
+      - "spec/**"
+      - "patches/**"
+      - ".github/workflows/spec-gates.yml"
+  pull_request:
+    paths:
+      - "spec/**"
+      - "patches/**"
+      - ".github/workflows/spec-gates.yml"
+
+jobs:
+  spec-gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: spec/fixtures/generator/package-lock.json
+
+      - name: Fixture generator — install (applies + verifies react-lang patch)
+        working-directory: spec/fixtures/generator
+        run: npm ci
+
+      - name: Fixture generator — regenerate + test
+        working-directory: spec/fixtures/generator
+        run: |
+          npm run generate
+          npm test
+
+      - name: Fixtures — committed expected trees are fresh
+        run: git diff --exit-code spec/fixtures
+
+      - name: Contract schema — regenerate and verify committed
+        run: |
+          node spec/contract/export-schema.mjs
+          git diff --exit-code spec/contract/genos.schema.json
+
+      - name: Prompt — spec assembly is byte-identical to shipped SYSTEM_PROMPT
+        run: node spec/prompt/check-prompt.mjs
+
+      - name: Fixtures — pairing + corpus floors
+        run: |
+          set -euo pipefail
+          total=0
+          partial=0
+          shopt -s nullglob
+          for oui in spec/fixtures/*.oui spec/fixtures/partial/*.oui; do
+            expected="${oui%.oui}.expected.json"
+            if [ ! -f "$expected" ]; then
+              echo "MISSING expected tree for $oui"; exit 1
+            fi
+            node -e "JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'))" "$expected" \
+              || { echo "INVALID JSON: $expected"; exit 1; }
+            total=$((total + 1))
+            case "$oui" in spec/fixtures/partial/*) partial=$((partial + 1));; esac
+          done
+          echo "fixtures: $total total, $partial partial"
+          [ "$total" -ge 60 ] || { echo "corpus too small: $total < 60"; exit 1; }
+          [ "$partial" -ge 12 ] || { echo "partial corpus too small: $partial < 12"; exit 1; }

@@ -1,0 +1,13 @@
+Example 3 - a dashboard screen (hero stat, stat tiles, one chart, list):
+
+root = Card([header, balance, tiles, chart, txTitle, txs])
+header = CardHeader("Wallet", "Personal · ··4821")
+balance = HeroStat("$8,427.50", "AVAILABLE BALANCE", "+$1,204 vs last month")
+tiles = StatTiles([{label: "Spent", value: "$2,318", delta: "-12%", icon: "arrow-down-right"}, {label: "Saved", value: "$940", delta: "+8%", icon: "piggy-bank"}])
+chart = AreaChart(["Feb", "Mar", "Apr", "May", "Jun", "Jul"], [spend], "natural")
+spend = Series("Spending", [2100, 1890, 2480, 2210, 1975, 2318])
+txTitle = TextContent("Recent activity", "large-heavy")
+txs = ListBlock([t1, t2, t3])
+t1 = ListItem("Blue Tokai Coffee", "Today, 9:12 AM", "coffee", "-$6.40", Action([@ToAssistant("Open the Blue Tokai Coffee transaction detail screen: amount HeroStat, a KVList of merchant, category, card and status, and a small MapView of the store location")]))
+t2 = ListItem("Salary - Meridian Labs", "Jul 1", "banknote", "+$5,200", Action([@ToAssistant("Open the salary transaction detail screen: amount HeroStat and a KVList of employer, account and date")]))
+t3 = ListItem("Spotify Premium", "Jun 29", "music", "-$9.99", Action([@ToAssistant("Open the Spotify subscription screen: plan KVList, a bar chart of monthly music spending, and a cancel button")]))

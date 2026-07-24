@@ -1,0 +1,54 @@
+## Component Signatures
+
+Arguments marked with ? are optional. Sub-components can be inline or referenced; prefer references for better streaming.
+Props typed `ActionExpression` accept an Action([@steps...]) expression. See the Action section for available steps (@ToAssistant, @OpenUrl).
+Props marked `$binding<type>` accept a `$variable` reference for two-way binding.
+
+### Structure
+Card(children: (CardHeader | TextContent | TextCallout | ListBlock | KVList | HeroStat | StatTiles | ImageBlock | PhotoGrid | Bubbles | Chips | Tabs | MapView | BarChart | LineChart | AreaChart | PieChart | HorizontalBarChart | Form | Buttons)[]) - Root of every screen - children stack vertically like a scrolling phone app.
+CardHeader(title: string, subtitle?: string) - Screen header with an iOS large title and an optional subtitle line above it
+TextContent(text: string, style?: "small" | "default" | "large" | "small-heavy" | "large-heavy") - Text block. style: 'large-heavy' section titles · 'default' body · 'small' footnotes · '-heavy' = bold
+TextCallout(variant: "neutral" | "info" | "success" | "warning" | "danger", title: string, description?: string) - iOS notification-style banner for alerts, tips and status messages
+Most screens start with CardHeader(title, subtitle?). Media-first screens (players, galleries, food) may start with ImageBlock instead.
+
+### Lists
+ListBlock(items: (ListItem | Toggle)[], header?: string) - iOS inset grouped list - the core app navigation surface. items: ListItem and Toggle rows. header: small uppercase section label above the group.
+ListItem(title: string, subtitle?: string, leading?: string | {src: string, alt?: string}, trailing?: string, action?: ActionExpression) - Tappable iOS list row. leading: an icon name ("wifi", "credit-card") shown as a colored badge, OR {src, alt} for a thumbnail image. trailing: small value text on the right ("82%", "4:32 PM", "$12.99"). Rows with an action get a chevron.
+Toggle(title: string, on: boolean, icon?: string, subtitle?: string) - iOS switch row for settings screens - flips instantly on tap, no round trip. icon: optional icon name badge.
+KVList(rows: {label: string, value: string}[], header?: string) - Compact label/value details group (order summary, flight details, nutrition facts, profile fields).
+ListBlock + ListItem rows are the core app navigation pattern - most screens should have one.
+Toggle rows are for settings switches; they flip locally without an action.
+
+### Stats & Charts
+HeroStat(value: string, label?: string, sublabel?: string) - One huge centered number - the screen's headline stat (temperature "23°", balance "$4,820", steps "12,480").
+StatTiles(items: {label: string, value: string, delta?: string, icon?: string}[]) - Grid of 2-4 KPI tiles: {label, value, delta?, icon?}. delta strings starting with "+" render green, "-" red.
+BarChart(labels: string[], series: Series[], variant?: "grouped" | "stacked", xLabel?: string, yLabel?: string) - Vertical bars; use for comparing values across categories with one or more series
+LineChart(labels: string[], series: Series[], variant?: "linear" | "natural" | "step", xLabel?: string, yLabel?: string) - Lines over categories; use for trends and continuous data over time
+AreaChart(labels: string[], series: Series[], variant?: "linear" | "natural" | "step", xLabel?: string, yLabel?: string) - Filled area under lines; use for cumulative totals or volume trends over time
+PieChart(labels: string[], values: number[], variant?: "pie" | "donut", appearance?: "circular" | "semiCircular") - Circular slices; use plucked arrays: PieChart(data.categories, data.values)
+HorizontalBarChart(labels: string[], series: Series[], variant?: "grouped" | "stacked", xLabel?: string, yLabel?: string) - Horizontal bars; prefer when category labels are long or for ranked lists
+Series(category: string, values: number[]) - One data series
+Dashboards read best as: HeroStat or StatTiles first, then ONE chart, then a ListBlock of items.
+
+### Media & Social
+ImageBlock(src: string, caption?: string) - Full-width hero image with rounded corners; caption overlays the bottom on a gradient.
+PhotoGrid(images: {src: string, alt?: string}[]) - 3-column photo grid of {src, alt} images - galleries, memories, product shots.
+Bubbles(messages: {text: string, me?: boolean, time?: string}[]) - iMessage-style conversation thread: {text, me?, time?}. me:true = my blue bubble on the right; others gray on the left.
+Chips(labels: string[]) - Horizontal filter/category pills. LIVE: tapping a chip regenerates the screen filtered to it - no action prop needed. Put the currently-active category first.
+Tabs(items: TabItem[]) - iOS segmented control that switches between TabItem contents instantly (no round trip).
+TabItem(label: string, children: any[]) - One tab: label + the content shown when selected.
+MapView(placeName: string, zoom?: number) - REAL interactive map centered on a place with a marker. placeName: specific place or area, e.g. "Sakura Sushi, Indiranagar, Bengaluru". zoom: 12 = city, 15 = neighborhood (default), 17 = street.
+MapView is a REAL map - use it on location screens (nearby, route, delivery tracking).
+
+### Forms & Buttons
+Form(name: string, buttons: Buttons, fields?: FormControl[]) - Form container with fields and explicit action buttons
+FormControl(label: string, input: Input | TextArea | Select | DatePicker | Slider, hint?: string) - Field with label, input component, and optional hint text
+Input(name: string, placeholder?: string, type?: "text" | "email" | "password" | "number" | "url", rules?: {required?: boolean, email?: boolean, url?: boolean, numeric?: boolean, min?: number, max?: number, minLength?: number, maxLength?: number, pattern?: string}, value?: $binding<string>)
+TextArea(name: string, placeholder?: string, rows?: number, rules?: {required?: boolean, email?: boolean, url?: boolean, numeric?: boolean, min?: number, max?: number, minLength?: number, maxLength?: number, pattern?: string}, value?: $binding<string>)
+Select(name: string, items: SelectItem[], placeholder?: string, rules?: {required?: boolean, email?: boolean, url?: boolean, numeric?: boolean, min?: number, max?: number, minLength?: number, maxLength?: number, pattern?: string}, value?: $binding<string>, size?: "small" | "medium" | "large")
+SelectItem(value: string, label: string) - Option for Select
+DatePicker(name: string, mode?: "single" | "range", rules?: {required?: boolean, email?: boolean, url?: boolean, numeric?: boolean, min?: number, max?: number, minLength?: number, maxLength?: number, pattern?: string}, value?: $binding<any>)
+Slider(name: string, variant: "continuous" | "discrete", min: number, max: number, step?: number, defaultValue?: number[], label?: string, rules?: {required?: boolean, email?: boolean, url?: boolean, numeric?: boolean, min?: number, max?: number, minLength?: number, maxLength?: number, pattern?: string}, value?: $binding<number[]>) - Numeric slider input; supports continuous and discrete (stepped) variants
+Buttons(buttons: Button[], direction?: "row" | "column") - Group of Button components. direction: "row" (default) | "column".
+Button(label: string, action?: ActionExpression, variant?: "primary" | "secondary" | "tertiary", type?: "normal" | "destructive", size?: "extra-small" | "small" | "medium" | "large") - Clickable button
+Form ONLY for input screens (compose, checkout, search, booking). Buttons/Button also work standalone outside forms.

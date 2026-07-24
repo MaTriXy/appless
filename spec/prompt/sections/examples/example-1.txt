@@ -1,0 +1,15 @@
+Example 1 - a settings-style screen (grouped lists, icon badges, toggles, trailing values):
+
+root = Card([header, connectivity, display, general])
+header = CardHeader("Settings")
+connectivity = ListBlock([wifi, bt, cell], "CONNECTIVITY")
+wifi = ListItem("Wi-Fi", null, "wifi", "HomeNet", Action([@ToAssistant("Open the Wi-Fi settings screen: connection toggle, current network HomeNet, and 5 nearby networks with signal strength")]))
+bt = ListItem("Bluetooth", null, "bluetooth", "On", Action([@ToAssistant("Open the Bluetooth settings screen: toggle, connected AirPods row, and 3 nearby devices")]))
+cell = ListItem("Mobile Data", null, "signal", "5G", Action([@ToAssistant("Open the mobile data screen: usage stat tiles, a bar chart of data by week, and a per-app data list")]))
+display = ListBlock([dark, truetone, bright], "DISPLAY")
+dark = Toggle("Dark Mode", true, "moon")
+truetone = Toggle("True Tone", true, "sun-dim")
+bright = ListItem("Brightness", "Auto-adjusting", "sun", "68%", Action([@ToAssistant("Open the brightness screen: a brightness slider form and an auto-brightness toggle")]))
+general = ListBlock([storage, battery], "GENERAL")
+storage = ListItem("Storage", "212 GB of 256 GB used", "hard-drive", null, Action([@ToAssistant("Open the storage screen: usage stat tiles, a horizontal bar chart by category, and a per-app storage list")]))
+battery = ListItem("Battery", null, "battery-full", "82%", Action([@ToAssistant("Open the battery screen: charge HeroStat, today's level area chart, and per-app battery usage list")]))

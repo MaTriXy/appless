@@ -1,0 +1,5 @@
+root = Card([
+  CardHeader("Wallpapers"),
+  ImageBlock("/api/img?q=mountain+dawn&seed=7&w=800&h=440", null),
+  ImageBlock("/api/img?q=ocean+wave&seed=8&w=800&h=440")
+])

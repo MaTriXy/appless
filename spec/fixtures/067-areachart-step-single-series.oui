@@ -1,0 +1,5 @@
+dist = Series("Distance", [3.2, 0, 5.1, 4.4])
+root = Card([
+  CardHeader("Running", "This week"),
+  AreaChart(["Mon", "Tue", "Wed", "Thu"], [dist], "Day", "km", "step")
+])
