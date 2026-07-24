@@ -12,23 +12,27 @@ struct RawStatement {
 
 /// Result of `autoClose`.
 struct AutoCloseResult {
-    let text: [Character]
+    let text: [UInt16]
     let wasIncomplete: Bool
 }
 
 /// Auto-close unclosed strings and brackets so partial/streaming input can be
 /// parsed without syntax errors. Port of `statements.js` `autoClose`
 /// (spec/openui-lang.md §7 auto-closing).
-func autoClose(_ input: [Character]) -> AutoCloseResult {
-    var stack: [Character] = []
-    var inStr: Character? = nil
+///
+/// Scans UTF-16 code units like the JS reference — a combining mark straight
+/// after a closing quote/bracket must NOT hide it (it would glue into the
+/// same grapheme cluster under `[Character]` scanning).
+func autoClose(_ input: [UInt16]) -> AutoCloseResult {
+    var stack: [UInt16] = []
+    var inStr: UInt16? = nil
     var esc = false
     for c in input {
         if esc {
             esc = false
             continue
         }
-        if c == "\\" && inStr != nil {
+        if c == ascii16("\\") && inStr != nil {
             esc = true
             continue
         }
@@ -36,17 +40,17 @@ func autoClose(_ input: [Character]) -> AutoCloseResult {
             if c == q { inStr = nil }
             continue
         }
-        if c == "\"" || c == "'" {
+        if c == ascii16("\"") || c == ascii16("'") {
             inStr = c
             continue
         }
-        if c == "(" || c == "[" || c == "{" {
+        if c == ascii16("(") || c == ascii16("[") || c == ascii16("{") {
             stack.append(c)
-        } else if c == ")" && stack.last == "(" {
+        } else if c == ascii16(")") && stack.last == ascii16("(") {
             stack.removeLast()
-        } else if c == "]" && stack.last == "[" {
+        } else if c == ascii16("]") && stack.last == ascii16("[") {
             stack.removeLast()
-        } else if c == "}" && stack.last == "{" {
+        } else if c == ascii16("}") && stack.last == ascii16("{") {
             stack.removeLast()
         }
     }
@@ -56,11 +60,13 @@ func autoClose(_ input: [Character]) -> AutoCloseResult {
     }
     var out = input
     if let q = inStr {
-        if esc { out.append("\\") }
+        if esc { out.append(ascii16("\\")) }
         out.append(q) // close with matching quote
     }
     for c in stack.reversed() {
-        out.append(c == "(" ? ")" : (c == "[" ? "]" : "}"))
+        out.append(
+            c == ascii16("(")
+                ? ascii16(")") : (c == ascii16("[") ? ascii16("]") : ascii16("}")))
     }
     return AutoCloseResult(text: out, wasIncomplete: true)
 }

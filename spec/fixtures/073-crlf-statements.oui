@@ -1,0 +1,8 @@
+root = Card([hdr, body, tail])
+hdr = CardHeader("CRLF lines")
+$n =42
+body = TextContent("count: " + $n)
+verdict = $n > 10
+ ? "big"
+ : "small"
+tail = TextContent(verdict)

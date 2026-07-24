@@ -117,6 +117,9 @@ func jsNumberToString(_ d: Double) -> String {
 }
 
 /// JS `Number(string)` semantics. Returns NaN for non-numeric strings.
+/// KNOWN-DEVIATION (README.md #7): the ES StrWhiteSpace set includes all of
+/// category Zs (covered via `whitespacesAndNewlines`) but NOT U+0085 NEL,
+/// which `whitespacesAndNewlines` adds — the port over-trims U+0085.
 func jsStringToNumber(_ s: String) -> Double {
     let jsWhitespace = CharacterSet(charactersIn: " \t\n\r\u{0B}\u{0C}\u{A0}\u{FEFF}")
         .union(.whitespacesAndNewlines)

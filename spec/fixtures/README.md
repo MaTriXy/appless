@@ -14,7 +14,7 @@ contract: [`../contract/genos.schema.json`](../contract/genos.schema.json)
 
 ```
 spec/fixtures/
-├── NNN-name.oui            complete-program fixtures (001–072)
+├── NNN-name.oui            complete-program fixtures (001–074)
 ├── NNN-name.expected.json  GENERATED — never edit by hand
 ├── partial/                prefix-truncated streaming snapshots (101–115)
 │   ├── NNN-name.oui        NO trailing newline — the cut point is the last byte

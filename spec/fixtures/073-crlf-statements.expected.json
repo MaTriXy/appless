@@ -1,0 +1,39 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "statementId": "hdr",
+        "props": {
+          "title": "CRLF lines"
+        }
+      },
+      {
+        "component": "TextContent",
+        "statementId": "body",
+        "props": {
+          "text": "count: 42"
+        }
+      },
+      {
+        "component": "TextContent",
+        "statementId": "tail",
+        "props": {
+          "text": "big"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {
+    "$n": 42
+  },
+  "runtimeErrors": []
+}

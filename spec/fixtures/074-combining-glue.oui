@@ -1,0 +1,5 @@
+root = Card([hdr, num, tail])
+hdr = CardHeader("glue"́ + "-mark")
+$n = 12́34
+num = TextContent("n: " + $n)
+tail = TextContent("end")́

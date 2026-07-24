@@ -2,8 +2,9 @@
 
 Swift port of the `@openuidev/lang-core` openui-lang parser + runtime
 evaluator, oracle-verified byte-for-byte against the JS reference
-implementation over the golden fixture corpus in `spec/fixtures/` (87
-fixtures) plus multi-`set()` streaming scenarios.
+implementation over the golden fixture corpus in `spec/fixtures/` (89
+fixtures) plus multi-`set()` streaming scenarios and differential probe
+sweeps (CRLF chunking, combining-mark adjacency).
 
 - Normative spec: `spec/openui-lang.md`
 - JS reference: `spec/fixtures/generator/node_modules/@openuidev/lang-core/dist`
@@ -85,8 +86,38 @@ current fixture corpus; each is listed with the condition under which it
    IS replicated in `Pipeline.convertValue`; only the runtime-evaluation
    collision for the 18 exact kind strings is not.
 
+7. **`trim()` / `Number()` whitespace sets over-include U+0085 NEL**
+   (`Preprocess.swift`, `jsTrim`/`jsTrimEnd`; `RuntimeValue.swift`,
+   `jsStringToNumber`). JS `String.prototype.trim()` strips exactly
+   *WhiteSpace* + *LineTerminator* (TAB, VT, FF, SP, NBSP, ZWNBSP/U+FEFF,
+   category Zs, LF, CR, LS, PS) — U+0085 NEXT LINE is **not** in that set.
+   ECMAScript `Number(string)`'s *StrWhiteSpace* is the same set (it does
+   include **all** of category Zs, which the port covers). The port builds
+   both sets from Foundation's `CharacterSet.whitespacesAndNewlines`, which
+   additionally contains U+0085 — so the port trims a leading/trailing
+   U+0085 that JS would keep. Observable only for program text or
+   `Number()`-coerced strings carrying U+0085 at a trimmed boundary
+   (e.g. JS `Number("5\u{0085}")` is `NaN`; the port yields `5`).
+
 ### Implemented quirk parity (not deviations)
 
+- **UTF-16 code-unit scanning** (`StreamCore.scanNewCompleted`,
+  `Lexer.tokenize`, `Statements.autoClose`, `Preprocess.stripFences` /
+  `stripComments`, plus the comparison helpers in `StringJS.swift`): every
+  scanner indexes UTF-16 code units exactly like the JS reference
+  (`src[i]`/`charCodeAt` semantics). This FIXED a former grapheme-cluster
+  deviation class: "\r\n" is ONE Swift `Character`, so cluster scanning
+  never fired the `"\n"` statement split (multi-statement CRLF programs
+  merged into a single statement), and a combining mark straight after a
+  closing quote / digit / bracket glued into that cluster and hid the
+  delimiter. CRLF now parses as LF + horizontal `\r` (spec §2) and
+  combining-mark adjacency matches JS byte-for-byte — pinned by fixtures
+  `073-crlf-statements` / `074-combining-glue`, the
+  `chunkBoundaryInsideCRLF` streaming scenario, and a 21-probe
+  batch+streaming differential sweep. Token values and statement slices are
+  rebuilt from code-unit ranges via `String(decoding:as: UTF16.self)`
+  (lone-surrogate behavior stays as documented in deviation #2); all stored
+  offsets/watermarks are code-unit indices.
 - **Schema `default` application** (`Materialize.swift`,
   `LibrarySchema.Param.defaultValue`): a missing/null REQUIRED prop takes
   the JSON Schema property's `default` before `missing-required` /

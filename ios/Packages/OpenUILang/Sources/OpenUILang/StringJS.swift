@@ -9,6 +9,18 @@ import Foundation
 /// carry program-derived text must go through these helpers so the port
 /// stays byte-compatible with the reference implementation.
 
+/// UTF-16 code unit of an ASCII scalar — comparison constant for the
+/// code-unit scanners (lexer, statement scanner, fence stripper). JS's
+/// `src[i] === "x"` compares single UTF-16 code units; scanning Swift
+/// `[Character]` (grapheme clusters) instead diverges on CRLF ("\r\n" is ONE
+/// Character) and on combining marks (which glue onto the previous cluster so
+/// `c == "\""` etc. never fire).
+@inline(__always)
+func ascii16(_ scalar: Unicode.Scalar) -> UInt16 {
+    assert(scalar.isASCII)
+    return UInt16(truncatingIfNeeded: scalar.value)
+}
+
 /// JS string equality (`===`, and `==` when both operands are strings):
 /// UTF-16 code-unit equality.
 func jsStringEquals(_ x: String, _ y: String) -> Bool {

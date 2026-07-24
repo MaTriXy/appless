@@ -262,6 +262,100 @@ import Testing
         )
     }
 
+    /// Chunk boundary INSIDE a CRLF pair: the first set() ends with the "\r"
+    /// of a "\r\n" (the "\n" and the next statements arrive in the second
+    /// set()). With code-unit scanning this is chunk-boundary-independent:
+    /// the "\r" is horizontal whitespace, the later "\n" splits statements
+    /// exactly as if the full text had arrived in one set(). (Grapheme-cluster
+    /// scanning merged "\r\n" into ONE Character and never split.)
+    ///
+    /// EXPECTED TREES derived from the JS oracle like every scenario above: a
+    /// throwaway script ran this exact set() sequence through ONE
+    /// `createStreamingParser` (lang-core) and printed
+    /// `stableStringify(serializeExpected(result, evaluatedRoot, errors))`
+    /// per step, with the store/evaluateElementProps pipeline copied from
+    /// `spec/fixtures/generator/generate.mjs`. Step 0: `hd` completes at the
+    /// mid-buffer "\r\n"; the trailing "\r" leaves no pending statement, so
+    /// `incomplete` is false and only `tl` is unresolved. Step 1: the
+    /// appended "\n" completes the CRLF, and `tl` / `$z` parse normally.
+    @Test func chunkBoundaryInsideCRLF() {
+        runScenario(
+            "chunkBoundaryInsideCRLF",
+            steps: [
+                (
+                    "root = Card([hd, tl])\r\nhd = CardHeader(\"Split\")\r",
+                    """
+                    {
+                      "root": {
+                        "component": "Card",
+                        "statementId": "root",
+                        "props": {},
+                        "children": [
+                          {
+                            "component": "CardHeader",
+                            "statementId": "hd",
+                            "props": {
+                              "title": "Split"
+                            }
+                          }
+                        ]
+                      },
+                      "meta": {
+                        "incomplete": false,
+                        "unresolved": [
+                          "tl"
+                        ],
+                        "errors": []
+                      },
+                      "state": {},
+                      "runtimeErrors": []
+                    }
+
+                    """
+                ),
+                (
+                    "root = Card([hd, tl])\r\nhd = CardHeader(\"Split\")\r"
+                        + "\ntl = TextContent(\"tail: \" + $z)\r\n$z = 9\r\n",
+                    """
+                    {
+                      "root": {
+                        "component": "Card",
+                        "statementId": "root",
+                        "props": {},
+                        "children": [
+                          {
+                            "component": "CardHeader",
+                            "statementId": "hd",
+                            "props": {
+                              "title": "Split"
+                            }
+                          },
+                          {
+                            "component": "TextContent",
+                            "statementId": "tl",
+                            "props": {
+                              "text": "tail: 9"
+                            }
+                          }
+                        ]
+                      },
+                      "meta": {
+                        "incomplete": false,
+                        "unresolved": [],
+                        "errors": []
+                      },
+                      "state": {
+                        "$z": 9
+                      },
+                      "runtimeErrors": []
+                    }
+
+                    """
+                ),
+            ]
+        )
+    }
+
     /// Shared oracle output for the single-TextContent scenarios above
     /// (identical modulo the text), byte-for-byte as printed by the JS
     /// pipeline.

@@ -1,0 +1,39 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "statementId": "hdr",
+        "props": {
+          "title": "glue-mark"
+        }
+      },
+      {
+        "component": "TextContent",
+        "statementId": "num",
+        "props": {
+          "text": "n: 12"
+        }
+      },
+      {
+        "component": "TextContent",
+        "statementId": "tail",
+        "props": {
+          "text": "end"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {
+    "$n": 12
+  },
+  "runtimeErrors": []
+}

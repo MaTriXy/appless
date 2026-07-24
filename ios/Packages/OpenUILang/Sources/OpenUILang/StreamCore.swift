@@ -146,8 +146,11 @@ final class StreamCore {
     private let cat: [String: [LibrarySchema.Param]]
     private let rootName: String?
 
-    private var buf: [Character] = []
-    private var bufString: String = ""
+    /// The accumulated program text as UTF-16 code units — the exact
+    /// representation the JS reference scans (`buf[i]` indexes a code unit).
+    /// All watermarks/offsets (`completedEnd`, statement starts) are
+    /// code-unit indices.
+    private var buf: [UInt16] = []
     private var completedEnd = 0
     private var completedStmtMap = OrderedMap<TypedStatement>()
     private var completedCount = 0
@@ -167,23 +170,17 @@ final class StreamCore {
         // prefix-extension where JS resets, and (b) mis-slice the delta when
         // a combining mark merges into the previous cluster.
         let newUnits = Array(fullText.utf16)
-        if newUnits.count < bufString.utf16.count
-            || !newUnits.starts(with: bufString.utf16)
-        {
+        if newUnits.count < buf.count || !newUnits.starts(with: buf) {
             reset()
         }
-        let prefixCount = bufString.utf16.count
-        if newUnits.count > prefixCount {
-            let delta = String(decoding: newUnits[prefixCount...], as: UTF16.self)
-            buf.append(contentsOf: delta)
-            bufString = fullText
+        if newUnits.count > buf.count {
+            buf.append(contentsOf: newUnits[buf.count...])
         }
         return currentResult()
     }
 
     private func reset() {
         buf = []
-        bufString = ""
         completedEnd = 0
         completedStmtMap = OrderedMap<TypedStatement>()
         completedCount = 0
@@ -193,7 +190,7 @@ final class StreamCore {
     private func addStmt(_ text: String) {
         let cleaned = stripComments(text).jsTrim()
         if cleaned.isEmpty || jsStringHasPrefix(cleaned, "```") { return }
-        for s in splitStatements(tokenize(Array(cleaned))) {
+        for s in splitStatements(tokenize(Array(cleaned.utf16))) {
             let expr = parseExpression(s.tokens)
             let stmt = classifyStatement(s, expr)
             completedStmtMap[s.id] = stmt
@@ -203,11 +200,18 @@ final class StreamCore {
     }
 
     /// Scan `buf` from the watermark for newly completed statements.
-    /// Returns the start index of the current pending (incomplete) statement.
+    /// Returns the start index (code units) of the current pending
+    /// (incomplete) statement.
+    ///
+    /// UTF-16 code-unit scan, exactly like the JS reference: the "\n" of a
+    /// CRLF pair is its own code unit (under `[Character]` scanning "\r\n"
+    /// was ONE cluster and the `c == "\n"` split never fired, merging
+    /// multi-statement CRLF programs), and a combining mark after `"`/`)`
+    /// cannot hide the quote or bracket.
     private func scanNewCompleted() -> Int {
         var depth = 0
         var ternaryDepth = 0
-        var inStr: Character? = nil
+        var inStr: UInt16? = nil
         var esc = false
         var stmtStart = completedEnd
         var i = completedEnd
@@ -218,7 +222,7 @@ final class StreamCore {
                 i += 1
                 continue
             }
-            if c == "\\" && inStr != nil {
+            if c == ascii16("\\") && inStr != nil {
                 esc = true
                 i += 1
                 continue
@@ -228,34 +232,35 @@ final class StreamCore {
                 i += 1
                 continue
             }
-            if c == "\"" || c == "'" {
+            if c == ascii16("\"") || c == ascii16("'") {
                 inStr = c
                 i += 1
                 continue
             }
-            if c == "(" || c == "[" || c == "{" {
+            if c == ascii16("(") || c == ascii16("[") || c == ascii16("{") {
                 depth += 1
-            } else if c == ")" || c == "]" || c == "}" {
+            } else if c == ascii16(")") || c == ascii16("]") || c == ascii16("}") {
                 depth = max(0, depth - 1)
-            } else if c == "?" && depth == 0 {
+            } else if c == ascii16("?") && depth == 0 {
                 ternaryDepth += 1
-            } else if c == ":" && depth == 0 && ternaryDepth > 0 {
+            } else if c == ascii16(":") && depth == 0 && ternaryDepth > 0 {
                 ternaryDepth -= 1
-            } else if c == "\n" && depth <= 0 && ternaryDepth <= 0 {
+            } else if c == ascii16("\n") && depth <= 0 && ternaryDepth <= 0 {
                 // Look ahead past whitespace — ternary continuation?
                 var peek = i + 1
                 while peek < buf.count,
-                    buf[peek] == " " || buf[peek] == "\t" || buf[peek] == "\r" || buf[peek] == "\n"
+                    buf[peek] == ascii16(" ") || buf[peek] == ascii16("\t")
+                        || buf[peek] == ascii16("\r") || buf[peek] == ascii16("\n")
                 {
                     peek += 1
                 }
                 if peek < buf.count,
-                    buf[peek] == "?" || (buf[peek] == ":" && ternaryDepth > 0)
+                    buf[peek] == ascii16("?") || (buf[peek] == ascii16(":") && ternaryDepth > 0)
                 {
                     i += 1
                     continue // ternary continuation — don't split
                 }
-                let t = String(buf[stmtStart..<i]).jsTrim()
+                let t = String(decoding: buf[stmtStart..<i], as: UTF16.self).jsTrim()
                 if !t.isEmpty { addStmt(t) }
                 stmtStart = i + 1
                 completedEnd = i + 1
@@ -267,7 +272,9 @@ final class StreamCore {
 
     func currentResult() -> InternalResult {
         let pendingStart = scanNewCompleted()
-        let pendingText = String(buf[min(pendingStart, buf.count)...]).jsTrim()
+        let pendingText = String(
+            decoding: buf[min(pendingStart, buf.count)...], as: UTF16.self
+        ).jsTrim()
 
         func completedOnly(_ incomplete: Bool) -> InternalResult {
             if completedCount == 0 { return .empty() }
@@ -283,7 +290,7 @@ final class StreamCore {
         if cleaned.isEmpty {
             return completedOnly(false)
         }
-        let closed = autoClose(Array(cleaned))
+        let closed = autoClose(Array(cleaned.utf16))
         let stmts = splitStatements(tokenize(closed.text))
         if stmts.isEmpty {
             if completedCount == 0 { return .empty(incomplete: closed.wasIncomplete) }
