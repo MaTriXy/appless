@@ -16,11 +16,17 @@ on:
     paths:
       - "spec/**"
       - "patches/**"
+      - "src/genos/ui/contract.tsx"
+      - "src/genos/generated/**"
+      - "scripts/embed-prompt.mjs"
       - ".github/workflows/spec-gates.yml"
   pull_request:
     paths:
       - "spec/**"
       - "patches/**"
+      - "src/genos/ui/contract.tsx"
+      - "src/genos/generated/**"
+      - "scripts/embed-prompt.mjs"
       - ".github/workflows/spec-gates.yml"
 
 jobs:
