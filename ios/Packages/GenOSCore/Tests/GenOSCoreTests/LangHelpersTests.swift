@@ -57,6 +57,13 @@ import Testing
         // /\n```\s*$/ - the trailing \s* must accept U+FEFF like JS.
         #expect(Lang.cleanLang("PROG\n```\u{FEFF}") == "PROG")
     }
+
+    @Test func combiningMarkGluedToClosingFenceStillCutsLikeJs() {
+        // node: with t = "PROG\n```́x", t.slice(0, t.indexOf("\n```"))
+        // === "PROG" - indexOf works at UTF-16 level. Character-level
+        // range(of: "\n```") saw the final backtick as "`\u{301}" and missed.
+        #expect(Lang.cleanLang("```\nPROG\n```\u{301}x") == "PROG")
+    }
 }
 
 // spec/openui-lang.md §11.2
@@ -184,6 +191,22 @@ import Testing
         // ICU case folding would accept U+017F (LONG S) for the "s" in
         // "genos"; JS /…/i does not.
         #expect(Lang.parseGenosUrl("geno\u{17F}://home") == nil)
+    }
+
+    @Test func combiningMarkAfterAmpersandStillSplitsPairsLikeJs() {
+        // node: "a=1&́b=2".split("&") === ["a=1", "́b=2"] - the
+        // Character-level split saw "&\u{301}" as one grapheme, never split,
+        // and produced {"a": "1&\u{301}b=2"} instead.
+        let parsed = Lang.parseGenosUrl("genos://open?a=1&\u{301}b=2")
+        #expect(parsed == GenosURL(cmd: "open", params: ["a": "1", "\u{301}b": "2"]))
+    }
+
+    @Test func combiningMarkAfterEqualsStillSplitsKeyValueLikeJs() {
+        // node: "k=́v".indexOf("=") === 1 → {"k": "́v"} - the
+        // Character-level range(of: "=") missed the glued "=" and stored the
+        // whole pair as a key-only param instead.
+        let parsed = Lang.parseGenosUrl("genos://open?k=\u{301}v")
+        #expect(parsed == GenosURL(cmd: "open", params: ["k": "\u{301}v"]))
     }
 }
 

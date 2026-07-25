@@ -351,6 +351,123 @@ import Testing
     }
 }
 
+// SSE line splitting must match RN's UTF-16-level buffer.split("\n") +
+// line.trim(): CRLF-terminated streams (legal per the SSE spec, produced by
+// some proxies) and pathological Unicode at line boundaries.
+@MainActor
+@Suite struct StreamSSELineEndingTests {
+    /// Re-terminate a "...\n" SSE line with "\r\n".
+    private func crlf(_ line: String) -> String {
+        line.hasSuffix("\n") ? String(line.dropLast()) + "\r\n" : line + "\r\n"
+    }
+
+    private func run(_ response: ScriptedResponse) async -> StreamRecorder {
+        let http = ScriptedHTTP()
+        await http.enqueue(response)
+        let recorder = StreamRecorder()
+        let client = makeStreamClient(http: http)
+        await client.streamScreen(
+            messages: [ChatMessage(role: .user, content: "hi")],
+            handlers: recorder.handlers(),
+            token: StreamCancelToken()
+        )
+        return recorder
+    }
+
+    @Test func crlfTerminatedStreamDeliversAllDeltasAndCleanDone() async {
+        // Regression: Character-level components(separatedBy: "\n") never
+        // splits "\r\n" (one grapheme) - the whole stream buffered forever
+        // and errored "stream dropped". node: "a\r\nb".split("\n") ===
+        // ["a\r","b"]; the scalar split matches, and jsTrim strips the \r.
+        let recorder = await run(.sse([
+            crlf(sseContent("root = ")),
+            crlf(sseContent("Card()")),
+            crlf(sseFinish("stop")),
+            crlf(sseDone),
+        ]))
+        #expect(recorder.deltas == ["root = ", "Card()"])
+        #expect(recorder.doneInfos == [StreamEndInfo(truncated: false, dropped: false)])
+        #expect(recorder.errors.isEmpty)
+    }
+
+    @Test func crlfSplitAcrossChunkBoundaryStillParses() async {
+        // The \r arrives at the end of one chunk, the \n at the start of the
+        // next - the tail-buffer must carry the \r over and still split.
+        let line = crlf(sseContent("hello"))
+        let bytes = Array(line.utf8)
+        let crIndex = bytes.firstIndex(of: 0x0D)!
+        let chunks = [
+            Data(bytes[0...crIndex]),
+            Data(bytes[(crIndex + 1)...]),
+            Data(crlf(sseDone).utf8),
+        ]
+        let recorder = await run(ScriptedResponse(chunks: chunks))
+        #expect(recorder.content == "hello")
+        #expect(recorder.doneInfos == [StreamEndInfo(truncated: false, dropped: false)])
+    }
+
+    @Test func mixedLfAndCrlfLinesAllSplit() async {
+        let recorder = await run(.sse([
+            sseContent("one"),
+            crlf(sseContent("two")),
+            sseContent("three"),
+            crlf(sseDone),
+        ]))
+        #expect(recorder.deltas == ["one", "two", "three"])
+        #expect(recorder.doneInfos == [StreamEndInfo(truncated: false, dropped: false)])
+        #expect(recorder.errors.isEmpty)
+    }
+
+    @Test func bomBeforeDataPrefixIsTrimmedLikeJs() async {
+        // RN's line.trim() strips U+FEFF before "data:" (JS \s includes it).
+        let recorder = await run(.sse([
+            "\u{FEFF}" + sseContent("ok"),
+            "\u{FEFF}" + sseDone,
+        ]))
+        #expect(recorder.content == "ok")
+        #expect(recorder.doneInfos == [StreamEndInfo(truncated: false, dropped: false)])
+    }
+
+    @Test func combiningMarkAtLineStartDoesNotGlueToPreviousNewline() async {
+        // "\n" followed by U+0301 is ONE grapheme - a Character-level split
+        // would merge the two lines and lose the first delta. JS (and the
+        // scalar split) keep them separate. Everything arrives in a SINGLE
+        // chunk so the glue hazard actually sits inside one buffer.
+        let body = sseContent("one")
+            + "\u{301}: stray-mark comment line\n"
+            + sseContent("two")
+            + sseDone
+        let recorder = await run(ScriptedResponse(chunks: [Data(body.utf8)]))
+        #expect(recorder.deltas == ["one", "two"])
+        #expect(recorder.errors.isEmpty)
+    }
+
+    @Test func jsonParseStrictChunksSkippedAndStreamContinues() async {
+        // Chunks JSON.parse would throw on (leading-zero number, raw control
+        // char in string, lone-surrogate escape) are skipped like RN's
+        // try/catch-continue, not processed and not fatal.
+        let recorder = await run(.sse([
+            "data: {\"choices\":[{\"delta\":{\"content\":01}}]}\n",
+            "data: {\"choices\":[{\"delta\":{\"content\":\"a\tb\"}}]}\n",
+            "data: {\"choices\":[{\"delta\":{\"content\":\"\\ud800\"}}]}\n",
+            sseContent("ok"),
+            sseFinish("stop"),
+            sseDone,
+        ]))
+        #expect(recorder.content == "ok")
+        #expect(recorder.errors.isEmpty)
+        #expect(recorder.doneInfos == [StreamEndInfo(truncated: false, dropped: false)])
+    }
+
+    @Test func httpErrorDetailTruncatedAtUtf16Units() async {
+        // RN: detail.slice(0, 500) counts UTF-16 units; slicing through 😀
+        // leaves a lone surrogate that UTF-8-encodes to U+FFFD.
+        let body = String(repeating: "a", count: 499) + "😀 rest of the error"
+        let recorder = await run(ScriptedResponse(status: 500, errorBody: body))
+        #expect(recorder.errors == [String(repeating: "a", count: 499) + "\u{FFFD}"])
+    }
+}
+
 // StreamCancelToken tears down the in-flight work (AbortController parity):
 // the SSE drain stops pulling chunks and tool execution cannot trigger the
 // next round's request.

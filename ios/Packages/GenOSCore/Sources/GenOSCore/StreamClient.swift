@@ -242,7 +242,8 @@ public final class StreamClient: ScreenStreaming {
             } catch {
                 detailData = Data()
             }
-            let detail = String((String(data: detailData, encoding: .utf8) ?? "").prefix(500))
+            // RN: detail.slice(0, 500) - UTF-16 units, not Characters.
+            let detail = jsSlice(String(data: detailData, encoding: .utf8) ?? "", upTo: 500)
             throw StreamError(detail.isEmpty ? "HTTP \(head.status)" : detail)
         }
 
@@ -258,16 +259,29 @@ public final class StreamClient: ScreenStreaming {
             // the byte-stream impl ignores Task cancellation.
             if token.isCancelled { throw CancellationError() }
             buffer += decoder.decode(chunkData)
-            var lines = buffer.components(separatedBy: "\n")
+            // RN: buffer.split("\n") - UTF-16-level. jsSplit splits at scalar
+            // level, so a CRLF-terminated SSE stream (legal per the SSE spec)
+            // yields ["…\r", …] exactly like JS; Character-level splitting
+            // treats "\r\n" as ONE grapheme, never splits, and buffers the
+            // whole stream forever. Tail-buffer semantics are identical:
+            // the final (possibly empty) piece goes back into `buffer`.
+            var lines = jsSplit(buffer, on: "\n")
             buffer = lines.popLast() ?? ""
 
             for line in lines {
                 // RN: line.trim() / payload.trim() - exact JS whitespace set
-                // (strips a BOM before "data:", keeps U+0085).
+                // (strips a BOM before "data:", strips the trailing \r a CRLF
+                // stream leaves on each line, keeps U+0085).
                 let trimmed = jsTrim(line)
-                guard trimmed.hasPrefix("data:") else { continue }
-                let payload = jsTrim(String(trimmed.dropFirst(5)))
+                // RN: trimmed.startsWith("data:") / trimmed.slice(5) - both
+                // UTF-16-level; scalar prefix + UTF-16 slice keep a combining
+                // mark straight after "data:" from defeating the match.
+                guard jsHasPrefix(trimmed, "data:") else { continue }
+                let payload = jsTrim(jsSlice(trimmed, from: 5))
                 if payload.isEmpty { continue }
+                // == on an all-ASCII literal is safe despite Swift's
+                // canonical-equivalence ==: no distinct scalar sequence
+                // normalizes to a pure-ASCII string.
                 if payload == "[DONE]" {
                     sawDone = true
                     continue
@@ -381,6 +395,11 @@ public final class StreamClient: ScreenStreaming {
                 // cancels it, so a cooperative ToolExecuting impl (URLSession
                 // honors Task cancellation) tears down mid-call, and the loop
                 // below never issues the next round's request.
+                //
+                // Sequential execution vs RN's Promise.all: outputs are
+                // collected in call order either way and tool messages are
+                // appended by index, so ordering and content are identical -
+                // only wall-clock overlap differs (deliberate; see review).
                 var outputs: [String] = []
                 for call in calls {
                     if let tools {

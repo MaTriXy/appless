@@ -117,7 +117,8 @@ public struct ExaSearchTool: ToolExecuting {
         )
         let (head, data) = try await http.fetch(request)
         guard head.ok else {
-            let detail = String((String(data: data, encoding: .utf8) ?? "").prefix(200))
+            // RN: detail.slice(0, 200) - UTF-16 units, not Characters.
+            let detail = jsSlice(String(data: data, encoding: .utf8) ?? "", upTo: 200)
             throw StreamError(detail.isEmpty ? "Exa HTTP \(head.status)" : detail)
         }
         let json = JSONValue.parse(data)
@@ -145,7 +146,8 @@ public func formatWebResults(query: String, results: [SearchResult]) -> String {
         return "Web results for \"\(query)\": none found. Say so honestly on the screen; do not fabricate specifics."
     }
     let lines = results.enumerated().map { i, r -> String in
-        let date = (r.published?.isEmpty == false) ? " (\(String(r.published!.prefix(10))))" : ""
+        // RN: r.published.slice(0, 10) - UTF-16 units, not Characters.
+        let date = (r.published?.isEmpty == false) ? " (\(jsSlice(r.published!, upTo: 10)))" : ""
         return "\(i + 1). \(r.title) - \(resultDomain(r.url))\(date)\n   \(r.snippet)"
     }
     return "Web results for \"\(query)\":\n" + lines.joined(separator: "\n")

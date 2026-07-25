@@ -142,3 +142,32 @@ import Testing
         #expect(store.listenerCount == 0)
     }
 }
+
+// JS Set iteration parity: listeners.forEach fires in insertion order, and
+// deleting a listener keeps the remaining order intact.
+@MainActor
+@Suite struct ScreenStoreListenerOrderTests {
+    final class OrderLog {
+        var events: [Int] = []
+    }
+
+    @Test func listenersNotifyInInsertionOrderAndSurviveRemoval() {
+        let clock = ManualClock()
+        let store = ScreenStore(clock: clock)
+        let log = OrderLog()
+        var unsubscribes: [@MainActor () -> Void] = []
+        for i in 0..<5 {
+            unsubscribes.append(store.subscribe { log.events.append(i) })
+        }
+
+        store.upsert(Screen(id: "s1", appId: "a", appName: "A", request: "r"))
+        #expect(log.events == [0, 1, 2, 3, 4])
+
+        // Removing a middle listener preserves the others' insertion order
+        // (JS Set.delete does not reorder survivors).
+        unsubscribes[2]()
+        log.events = []
+        store.patch("s1") { $0.status = .done }
+        #expect(log.events == [0, 1, 3, 4])
+    }
+}

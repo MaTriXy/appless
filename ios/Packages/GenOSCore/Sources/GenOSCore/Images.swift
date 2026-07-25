@@ -16,30 +16,39 @@ public struct ImgQuery: Sendable, Equatable {
 }
 
 public enum Images {
-    /// clamp with JS NaN semantics: a non-number falls to the min bound.
-    private static func clamp(_ n: Int?, _ min: Int, _ max: Int) -> Int {
-        guard let n else { return min }
-        return Swift.max(min, Swift.min(max, n))
+    /// clamp with JS Number semantics: NaN AND ±Infinity fall to the min
+    /// bound (RN: `Number.isFinite(n) ? n : min` before Math.min/max), so a
+    /// digit run long enough to overflow to Infinity clamps to min, while a
+    /// merely huge finite value (e.g. a 23-digit seed ≈ 1.23e22) clamps to
+    /// max - both matching JS parseInt feeding the clamp.
+    private static func clamp(_ n: Double, _ min: Int, _ max: Int) -> Int {
+        guard n.isFinite else { return min }
+        return Int(Swift.max(Double(min), Swift.min(Double(max), n)))
     }
 
     /// Parse an /api/img?... reference; nil for any other src.
     /// Key-only pairs (no "=") are SKIPPED entirely - unlike parseGenosUrl.
     /// q defaults to "abstract gradient", +→space, stripped to [a-zA-Z0-9, -],
     /// trimmed. seed default 1 clamp [1,10000]; w default 800 clamp [40,1600];
-    /// h default 500 clamp [40,1600]; NaN → the min bound.
+    /// h default 500 clamp [40,1600]; NaN/±Infinity → the min bound.
     public static func parseImgUrl(_ src: String) -> ImgQuery? {
-        guard src.hasPrefix("/api/img") else { return nil }
+        // RN: src.startsWith / src.split("?") / pair.indexOf("=") - all
+        // UTF-16-level. Scalar-level prefix + splits keep combining marks
+        // glued onto "g", "?", "&" or "=" (model-controlled srcs) from
+        // changing what parses.
+        guard jsHasPrefix(src, "/api/img") else { return nil }
         var params: [String: String] = [:]
-        let query = src.components(separatedBy: "?").count > 1 ? src.components(separatedBy: "?")[1] : ""
-        for pair in query.components(separatedBy: "&") {
-            guard let eq = pair.range(of: "=") else { continue }
-            let key = String(pair[..<eq.lowerBound])
-            let value = String(pair[eq.upperBound...])
+        let queryParts = jsSplit(src, on: "?")
+        let query = queryParts.count > 1 ? queryParts[1] : ""
+        for pair in jsSplit(query, on: "&") {
+            guard let (key, value) = jsSplitFirst(pair, on: "=") else { continue }
             params[key] = jsDecodeURIComponent(value) ?? value
         }
         var q = params["q"] ?? ""
         if q.isEmpty { q = "abstract gradient" }
-        q = q.replacingOccurrences(of: "+", with: " ")
+        // RN: .replace(/\+/g, " ") - regex (UTF-16); literal
+        // replacingOccurrences would skip a "+" glued to a combining mark.
+        q = JSRegex.replacingAll("\\+", in: q, with: " ")
         // RN: /[^a-zA-Z0-9, -]/g - explicit ASCII class + no `i` flag, so ICU
         // and JS semantics are identical (audited, no change needed).
         q = JSRegex.replacingAll("[^a-zA-Z0-9, -]", in: q, with: "")

@@ -8,7 +8,8 @@ import Foundation
 @MainActor
 public final class ScreenStore {
     let clock: GenOSClock
-    private var listeners: [UUID: @MainActor () -> Void] = [:]
+    /// Insertion-ordered (JS `Set` iteration parity for notify order).
+    private var listeners: [(id: UUID, fn: @MainActor () -> Void)] = []
     private var screens: [String: Screen] = [:]
     /// Insertion order (JS Map iteration parity for all()).
     private var order: [String] = []
@@ -26,8 +27,12 @@ public final class ScreenStore {
 
     public func subscribe(_ fn: @escaping @MainActor () -> Void) -> @MainActor () -> Void {
         let id = UUID()
-        listeners[id] = fn
-        return { [weak self] in self?.listeners.removeValue(forKey: id) }
+        listeners.append((id: id, fn: fn))
+        return { [weak self] in self?.removeListener(id) }
+    }
+
+    private func removeListener(_ id: UUID) {
+        listeners.removeAll { $0.id == id }
     }
 
     /// SwiftUI-friendly change feed: yields once per subscriber notify (same
@@ -36,10 +41,10 @@ public final class ScreenStore {
     public var updates: AsyncStream<Void> {
         let (stream, continuation) = AsyncStream<Void>.makeStream()
         let id = UUID()
-        listeners[id] = { continuation.yield(()) }
+        listeners.append((id: id, fn: { continuation.yield(()) }))
         continuation.onTermination = { [weak self] _ in
             Task { @MainActor [weak self] in
-                self?.listeners.removeValue(forKey: id)
+                self?.removeListener(id)
             }
         }
         return stream
@@ -108,6 +113,8 @@ public final class ScreenStore {
             flushTimer = nil
         }
         versionCounter += 1
-        for fn in listeners.values { fn() }
+        // JS Set.forEach fires in insertion order - iterate the ordered list
+        // (a Dictionary would notify in nondeterministic order).
+        for entry in listeners { entry.fn() }
     }
 }

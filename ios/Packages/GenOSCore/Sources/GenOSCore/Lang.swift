@@ -29,8 +29,13 @@ public enum Lang {
         let opened = JSRegex.test("^\(ws)*```", text)
         var t = JSRegex.replacingFirst("^\(ws)*```[A-Za-z0-9_-]*\(wsNoNL)*\\n?", in: text, with: "")
         if opened {
-            if let end = t.range(of: "\n```") {
-                t = String(t[..<end.lowerBound])
+            // RN: t.indexOf("\n```") + t.slice(0, end) - UTF-16-level, so a
+            // combining mark glued onto the closing fence ("\n```\u{301}")
+            // still matches; Character-level range(of:) would miss it. The
+            // cut lands on the "\n" (ASCII), so it can never split a
+            // surrogate pair.
+            if let end = jsUTF16Index(of: "\n```", in: t) {
+                t = jsSlice(t, upTo: end)
             }
         } else {
             t = JSRegex.replacingFirst("\\n```\(ws)*\\z", in: t, with: "")
@@ -93,18 +98,24 @@ public enum Lang {
         else { return nil }
         var params: [String: String] = [:]
         let query = (m.count > 2 ? m[2] : nil) ?? ""
-        for pair in query.components(separatedBy: "&") {
+        // RN: query.split("&") / pair.indexOf("=") - UTF-16-level. Scalar
+        // splits keep a combining mark straight after "&" or "=" from gluing
+        // onto the delimiter (Character-level splitting would swallow the
+        // pair boundary and mis-parse model-controlled URLs).
+        for pair in jsSplit(query, on: "&") {
             if pair.isEmpty { continue }
             let key: String
             let value: String
-            if let eq = pair.range(of: "=") {
-                key = String(pair[..<eq.lowerBound])
-                value = String(pair[eq.upperBound...])
+            if let (k, v) = jsSplitFirst(pair, on: "=") {
+                key = k
+                value = v
             } else {
                 key = pair
                 value = ""
             }
-            let plusDecoded = value.replacingOccurrences(of: "+", with: " ")
+            // RN: v.replace(/\+/g, " ") - regex (UTF-16); literal
+            // replacingOccurrences would skip a "+" glued to a combining mark.
+            let plusDecoded = JSRegex.replacingAll("\\+", in: value, with: " ")
             if let decodedKey = jsDecodeURIComponent(key), let decodedValue = jsDecodeURIComponent(plusDecoded) {
                 params[decodedKey] = decodedValue
             } else {
@@ -121,7 +132,9 @@ public enum Lang {
     ///
     /// RN: /CardHeader\(\s*"((?:\\.|[^"\\])*)"/ then m?.[1]?.trim().
     public static func summonedAppTitle(appId: String, stackDepth: Int, content: String) -> String? {
-        guard appId.hasPrefix("summon-"), !content.isEmpty, stackDepth == 1 else { return nil }
+        // RN: appId.startsWith("summon-") - UTF-16-level (scalar prefix; a
+        // combining mark right after the hyphen must not defeat the gate).
+        guard jsHasPrefix(appId, "summon-"), !content.isEmpty, stackDepth == 1 else { return nil }
         guard
             let m = JSRegex.first("CardHeader\\(\(ws)*\"((?:\\\\\(dot)|[^\"\\\\])*)\"", cleanLang(content)),
             let raw = m.count > 1 ? m[1] : nil

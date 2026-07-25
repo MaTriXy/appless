@@ -222,6 +222,15 @@ public final class GenOSController {
             }
         }
         let app = apps.first { $0.id == appId.lowercased() }
+        // RN: appId.charAt(0).toUpperCase() + appId.slice(1). Grapheme
+        // prefix(1)/dropFirst() is provably equivalent for every BMP input:
+        // uppercasing is scalar-wise, so "e\u{301}…" → "E\u{301}…" both ways,
+        // and surrogate halves that JS splits and rejoins unchanged come out
+        // identical too. The only divergence is a non-BMP FIRST character
+        // with a case mapping (e.g. Deseret), where JS's lone-surrogate
+        // charAt(0) can't uppercase but Swift can - kept grapheme-level
+        // deliberately, since the UTF-16 spelling would corrupt such ids
+        // into U+FFFD (Swift cannot hold JS's lone surrogates).
         let fallbackName = appId.prefix(1).uppercased() + appId.dropFirst()
         let id = launchScreen(LaunchInput(
             appId: app?.id ?? appId.lowercased(),

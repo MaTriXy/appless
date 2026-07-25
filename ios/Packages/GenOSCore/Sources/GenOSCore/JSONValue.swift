@@ -249,6 +249,12 @@ private struct JSONParser {
             if c == "\"" {
                 return String(out)
             }
+            // JSON.parse throws on raw (unescaped) control characters
+            // U+0000-U+001F inside strings - reject so the SSE layer skips
+            // the chunk exactly where RN's try/catch around JSON.parse does.
+            if c.value < 0x20 {
+                return nil
+            }
             if c == "\\" {
                 guard let esc = current else { return nil }
                 index += 1
@@ -262,6 +268,14 @@ private struct JSONParser {
                 case "r": out.append("\r")
                 case "t": out.append("\t")
                 case "u":
+                    // Known divergence (pinned by tests): JSON.parse ACCEPTS
+                    // a lone-surrogate \u escape (the JS string keeps the
+                    // unpaired surrogate; it becomes U+FFFD only when later
+                    // UTF-8-encoded). Swift String cannot represent a lone
+                    // surrogate at all, so this parser rejects the document
+                    // and the SSE layer skips the whole chunk - RN would
+                    // instead deliver the delta with a replacement-character
+                    // artifact. Accepted as a Swift String limit.
                     guard let first = parseHex4() else { return nil }
                     if (0xD800...0xDBFF).contains(first) {
                         // Surrogate pair.
@@ -301,10 +315,19 @@ private struct JSONParser {
     private mutating func parseNumber() -> JSONValue? {
         let start = index
         if current == "-" { index += 1 }
+        // JSON.parse rejects leading zeros: the integer part is exactly "0"
+        // or [1-9][0-9]*. "01" must fail so the SSE layer skips the chunk
+        // the same way RN's try/catch around JSON.parse does.
         var sawDigit = false
-        while let c = current, ("0"..."9").contains(c) {
+        if current == "0" {
             sawDigit = true
             index += 1
+            if let c = current, ("0"..."9").contains(c) { return nil }
+        } else {
+            while let c = current, ("0"..."9").contains(c) {
+                sawDigit = true
+                index += 1
+            }
         }
         guard sawDigit else { return nil }
         if current == "." {

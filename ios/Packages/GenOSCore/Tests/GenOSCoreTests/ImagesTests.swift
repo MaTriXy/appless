@@ -44,6 +44,32 @@ import Testing
         #expect(nan == ImgQuery(q: "abstract gradient", seed: 1, w: 40, h: 40))
         #expect(Images.parseImgUrl("/api/img?seed=0")?.seed == 1)
     }
+
+    @Test func nbspPrefixedSeedSkipsFullJsWhitespace() {
+        // %C2%A0 decodes to NBSP; JS parseInt skips it (full StrWhiteSpace).
+        // node: clamp(parseInt(decodeURIComponent("%C2%A05"), 10), 1, 10000) === 5
+        // (the old ' \t\n\r'-only skip yielded NaN → 1).
+        #expect(Images.parseImgUrl("/api/img?seed=%C2%A05")?.seed == 5)
+    }
+
+    @Test func overflowLengthSeedsSaturateThroughDoubleLikeJs() {
+        // node: clamp(parseInt("12345678901234567890123", 10), 1, 10000) === 10000
+        // (parseInt → ~1.23e22, clamps at max - the old Int overflow → nil → 1).
+        #expect(Images.parseImgUrl("/api/img?seed=12345678901234567890123")?.seed == 10_000)
+        // node: parseInt("9".repeat(400), 10) === Infinity → Number.isFinite
+        // false → min bound 1.
+        #expect(Images.parseImgUrl("/api/img?seed=" + String(repeating: "9", count: 400))?.seed == 1)
+    }
+
+    @Test func combiningMarksGluedToDelimitersParseLikeJs() {
+        // U+0301 straight after "/api/img": JS startsWith (UTF-16) still
+        // matches; Character-level hasPrefix saw "g\u{301}" and bailed to nil.
+        #expect(Images.parseImgUrl("/api/img\u{301}?w=1600")?.w == 1600)
+        // U+0301 straight after "=": JS indexOf("=") still splits; value
+        // "\u{301}99" → parseInt NaN → min bound 40. Character-level
+        // range(of: "=") missed the glued "=" and left w at its default 800.
+        #expect(Images.parseImgUrl("/api/img?w=\u{301}99")?.w == 40)
+    }
 }
 
 @Suite struct ImageResolutionTests {
