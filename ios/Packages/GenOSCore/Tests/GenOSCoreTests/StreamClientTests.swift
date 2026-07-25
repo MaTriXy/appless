@@ -709,12 +709,17 @@ import Testing
         let corpus = try JSONDecoder().decode(FuzzCorpus.self, from: Data(contentsOf: url))
         #expect(corpus.cases.count >= 200)
 
+        // Compare SCALAR-exactly, not with String ==: Swift string equality
+        // applies canonical equivalence and could in principle absorb a
+        // scalar-level divergence (e.g. a U+FFFD emitted where a combining
+        // mark belongs) that TextDecoder would have distinguished.
+        func scalars(_ s: String) -> [UInt32] { s.unicodeScalars.map(\.value) }
         var mismatches: [String] = []
         for (index, testCase) in corpus.cases.enumerated() {
             let actual = emissions(testCase.chunks)
-            if actual != testCase.perChunk {
+            if actual.map(scalars) != testCase.perChunk.map(scalars) {
                 mismatches.append(
-                    "case \(index): chunks=\(testCase.chunks) expected=\(testCase.perChunk) actual=\(actual)"
+                    "case \(index): chunks=\(testCase.chunks) expected=\(testCase.perChunk.map(scalars)) actual=\(actual.map(scalars))"
                 )
             }
         }

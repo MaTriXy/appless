@@ -104,3 +104,69 @@ import Testing
         #expect(JSONValue.parse("\"\\ud83d\\ude00\"") == .string("😀"))
     }
 }
+
+// JSON.stringify number formatting is ECMAScript Number::toString, whose
+// positional/exponential thresholds and exponent spelling differ from Swift's
+// "\(d)" (JS writes 10000000000000000 / 0.00001 / 1e-7 where Swift writes
+// 1e+16 / 1e-05 / 1e-07). Expectations below are node v22 JSON.stringify
+// outputs. The algorithm is shared with OpenUILang's TreeSerializer, which
+// pins it against a 267-entry node table.
+@Suite struct JSONStringifyNumberTests {
+    @Test func numberStringMatchesJsonStringify() {
+        let cases: [(Double, String)] = [
+            (1e16, "10000000000000000"),
+            (9007199254740994, "9007199254740994"),
+            (-1e17, "-100000000000000000"),
+            (1e-5, "0.00001"),
+            (1e-6, "0.000001"),
+            (1e-7, "1e-7"),
+            (-1e-7, "-1e-7"),
+            (1e-10, "1e-10"),
+            (1e20, "100000000000000000000"),
+            (1e21, "1e+21"),
+            (-0.0, "0"),
+            (0.1, "0.1"),
+            (0.1 + 0.2, "0.30000000000000004"),
+            (5e-324, "5e-324"),
+            (1.7976931348623157e308, "1.7976931348623157e+308"),
+            (pow(2, 56), "72057594037927940"),
+            (pow(2, 53), "9007199254740992"),
+            (-9007199254740994, "-9007199254740994"),
+            (1.0 / 3.0, "0.3333333333333333"),
+            (-0.5, "-0.5"),
+        ]
+        for (input, expected) in cases {
+            #expect(JSONValue.numberString(input) == expected, "numberString(\(input))")
+        }
+        // JSON.stringify emits null for non-finite numbers.
+        #expect(JSONValue.numberString(.nan) == "null")
+        #expect(JSONValue.numberString(.infinity) == "null")
+    }
+
+    /// Pins the RAW serialized bytes - key ordering AND number formatting -
+    /// rather than laundering them through a re-parse, which is what every
+    /// other body assertion does.
+    @Test func stringifiedEmitsExactBytes() {
+        let body = JSONValue.object([
+            "model": .string("gemma-4-31b"),
+            "temperature": .number(0.8),
+            "max_completion_tokens": .number(3072),
+            "stream": .bool(true),
+        ])
+        #expect(
+            body.stringified(keyOrder: ["model", "temperature", "max_completion_tokens", "stream"])
+                == #"{"model":"gemma-4-31b","temperature":0.8,"max_completion_tokens":3072,"stream":true}"#
+        )
+        // Unhinted keys sort; nested values recurse; large/tiny numbers keep
+        // JSON.stringify formatting.
+        let form: [(String, JSONValue)] = [
+            ("zeta", .number(1e16)),
+            ("alpha", .number(1e-7)),
+            ("nested", .object(["b": .number(-0.0), "a": .array([.number(1), .null])])),
+        ]
+        #expect(
+            JSONValue.stringifyOrdered(form)
+                == #"{"zeta":10000000000000000,"alpha":1e-7,"nested":{"a":[1,null],"b":0}}"#
+        )
+    }
+}

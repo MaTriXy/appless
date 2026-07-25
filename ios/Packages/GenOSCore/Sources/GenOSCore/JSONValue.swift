@@ -54,12 +54,74 @@ public enum JSONValue: Sendable, Equatable {
         }
     }
 
+    /// ECMAScript `Number::toString` (what `JSON.stringify` emits for numbers),
+    /// ported from OpenUILang's TreeSerializer.formatNumber - the same algorithm
+    /// verified there against a 267-entry table of node `String(x)` outputs
+    /// spanning powers of two, Int64 boundaries, the 1e21/1e-7 thresholds,
+    /// subnormals and -0.0.
+    ///
+    /// Swift's `"\(d)"` is shortest-round-trip like JS, but its positional vs
+    /// exponential thresholds and exponent spelling differ (`1e+16` where JS
+    /// writes `10000000000000000`; `1e-05` where JS writes `0.00001`;
+    /// `1e-07` where JS writes `1e-7`), so the shortest digits are re-rendered
+    /// under the spec's rules here.
     static func numberString(_ n: Double) -> String {
+        // JSON.stringify serializes non-finite numbers as null.
         if n.isNaN || n.isInfinite { return "null" }
-        if n == n.rounded(), abs(n) < 9_007_199_254_740_992 {
-            return String(Int64(n))
+        if n == 0 { return "0" } // JSON.stringify(-0) === "0"
+
+        // Integer fast path, valid only below 2^53: there every integer is
+        // exactly representable, so the exact decimal expansion IS the shortest
+        // round-trip form. At or above 2^53 ECMAScript renders SHORTEST digits
+        // (String(2 ** 56) is "72057594037927940", not "...936"), so those fall
+        // through to the re-rendering below even when they fit Int64.
+        if abs(n) < 9_007_199_254_740_992, let i = Int64(exactly: n) { // 2^53
+            return String(i)
         }
-        return "\(n)"
+
+        let repr = "\(n)" // Swift's shortest round-trip representation
+        guard let eIndex = repr.firstIndex(where: { $0 == "e" || $0 == "E" }) else {
+            // Positional shortest form already matches JS in the positional
+            // range, except Swift's ".0" suffix on integer-valued doubles
+            // (reachable now that |n| >= 2^53 integers land here).
+            if repr.hasSuffix(".0") { return String(repr.dropLast(2)) }
+            return repr
+        }
+
+        // Re-render Swift's exponential form under the Number::toString rules.
+        var mantissa = String(repr[repr.startIndex..<eIndex])
+        let exponent = Int(repr[repr.index(after: eIndex)...]) ?? 0
+        var sign = ""
+        if mantissa.hasPrefix("-") {
+            sign = "-"
+            mantissa.removeFirst()
+        }
+        var digits = mantissa
+        var pointOffset = mantissa.count
+        if let dot = mantissa.firstIndex(of: ".") {
+            pointOffset = mantissa.distance(from: mantissa.startIndex, to: dot)
+            digits.remove(at: dot)
+        }
+        while digits.count > 1 && digits.hasSuffix("0") {
+            digits.removeLast()
+        }
+        let k = digits.count
+        // pos: value == 0.digits * 10^pos
+        let pos = exponent + pointOffset
+        if k <= pos && pos <= 21 {
+            return sign + digits + String(repeating: "0", count: pos - k)
+        }
+        if 0 < pos && pos <= 21 {
+            return sign + String(digits.prefix(pos)) + "." + String(digits.dropFirst(pos))
+        }
+        if -6 < pos && pos <= 0 {
+            return sign + "0." + String(repeating: "0", count: -pos) + digits
+        }
+        let first = String(digits.prefix(1))
+        let rest = String(digits.dropFirst())
+        let e = pos - 1
+        let expPart = (e >= 0 ? "e+" : "e-") + String(abs(e))
+        return sign + first + (rest.isEmpty ? "" : "." + rest) + expPart
     }
 
     static func encodeJSONString(_ s: String) -> String {

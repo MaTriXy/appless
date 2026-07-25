@@ -34,7 +34,7 @@ import Testing
         #expect(ks.get() == nil)
     }
 
-    @Test func setTrimsPersistsAndNotifies() async {
+    @Test(.timeLimit(.minutes(1))) func setTrimsPersistsAndNotifies() async {
         let store = MemorySecureStore()
         let ks = KeyStore(envKey: nil, store: store)
         await ks.hydrate()
@@ -53,7 +53,7 @@ import Testing
         unsubscribe()
     }
 
-    @Test func markRejectedDropsKeyAndClearsPersistence() async {
+    @Test(.timeLimit(.minutes(1))) func markRejectedDropsKeyAndClearsPersistence() async {
         let store = MemorySecureStore()
         await store.seed(KeyStore.storageKey, "bad-key")
         let ks = KeyStore(envKey: nil, store: store)
@@ -81,7 +81,7 @@ import Testing
         #expect(ks.get() == "new-key")
     }
 
-    @Test func whitespaceOnlyKeyStoresEmptyAndStatusPresent() async {
+    @Test(.timeLimit(.minutes(1))) func whitespaceOnlyKeyStoresEmptyAndStatusPresent() async {
         // RN parity (config.ts): set('  ') stores '' and setStatus("present")
         // runs UNCONDITIONALLY - the gate shows present even though the key
         // is unusable; the stream client rejects it locally (falsy check).
