@@ -103,11 +103,24 @@ public struct StreamConfig: Sendable {
     /// "Weekday, Month D, YYYY" (en-US long) for the "Today is ..." line.
     public var todayString: @Sendable () -> String
 
+    /// Fail-safe default for `todayString`: the RN systemPrompt date
+    /// (src/genos/stream.ts) - `new Date().toLocaleDateString("en-US",
+    /// { weekday: "long", year: "numeric", month: "long", day: "numeric" })`
+    /// - e.g. "Friday, July 25, 2026". en_US_POSIX pins the English
+    /// weekday/month names regardless of device locale; the device's current
+    /// time zone is kept, matching toLocaleDateString's local-time behavior.
+    public static let defaultTodayString: @Sendable () -> String = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "EEEE, MMMM d, yyyy"
+        return formatter.string(from: Date())
+    }
+
     public init(
         baseURL: String = GenOSConstants.defaultBaseURL,
         model: String = GenOSConstants.defaultModel,
         systemPrompt: String = "",
-        todayString: @escaping @Sendable () -> String = { "" }
+        todayString: @escaping @Sendable () -> String = StreamConfig.defaultTodayString
     ) {
         self.baseURL = baseURL
         self.model = model

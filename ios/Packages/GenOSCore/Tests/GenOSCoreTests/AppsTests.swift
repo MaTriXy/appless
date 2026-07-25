@@ -83,16 +83,12 @@ actor GatedFetchHTTP: HTTPFetching {
     func seen() -> [HTTPRequest] { requests }
 }
 
-/// The launch-event fetch is detached (RN fires fetch().catch() WITHOUT
-/// awaiting) - poll the fake until the request deterministically lands.
-private func pollRequests(_ http: ScriptedHTTP, minCount: Int = 1) async -> [HTTPRequest] {
-    for _ in 0..<500 {
-        let requests = await http.requests()
-        if requests.count >= minCount { return requests }
-        try? await Task.sleep(nanoseconds: 1_000_000)
-    }
-    return await http.requests()
-}
+// The launch-event fetch is detached (RN fires fetch().catch() WITHOUT
+// awaiting). Instead of polling the fakes, tests use Telemetry's @testable
+// seam: the internal initTelemetry overload returns the detached fetch Task
+// (awaitable when the fake fetch completes) and takes an onDispatch hook
+// invoked with the request just before the - possibly hung - fetch is
+// awaited. Both make the detached work deterministically observable.
 
 @Suite struct TelemetryTests {
     @Test func optOutAcceptsOneAndTrueCaseInsensitive() {
@@ -167,16 +163,19 @@ private func pollRequests(_ http: ScriptedHTTP, minCount: Int = 1) async -> [HTT
         await store.gateWrites()
         let http = ScriptedHTTP()
         await http.enqueue(ScriptedResponse(status: 200))
-        await Telemetry.initTelemetry(
+        let fetchTask = await Telemetry.initTelemetry(
             env: [:],
             platform: "ios",
             store: store,
             http: http,
-            newId: { "anon-hung-1" }
+            newId: { "anon-hung-1" },
+            onDispatch: nil
         )
         // initTelemetry returned while the write is still hung; the detached
-        // fetch still dispatches the event (poll for it).
-        let requests = await pollRequests(http)
+        // fetch still dispatches the event - await the returned Task so the
+        // (non-gated) fetch has deterministically completed.
+        await fetchTask?.value
+        let requests = await http.requests()
         #expect(requests.count == 1)
         #expect((await http.requestBodies()).first?["distinct_id"]?.stringValue == "anon-hung-1")
         #expect(await store.stored(Telemetry.idStorageKey) == nil)
@@ -189,25 +188,28 @@ private func pollRequests(_ http: ScriptedHTTP, minCount: Int = 1) async -> [HTT
         // must return while the network call is still hung. If the fetch were
         // awaited, this test would deadlock on the gate instead of returning.
         let http = GatedFetchHTTP()
-        await Telemetry.initTelemetry(
+        let (dispatched, onDispatch) = AsyncStream.makeStream(of: HTTPRequest.self)
+        let fetchTask = await Telemetry.initTelemetry(
             env: [:],
             platform: "ios",
             store: MemorySecureStore(),
             http: http,
-            newId: { "anon-gated-1" }
+            newId: { "anon-gated-1" },
+            onDispatch: { onDispatch.yield($0) }
         )
-        // initTelemetry already returned; the detached fetch has been issued
-        // (poll for the request) but is still parked on the gate.
-        var seen: [HTTPRequest] = []
-        for _ in 0..<500 {
-            seen = await http.seen()
-            if !seen.isEmpty { break }
-            try? await Task.sleep(nanoseconds: 1_000_000)
-        }
+        // initTelemetry already returned while the gate is still closed.
+        // Await the DISPATCH HOOK - not the fetch, which is parked on the
+        // gate - to observe the detached request deterministically.
+        var iterator = dispatched.makeAsyncIterator()
+        let request = await iterator.next()
+        #expect(request?.url == "https://us.i.posthog.com/i/v0/e/")
+        // Unblock the abandoned fetch so its continuation isn't leaked, then
+        // drain the detached Task and confirm exactly one request was seen.
+        await http.release()
+        await fetchTask?.value
+        let seen = await http.seen()
         #expect(seen.count == 1)
         #expect(seen.first?.url == "https://us.i.posthog.com/i/v0/e/")
-        // Unblock the abandoned fetch so its continuation isn't leaked.
-        await http.release()
     }
 
     @Test func base36FractionDigitsPinnedDeviationFromJs() {
@@ -227,15 +229,18 @@ private func pollRequests(_ http: ScriptedHTTP, minCount: Int = 1) async -> [HTT
     @Test func initTelemetrySendsOneEventThroughTheSeam() async {
         let http = ScriptedHTTP()
         await http.enqueue(ScriptedResponse(status: 200))
-        await Telemetry.initTelemetry(
+        let fetchTask = await Telemetry.initTelemetry(
             env: [:],
             platform: "ios",
             store: MemorySecureStore(),
             http: http,
-            newId: { "anon-1-x" }
+            newId: { "anon-1-x" },
+            onDispatch: nil
         )
-        // The fetch is fire-and-forget - poll the fake for the request.
-        let requests = await pollRequests(http)
+        // The fetch is fire-and-forget - await the detached Task returned by
+        // the @testable seam so it has deterministically completed.
+        await fetchTask?.value
+        let requests = await http.requests()
         #expect(requests.count == 1)
         #expect(requests.first?.url == "https://us.i.posthog.com/i/v0/e/")
         let body = (await http.requestBodies()).first

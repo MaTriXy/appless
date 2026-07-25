@@ -127,12 +127,47 @@ public enum Telemetry {
         http: HTTPFetching,
         newId: () -> String
     ) async {
-        if optedOut(env: env) { return }
+        await initTelemetry(
+            env: env,
+            platform: platform,
+            store: store,
+            http: http,
+            newId: newId,
+            onDispatch: nil
+        )
+    }
+
+    /// Test-only seam (@testable): identical semantics to the public
+    /// `initTelemetry`, plus two deterministic observation points so tests
+    /// never have to poll for the detached fire-and-forget fetch:
+    ///
+    /// - `onDispatch` is invoked from inside the detached Task with the exact
+    ///   request, immediately before `http.fetch` is awaited. Awaiting a
+    ///   continuation resumed by this hook proves the launch event was
+    ///   dispatched WITHOUT awaiting the fetch itself - which may be
+    ///   deliberately hung by the test's gated fake.
+    /// - The detached fetch Task is returned so tests with a non-hanging
+    ///   fake can `await task?.value` for full completion before asserting.
+    ///
+    /// Production callers use the public overload and never see either seam.
+    @discardableResult
+    internal static func initTelemetry(
+        env: [String: String],
+        platform: String,
+        store: SecureStore,
+        http: HTTPFetching,
+        newId: () -> String,
+        onDispatch: (@Sendable (HTTPRequest) -> Void)?
+    ) async -> Task<Void, Never>? {
+        if optedOut(env: env) { return nil }
         let id = await deviceId(store: store, newId: newId)
         let request = launchRequest(distinctId: id, platform: platform)
         // RN fires fetch(...).catch(() => {}) WITHOUT awaiting - the launch
         // event is fire-and-forget, so a hung network can never delay
         // initTelemetry's return (same shape as the detached store write).
-        Task { _ = try? await http.fetch(request) }
+        return Task {
+            onDispatch?(request)
+            _ = try? await http.fetch(request)
+        }
     }
 }
