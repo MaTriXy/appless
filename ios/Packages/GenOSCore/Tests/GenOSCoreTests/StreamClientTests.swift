@@ -631,3 +631,41 @@ import Testing
         #expect(JSRegex.test(pattern, StreamConfig.defaultTodayString()))
     }
 }
+
+// TextDecoder("utf-8", {stream:true}) emission-TIMING parity for malformed
+// input (expectations generated from node v22 TextDecoder): only VALID lead
+// bytes (0xC2-0xDF, 0xE0-0xEF, 0xF0-0xF4) may start an incomplete tail that
+// is held back across chunks. Invalid leads (0xC0/0xC1, 0xF5-0xFF) and stray
+// continuation bytes emit U+FFFD in the SAME chunk they arrive in - never
+// held back up to 3 bytes as presumed multi-byte leads.
+@Suite struct UTF8StreamDecoderTests {
+    private func emissions(_ chunks: [[UInt8]]) -> [String] {
+        var decoder = UTF8StreamDecoder()
+        return chunks.map { decoder.decode(Data($0)) }
+    }
+
+    @Test func invalidLeadsEmitReplacementImmediatelyLikeTextDecoder() {
+        // Invalid lead 0xF5 mid-chunk.
+        #expect(emissions([[0x61, 0x62, 0xF5, 0x63, 0x64]]) == ["ab\u{FFFD}cd"])
+        // Invalid lead 0xF5 at chunk end - previously misclassified as a
+        // 4-byte lead and held back until the next chunk.
+        #expect(emissions([[0x61, 0x62, 0xF5], [0x63, 0x64]]) == ["ab\u{FFFD}", "cd"])
+        // 0xFF alone in a chunk.
+        #expect(emissions([[0xFF], [0x78]]) == ["\u{FFFD}", "x"])
+        // Overlong lead 0xC0 at chunk end.
+        #expect(emissions([[0x61, 0xC0], [0x62]]) == ["a\u{FFFD}", "b"])
+        // Stray continuation byte at chunk end.
+        #expect(emissions([[0x61, 0x80], [0x62]]) == ["a\u{FFFD}", "b"])
+        // Invalid lead then continuations split across chunks: one U+FFFD
+        // per bogus byte, each emitted in the chunk it arrived in.
+        #expect(emissions([[0x61, 0xF5, 0x8F], [0xBF, 0xBF, 0x62]])
+            == ["a\u{FFFD}\u{FFFD}", "\u{FFFD}\u{FFFD}b"])
+    }
+
+    @Test func validIncompleteTailsStillHeldBack() {
+        // € (E2 82 AC) split mid-scalar: held, then completed.
+        #expect(emissions([[0x61, 0xE2, 0x82], [0xAC]]) == ["a", "\u{20AC}"])
+        // 0xF4 is the MAX valid 4-byte lead - still held to completion.
+        #expect(emissions([[0xF4, 0x8F], [0xBF, 0xBF]]) == ["", "\u{10FFFF}"])
+    }
+}

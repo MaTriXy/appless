@@ -140,17 +140,17 @@ actor GatedFetchHTTP: HTTPFetching {
 
     @Test func deviceIdPersistedOnceAndReused() async {
         let store = MemorySecureStore()
+        // Register the write-observation seam BEFORE the call; the stream
+        // buffers, so the detached persist cannot race past the await below.
+        let writes = await store.committedWrites()
         let first = await Telemetry.deviceId(store: store, newId: { "fresh-id" })
         #expect(first == "fresh-id")
         // The persist is fire-and-forget (RN doesn't await setItemAsync) -
-        // poll briefly for the detached write to land.
-        var persisted: String?
-        for _ in 0..<100 {
-            persisted = await store.stored(Telemetry.idStorageKey)
-            if persisted != nil { break }
-            try? await Task.sleep(nanoseconds: 1_000_000)
-        }
-        #expect(persisted == "fresh-id")
+        // await the store's committed-write notification, the deterministic
+        // analog of initTelemetry's onDispatch hook, instead of polling.
+        var iterator = writes.makeAsyncIterator()
+        #expect(await iterator.next() == Telemetry.idStorageKey)
+        #expect(await store.stored(Telemetry.idStorageKey) == "fresh-id")
         // A later call must reuse the persisted id, not mint a new one.
         let second = await Telemetry.deviceId(store: store, newId: { "other-id" })
         #expect(second == "fresh-id")

@@ -57,11 +57,20 @@ actor GatedStorage {
     var gated = false
     var writeWaiters: [CheckedContinuation<Void, Never>] = []
     var writesGated = false
+    var writeObservers: [@Sendable (String) -> Void] = []
 
     func setGated(_ g: Bool) { gated = g }
     func setWritesGated(_ g: Bool) { writesGated = g }
+    func addWriteObserver(_ observe: @escaping @Sendable (String) -> Void) {
+        writeObservers.append(observe)
+    }
     func set(_ key: String, _ value: String?) {
         if let value { values[key] = value } else { values.removeValue(forKey: key) }
+    }
+    /// A write-path set: commits the value, then notifies write observers.
+    func commitWrite(_ key: String, _ value: String?) {
+        set(key, value)
+        for observe in writeObservers { observe(key) }
     }
     func get(_ key: String) -> String? { values[key] }
 
@@ -105,6 +114,16 @@ struct MemorySecureStore: SecureStore {
     func gateWrites() async { await storage.setWritesGated(true) }
     func releaseWrites() async { await storage.releaseWrites() }
 
+    /// Write-observation seam: an AsyncStream that yields the key of each
+    /// COMMITTED write. The stream buffers, so a fire-and-forget write that
+    /// lands before the test's first `next()` is never lost - awaiting it is
+    /// a deterministic replacement for polling on detached persists.
+    func committedWrites() async -> AsyncStream<String> {
+        let (stream, continuation) = AsyncStream.makeStream(of: String.self)
+        await storage.addWriteObserver { continuation.yield($0) }
+        return stream
+    }
+
     func read(_ key: String) async throws -> String? {
         await storage.waitIfGated()
         return await storage.get(key)
@@ -112,7 +131,7 @@ struct MemorySecureStore: SecureStore {
 
     func write(_ key: String, value: String?) async throws {
         await storage.waitIfWritesGated()
-        await storage.set(key, value)
+        await storage.commitWrite(key, value)
     }
 
     func stored(_ key: String) async -> String? {
