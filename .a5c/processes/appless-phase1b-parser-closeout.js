@@ -11,11 +11,13 @@
 import { defineTask } from '@a5c-ai/babysitter-sdk';
 
 const REPO = '/home/user/appless';
-const PKG = `${REPO}/ios/Packages/OpenUILang`;
+// Package under closeout - overridable so follow-up phases reuse this process.
+const PKG_DEFAULT = `${REPO}/ios/Packages/OpenUILang`;
 const SWIFT = 'export PATH=/opt/swift/usr/bin:$PATH';
 
 export async function process(inputs, ctx) {
   const { targetQuality = 99, maxIterations = 2 } = inputs;
+  const PKG = inputs.packageDir || PKG_DEFAULT;
 
   let iteration = 0;
   let score = 0;
@@ -30,10 +32,10 @@ export async function process(inputs, ctx) {
 
   while (iteration < maxIterations && !converged) {
     iteration++;
-    await ctx.task(closeoutTask, { feedback, iteration });
-    const buildGate = await ctx.task(buildGateTask, { iteration });
-    const testGate = await ctx.task(testGateTask, { iteration });
-    const judged = await ctx.task(judgeTask, { iteration, targetQuality, gates: { build: buildGate, tests: testGate } });
+    await ctx.task(closeoutTask, { feedback, iteration, pkg: PKG });
+    const buildGate = await ctx.task(buildGateTask, { iteration, pkg: PKG });
+    const testGate = await ctx.task(testGateTask, { iteration, pkg: PKG, testProof: inputs.testProof || 'fixtures exercised: 89' });
+    const judged = await ctx.task(judgeTask, { iteration, targetQuality, pkg: PKG, gates: { build: buildGate, tests: testGate } });
     score = judged.overallScore;
     feedback = judged.recommendations;
     history.push({ iteration, score, criticalIssues: judged.criticalIssues || [] });
@@ -53,7 +55,7 @@ export const closeoutTask = defineTask('closeout', (args, taskCtx) => ({
       role: 'Swift engineer closing final review findings for convergence',
       task: 'Address every feedback item on ios/Packages/OpenUILang without regressing the 89-fixture suite',
       context: {
-        packageDir: PKG,
+        packageDir: args.pkg || PKG_DEFAULT,
         repo: REPO,
         feedback: args.feedback,
         swift: 'toolchain at /opt/swift/usr/bin',
@@ -88,14 +90,14 @@ export const closeoutTask = defineTask('closeout', (args, taskCtx) => ({
 export const buildGateTask = defineTask('build-gate', (args, taskCtx) => ({
   kind: 'shell',
   title: `swift build clean (closeout ${args.iteration})`,
-  shell: { command: `${SWIFT} && cd ${PKG} && swift build 2>&1 | tail -2`, expectedExitCode: 0, timeout: 600000 },
+  shell: { command: `${SWIFT} && cd ${args.pkg || PKG_DEFAULT} && swift build 2>&1 | tail -2`, expectedExitCode: 0, timeout: 600000 },
   labels: ['gate'],
 }));
 
 export const testGateTask = defineTask('test-gate', (args, taskCtx) => ({
   kind: 'shell',
   title: `swift test green, 89 fixtures (closeout ${args.iteration})`,
-  shell: { command: `${SWIFT} && cd ${PKG} && swift test 2>&1 | grep -q 'fixtures exercised: 89' && cd ${PKG} && swift test 2>&1 | tail -2`, expectedExitCode: 0, timeout: 900000 },
+  shell: { command: `${SWIFT} && cd ${args.pkg || PKG_DEFAULT} && swift test 2>&1 | grep -q '${args.testProof || "fixtures exercised: 89"}' && cd ${args.pkg || PKG_DEFAULT} && swift test 2>&1 | tail -2`, expectedExitCode: 0, timeout: 900000 },
   labels: ['gate'],
 }));
 
@@ -108,7 +110,7 @@ export const judgeTask = defineTask('judge-closeout', (args, taskCtx) => ({
       role: 'principal Swift engineer; adversarial, evidence-based; same rubric as the Phase 1 run',
       task: 'Score ios/Packages/OpenUILang 0-100 (fidelity 35, architecture 25, testQuality 20, maintainability 20). The package last scored 96 with three recommendations; verify they are now closed and that nothing regressed, then score the artifact as it IS.',
       context: {
-        packageDir: PKG,
+        packageDir: args.pkg || PKG_DEFAULT,
         spec: `${REPO}/spec/openui-lang.md`,
         gates: args.gates,
         priorScore: 96,
