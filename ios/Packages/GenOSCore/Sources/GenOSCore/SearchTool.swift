@@ -49,33 +49,104 @@ public struct ExaSearchTool: ToolExecuting {
     }
 
     public var available: Bool {
-        false // STUB
+        !(apiKey ?? "").isEmpty
     }
 
     public var promptSection: String { SearchToolText.promptSection }
 
     public var toolDefs: JSONValue {
-        .null // STUB
+        .array([
+            .object([
+                "type": .string("function"),
+                "function": .object([
+                    "name": .string("web_search"),
+                    "description": .string(
+                        "Search the live web. Use for current or real-world facts: news, prices, scores, weather, events, and real places such as famous hotels, restaurants or attractions."
+                    ),
+                    "parameters": .object([
+                        "type": .string("object"),
+                        "properties": .object([
+                            "query": .object([
+                                "type": .string("string"),
+                                "description": .string("Concise web search query"),
+                            ]),
+                        ]),
+                        "required": .array([.string("query")]),
+                    ]),
+                ]),
+            ]),
+        ])
     }
 
     public func execute(name: String, args: [String: JSONValue]) async -> String {
-        "" // STUB
+        guard name == "web_search" else { return "ERROR: unknown tool \"\(name)\"" }
+        let query = jsStringCoerce(args["query"]).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return "ERROR: web_search requires a non-empty query" }
+        do {
+            return formatWebResults(query: query, results: try await webSearch(query: query))
+        } catch {
+            let message = (error as? StreamError)?.message ?? String(describing: error)
+            return "ERROR: web search failed (\(message))"
+        }
     }
 
     /// Raw Exa search; throws on HTTP/network failure (detail truncated to
     /// 200 chars). Results mapped: title fallback = domain, snippet
     /// whitespace-collapsed + trimmed, url-less entries dropped.
     public func webSearch(query: String) async throws -> [SearchResult] {
-        [] // STUB
+        let body: JSONValue = .object([
+            "query": .string(query),
+            "numResults": .number(Double(GenOSConstants.exaNumResults)),
+            "contents": .object([
+                "text": .object(["maxCharacters": .number(Double(GenOSConstants.exaMaxCharacters))]),
+            ]),
+        ])
+        let request = HTTPRequest(
+            url: "https://api.exa.ai/search",
+            method: "POST",
+            headers: ["Content-Type": "application/json", "x-api-key": apiKey ?? ""],
+            body: Data(body.stringified(keyOrder: ["query", "numResults", "contents", "text", "maxCharacters"]).utf8)
+        )
+        let (head, data) = try await http.fetch(request)
+        guard head.ok else {
+            let detail = String((String(data: data, encoding: .utf8) ?? "").prefix(200))
+            throw StreamError(detail.isEmpty ? "Exa HTTP \(head.status)" : detail)
+        }
+        let json = JSONValue.parse(data)
+        let rawResults = json?["results"]?.arrayValue ?? []
+        return rawResults.compactMap { r -> SearchResult? in
+            guard let url = r["url"]?.stringValue, !url.isEmpty else { return nil }
+            let title = r["title"]?.stringValue
+            let text = r["text"]?.stringValue ?? ""
+            let snippet = JSRegex.replacingAll(#"\s+"#, in: text, with: " ")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            return SearchResult(
+                title: title ?? resultDomain(url),
+                url: url,
+                snippet: snippet,
+                published: r["publishedDate"]?.stringValue
+            )
+        }
     }
 }
 
 /// "Web results for ..." tool-message formatting (pure).
 public func formatWebResults(query: String, results: [SearchResult]) -> String {
-    "" // STUB
+    if results.isEmpty {
+        return "Web results for \"\(query)\": none found. Say so honestly on the screen; do not fabricate specifics."
+    }
+    let lines = results.enumerated().map { i, r -> String in
+        let date = (r.published?.isEmpty == false) ? " (\(String(r.published!.prefix(10))))" : ""
+        return "\(i + 1). \(r.title) - \(resultDomain(r.url))\(date)\n   \(r.snippet)"
+    }
+    return "Web results for \"\(query)\":\n" + lines.joined(separator: "\n")
 }
 
 /// Hostname without leading www., or the input when not http(s).
 public func resultDomain(_ url: String) -> String {
-    "" // STUB
+    guard
+        let m = JSRegex.first(#"^https?://(?:www\.)?([^/]+)"#, url),
+        let host = m.count > 1 ? m[1] : nil
+    else { return url }
+    return host
 }

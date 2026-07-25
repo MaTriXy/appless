@@ -19,14 +19,23 @@ public struct TelemetryEvent: Sendable, Equatable {
 public enum Telemetry {
     public static let posthogHost = "https://us.i.posthog.com"
 
+    private static func isTruthy(_ v: String?) -> Bool {
+        v == "1" || v?.lowercased() == "true"
+    }
+
     /// Opted out when POSTHOG_DISABLED or DO_NOT_TRACK is "1" or "true"
     /// (case-insensitive).
     public static func optedOut(env: [String: String]) -> Bool {
-        false // STUB
+        isTruthy(env["POSTHOG_DISABLED"]) || isTruthy(env["DO_NOT_TRACK"])
     }
 
     /// The single launch event payload.
     public static func launchEvent(distinctId: String, platform: String) -> TelemetryEvent {
-        TelemetryEvent(event: "", distinctId: "", lib: "", platform: "") // STUB
+        TelemetryEvent(
+            event: "appless_app_launched",
+            distinctId: distinctId,
+            lib: "appless-native",
+            platform: platform
+        )
     }
 }

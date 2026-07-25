@@ -12,6 +12,10 @@ public enum KeyStatus: String, Sendable, Equatable {
 public final class KeyStore {
     public static let storageKey = "genos.cerebras-key"
 
+    private let store: SecureStore
+    private var key: String?
+    private var currentStatus: KeyStatus
+    private var hydrationTask: Task<Void, Never>?
     private var listeners: [UUID: @MainActor () -> Void] = [:]
 
     /// - Parameters:
@@ -19,35 +23,65 @@ public final class KeyStore {
     ///     analog). Trimmed; empty treated as absent.
     ///   - store: persistence seam.
     public init(envKey: String?, store: SecureStore) {
-        // STUB
+        self.store = store
+        let trimmed = envKey?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let trimmed, !trimmed.isEmpty {
+            key = trimmed
+            currentStatus = .present
+        } else {
+            key = nil
+            currentStatus = .loading
+        }
     }
 
     /// Current gate status. Starts "present" with an env key, else "loading".
     public var status: KeyStatus {
-        .loading // STUB
+        currentStatus
     }
 
     /// The usable key, nil when missing/rejected/still loading.
     public func get() -> String? {
-        nil // STUB
+        key
     }
 
     /// Kick off the persisted-key read. Idempotent. Await to know hydration
     /// settled; a key entered while the read is in flight must win.
     public func hydrate() async {
-        // STUB
+        if hydrationTask == nil {
+            let store = self.store
+            hydrationTask = Task { @MainActor [weak self] in
+                do {
+                    let stored = try await store.read(KeyStore.storageKey)
+                    guard let self, self.currentStatus == .loading else { return }
+                    let trimmed = stored?.trimmingCharacters(in: .whitespacesAndNewlines)
+                    self.key = (trimmed?.isEmpty == false) ? trimmed : nil
+                    self.setStatus(self.key != nil ? .present : .missing)
+                } catch {
+                    self?.setStatus(.missing)
+                }
+            }
+        }
+        await hydrationTask?.value
     }
 
     /// User entered a key: trim, mark present synchronously, persist
     /// best-effort in the background.
     public func set(_ key: String) {
-        // STUB
+        let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.key = trimmed
+        setStatus(.present)
+        let store = self.store
+        Task { try? await store.write(KeyStore.storageKey, value: trimmed) }
     }
 
     /// The API rejected `rejectedKey` (401/403) - drop it and re-show the
     /// gate. No-ops if the user already replaced the key.
     public func markRejected(_ rejectedKey: String) {
-        // STUB
+        guard key == rejectedKey else { return }
+        key = nil
+        setStatus(.rejected)
+        let store = self.store
+        Task { try? await store.write(KeyStore.storageKey, value: nil) }
     }
 
     /// Subscribe to status changes; returns an unsubscribe closure.
@@ -55,5 +89,10 @@ public final class KeyStore {
         let id = UUID()
         listeners[id] = fn
         return { [weak self] in self?.listeners.removeValue(forKey: id) }
+    }
+
+    private func setStatus(_ s: KeyStatus) {
+        currentStatus = s
+        for fn in listeners.values { fn() }
     }
 }

@@ -157,8 +157,15 @@ struct ScriptedHTTP: HTTPStreaming, HTTPFetching {
             throw StreamError("no scripted response")
         }
         let head = HTTPResponseHead(status: scripted.status)
+        // For error statuses the RN reference reads the response body via
+        // res.text(); surface errorBody through the byte stream so the
+        // client's drain-and-decode path sees it.
+        var chunks = scripted.chunks
+        if !head.ok, chunks.isEmpty, !scripted.errorBody.isEmpty {
+            chunks = [Data(scripted.errorBody.utf8)]
+        }
         let stream = AsyncThrowingStream<Data, Error> { continuation in
-            for chunk in scripted.chunks { continuation.yield(chunk) }
+            for chunk in chunks { continuation.yield(chunk) }
             if let msg = scripted.streamErrorMessage {
                 continuation.finish(throwing: StreamError(msg))
             } else {

@@ -9,6 +9,11 @@ import Foundation
 public final class ScreenStore {
     let clock: GenOSClock
     private var listeners: [UUID: @MainActor () -> Void] = [:]
+    private var screens: [String: Screen] = [:]
+    /// Insertion order (JS Map iteration parity for all()).
+    private var order: [String] = []
+    private var versionCounter = 0
+    private var flushTimer: GenOSCancellable?
 
     public init(clock: GenOSClock) {
         self.clock = clock
@@ -16,7 +21,7 @@ public final class ScreenStore {
 
     /// Monotonically increasing change counter; bumps once per notify.
     public var version: Int {
-        0 // STUB
+        versionCounter
     }
 
     public func subscribe(_ fn: @escaping @MainActor () -> Void) -> @MainActor () -> Void {
@@ -26,27 +31,63 @@ public final class ScreenStore {
     }
 
     public func get(_ id: String) -> Screen? {
-        nil // STUB
+        screens[id]
     }
 
     public func all() -> [Screen] {
-        [] // STUB
+        order.compactMap { screens[$0] }
     }
 
     /// Insert/replace a screen; notifies immediately.
     public func upsert(_ screen: Screen) {
-        // STUB
+        if screens[screen.id] == nil {
+            order.append(screen.id)
+        }
+        screens[screen.id] = screen
+        bump()
     }
 
     /// Mutate an existing screen (no-op when absent); notifies immediately,
     /// flushing any buffered streaming notify with it.
     public func patch(_ id: String, _ mutate: (inout Screen) -> Void) {
-        // STUB
+        guard var screen = screens[id] else { return }
+        mutate(&screen)
+        screens[id] = screen
+        // A status/metadata change (done, error, prefetch flip) is meaningful -
+        // flush any buffered streaming notify with it, immediately.
+        bump()
     }
 
     /// Append streamed content: synchronously updates content, flips status
     /// to .streaming and searching to false; schedules a coalesced notify.
     public func append(_ id: String, delta: String) {
-        // STUB
+        guard var screen = screens[id] else { return }
+        // Content is updated synchronously so get()/onDone always see the
+        // latest; only the subscriber notification is throttled. Content
+        // flowing also means any tool round is over - flip "searching" back.
+        screen.content += delta
+        screen.status = .streaming
+        screen.searching = false
+        screens[id] = screen
+        scheduleFlush()
+    }
+
+    /// Notify subscribers at most once per STREAM_FLUSH_MS during streaming.
+    private func scheduleFlush() {
+        guard flushTimer == nil else { return }
+        flushTimer = clock.schedule(afterMs: GenOSConstants.streamFlushMs) { [weak self] in
+            guard let self else { return }
+            self.flushTimer = nil
+            self.bump()
+        }
+    }
+
+    private func bump() {
+        if let timer = flushTimer {
+            timer.cancel()
+            flushTimer = nil
+        }
+        versionCounter += 1
+        for fn in listeners.values { fn() }
     }
 }

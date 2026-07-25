@@ -10,11 +10,31 @@ public final class GenOSController {
     /// App catalog used by openDeepLink lookups (Apps.all in production).
     let apps: [AppDef]
 
+    private var idCounter = 0
+    private var currentActiveScreenId: String?
+    /// `${parentId} ${actionMessage}` → child screen id.
+    private var actionIndex: [String: String] = [:]
+    /// appId → home screen id (reopening an app from the grid is instant).
+    private var appHomeIndex: [String: String] = [:]
+    /// `${appId} ${request}` → screen id (repeated deep links reuse a screen).
+    private var deepLinkIndex: [String: String] = [:]
+    /// screen id → cancellation token for its in-flight generation.
+    private var inflight: [String: StreamCancelToken] = [:]
+
     public init(store: ScreenStore, streamer: ScreenStreaming, clock: GenOSClock, apps: [AppDef]) {
         self.store = store
         self.streamer = streamer
         self.clock = clock
         self.apps = apps
+    }
+
+    private func newId() -> String {
+        idCounter += 1
+        return "screen-\(idCounter)"
+    }
+
+    private func actionKey(_ parentId: String, _ message: String) -> String {
+        "\(parentId) \(message)"
     }
 
     // MARK: - Context
@@ -23,7 +43,139 @@ public final class GenOSController {
     /// user request + (if content) assistant cleanLang(content); final turn
     /// is the screen's own request. Text-only.
     public func buildMessages(for screen: Screen) -> [ChatMessage] {
-        [] // STUB
+        var chain: [Screen] = [screen]
+        var cur = screen
+        while let parentId = cur.parentId, chain.count <= GenOSConstants.contextDepth {
+            guard let parent = store.get(parentId) else { break }
+            chain.insert(parent, at: 0)
+            cur = parent
+        }
+
+        var messages: [ChatMessage] = []
+        for s in chain.dropLast() {
+            // Ancestors replay text-only - re-sending images would burn
+            // tokens per hop.
+            messages.append(ChatMessage(role: .user, content: s.request))
+            if !s.content.isEmpty {
+                messages.append(ChatMessage(role: .assistant, content: Lang.cleanLang(s.content)))
+            }
+        }
+        messages.append(ChatMessage(role: .user, content: screen.request))
+        return messages
+    }
+
+    // MARK: - Stream lifecycle
+
+    private func startStream(_ id: String) {
+        guard let screen = store.get(id) else { return }
+        inflight[id]?.cancel()
+
+        // Callbacks from a superseded stream (a retry replaced this token)
+        // must not touch the screen or delete the new stream's token.
+        final class TokenBox {
+            var token: StreamCancelToken?
+        }
+        let box = TokenBox()
+        let stale: @MainActor () -> Bool = { [weak self] in
+            guard let self, let token = box.token else { return true }
+            return self.inflight[id] !== token
+        }
+
+        let handlers = StreamHandlers(
+            onDelta: { [weak self] delta in
+                guard let self, !stale() else { return }
+                self.store.append(id, delta: delta)
+            },
+            onDone: { [weak self] info in
+                guard let self, !stale() else { return }
+                self.inflight.removeValue(forKey: id)
+                let s = self.store.get(id)
+                if info.dropped {
+                    // The stream died mid-flight - a partial screen looks
+                    // complete but is missing content; surface it as retryable.
+                    self.store.patch(id) {
+                        $0.status = .error
+                        $0.error = "The connection dropped mid-screen - retry"
+                        $0.searching = false
+                    }
+                    return
+                }
+                let genMs = s.map { Int((self.clock.now - $0.startedAt).rounded()) }
+                let osCommand = s.flatMap { Lang.parseOsCommand($0.content) }
+                self.store.patch(id) {
+                    $0.status = .done
+                    $0.genMs = genMs
+                    $0.truncated = info.truncated
+                    $0.osCommand = osCommand
+                    $0.searching = false
+                }
+                if osCommand == nil { self.maybePrefetch(id) }
+            },
+            onError: { [weak self] error in
+                guard let self, !stale() else { return }
+                self.inflight.removeValue(forKey: id)
+                let message = (error as? StreamError)?.message ?? String(describing: error)
+                self.store.patch(id) {
+                    $0.status = .error
+                    $0.error = message
+                    $0.searching = false
+                }
+            },
+            onToolRound: { [weak self] _ in
+                // The model wants tools (web_search). Refuse on speculative
+                // prefetch - quota only burns on screens the user actually
+                // opens; the errored cache entry regenerates fresh
+                // (non-speculative, tools allowed) on tap.
+                guard let self, !stale() else { return .abort }
+                if self.store.get(id)?.speculative == true { return .abort }
+                self.store.patch(id) {
+                    $0.content = ""
+                    $0.status = .pending
+                    $0.searching = true
+                }
+                return .proceed
+            }
+        )
+
+        let token = streamer.stream(messages: buildMessages(for: screen), handlers: handlers)
+        box.token = token
+        inflight[id] = token
+    }
+
+    private struct LaunchInput {
+        var appId: String
+        var appName: String
+        var request: String
+        var parentId: String?
+        var speculative: Bool
+    }
+
+    private func launchScreen(_ input: LaunchInput) -> String {
+        let id = newId()
+        store.upsert(Screen(
+            id: id,
+            appId: input.appId,
+            appName: input.appName,
+            request: input.request,
+            parentId: input.parentId,
+            content: "",
+            status: .pending,
+            speculative: input.speculative,
+            startedAt: clock.now
+        ))
+        startStream(id)
+        return id
+    }
+
+    /// A cached screen is reusable unless it errored or looks stuck mid-stream.
+    private func reusable(_ screen: Screen?) -> Bool {
+        guard let screen else { return false }
+        if screen.status == .error { return false }
+        if (screen.status == .pending || screen.status == .streaming),
+           clock.now - screen.startedAt > GenOSConstants.staleMs {
+            return false
+        }
+        return true
     }
 
     // MARK: - Navigation entry points
@@ -32,7 +184,23 @@ public final class GenOSController {
     /// screen when reusable; retries in place when stuck/errored.
     @discardableResult
     public func openApp(_ app: AppDef) -> String {
-        "" // STUB
+        if let existing = appHomeIndex[app.id] {
+            let screen = store.get(existing)
+            if reusable(screen) { return existing }
+            if screen != nil {
+                retryScreen(existing)
+                return existing
+            }
+        }
+        let id = launchScreen(LaunchInput(
+            appId: app.id,
+            appName: app.name,
+            request: app.request,
+            parentId: nil,
+            speculative: false
+        ))
+        appHomeIndex[app.id] = id
+        return id
     }
 
     /// Open a screen in another app via a genos://open deep link. Cache key
@@ -40,7 +208,26 @@ public final class GenOSController {
     /// fallback name.
     @discardableResult
     public func openDeepLink(appId: String, request: String) -> String {
-        "" // STUB
+        let key = "\(appId.lowercased()) \(request)"
+        if let existing = deepLinkIndex[key] {
+            let screen = store.get(existing)
+            if reusable(screen) { return existing }
+            if screen != nil {
+                retryScreen(existing)
+                return existing
+            }
+        }
+        let app = apps.first { $0.id == appId.lowercased() }
+        let fallbackName = appId.prefix(1).uppercased() + appId.dropFirst()
+        let id = launchScreen(LaunchInput(
+            appId: app?.id ?? appId.lowercased(),
+            appName: app?.name ?? fallbackName,
+            request: request,
+            parentId: nil,
+            speculative: false
+        ))
+        deepLinkIndex[key] = id
+        return id
     }
 
     /// Resolve a tapped action: prefetched screen when one exists, fresh
@@ -48,23 +235,92 @@ public final class GenOSController {
     /// append "\n\nSubmitted form values: " + JSON to the request.
     @discardableResult
     public func resolveAction(parentId: String, message: String, formState: [String: JSONValue]? = nil) -> String {
-        "" // STUB
+        let parent = store.get(parentId)
+        let hasFormValues = !(formState ?? [:]).isEmpty
+        let key = actionKey(parentId, message)
+
+        if !hasFormValues, let hit = actionIndex[key] {
+            if let hitScreen = store.get(hit) {
+                if reusable(hitScreen) {
+                    store.patch(hit) {
+                        $0.speculative = false
+                        $0.prefetched = hitScreen.speculative && hitScreen.status == .done
+                    }
+                    return hit
+                }
+                retryScreen(hit)
+                return hit
+            }
+        }
+
+        let request: String
+        if hasFormValues, let formState {
+            request = "\(message)\n\nSubmitted form values: \(JSONValue.object(formState).stringified())"
+        } else {
+            request = message
+        }
+        let id = launchScreen(LaunchInput(
+            appId: parent?.appId ?? "unknown",
+            appName: parent?.appName ?? "App",
+            request: request,
+            parentId: parentId,
+            speculative: false
+        ))
+        if !hasFormValues { actionIndex[key] = id }
+        return id
     }
 
     /// Re-generate a failed or stuck screen in place: clears content/error/
     /// flags, resets startedAt, speculative → false (re-enables tools).
     public func retryScreen(_ id: String) {
-        // STUB
+        guard store.get(id) != nil else { return }
+        let now = clock.now
+        store.patch(id) {
+            $0.content = ""
+            $0.status = .pending
+            $0.error = nil
+            $0.genMs = nil
+            $0.prefetched = nil
+            $0.truncated = nil
+            $0.startedAt = now
+            // A user-initiated retry is never speculative - this also
+            // re-enables tools for prefetched screens that errored with
+            // NEEDS_LIVE_DATA.
+            $0.speculative = false
+            $0.searching = false
+        }
+        startStream(id)
     }
 
     /// The shell reports which screen is on top; prefetch only ever runs for
     /// the visible screen.
     public func setActiveScreen(_ id: String?) {
-        // STUB
+        currentActiveScreenId = id
+        if let id, store.get(id)?.status == .done {
+            maybePrefetch(id)
+        }
     }
 
     /// Currently visible screen id as last reported by the shell.
     public var activeScreenId: String? {
-        nil // STUB
+        currentActiveScreenId
+    }
+
+    private func maybePrefetch(_ id: String) {
+        guard currentActiveScreenId == id else { return }
+        guard let screen = store.get(id), screen.status == .done else { return }
+
+        for message in Lang.extractActions(Lang.cleanLang(screen.content)).prefix(GenOSConstants.maxPrefetch) {
+            let key = actionKey(id, message)
+            if actionIndex[key] != nil { continue }
+            let childId = launchScreen(LaunchInput(
+                appId: screen.appId,
+                appName: screen.appName,
+                request: message,
+                parentId: id,
+                speculative: true
+            ))
+            actionIndex[key] = childId
+        }
     }
 }
