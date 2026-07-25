@@ -117,13 +117,12 @@ func jsNumberToString(_ d: Double) -> String {
 }
 
 /// JS `Number(string)` semantics. Returns NaN for non-numeric strings.
-/// KNOWN-DEVIATION (README.md #7): the ES StrWhiteSpace set includes all of
-/// category Zs (covered via `whitespacesAndNewlines`) but NOT U+0085 NEL,
-/// which `whitespacesAndNewlines` adds — the port over-trims U+0085.
+/// ES *StrWhiteSpace* is exactly the `trim()` set (*WhiteSpace* ∪
+/// *LineTerminator*; U+0085 NEL is NOT in it — former KNOWN-DEVIATION #7,
+/// now fixed), so this reuses `jsTrim()` (Preprocess.swift), verified
+/// empirically against node v22 `Number()` for every candidate scalar.
 func jsStringToNumber(_ s: String) -> Double {
-    let jsWhitespace = CharacterSet(charactersIn: " \t\n\r\u{0B}\u{0C}\u{A0}\u{FEFF}")
-        .union(.whitespacesAndNewlines)
-    let t = s.trimmingCharacters(in: jsWhitespace)
+    let t = s.jsTrim()
     if t.isEmpty { return 0 }
     if t == "Infinity" || t == "+Infinity" { return .infinity }
     if t == "-Infinity" { return -.infinity }

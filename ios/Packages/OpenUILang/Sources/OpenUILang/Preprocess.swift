@@ -153,19 +153,50 @@ func stripComments(_ input: String) -> String {
 }
 
 extension String {
-    /// JS `String.prototype.trim()` whitespace set (close approximation).
-    /// KNOWN-DEVIATION (README.md #7): `whitespacesAndNewlines` also contains
-    /// U+0085 NEL, which the JS trim set does not.
-    static let jsWhitespace = CharacterSet.whitespacesAndNewlines
-        .union(CharacterSet(charactersIn: "\u{FEFF}\u{A0}"))
+    /// JS `String.prototype.trim()` whitespace set, EXACT: ECMAScript
+    /// *WhiteSpace* ∪ *LineTerminator* (TAB, LF, VT, FF, CR, SP, NBSP,
+    /// OGHAM SPACE MARK, the Zs run U+2000–200A, LS, PS, NNBSP, MMSP,
+    /// IDEOGRAPHIC SPACE, ZWNBSP/U+FEFF). `Number(string)`'s *StrWhiteSpace*
+    /// is the same set, so `jsStringToNumber` reuses these helpers.
+    ///
+    /// Verified empirically against node v22 (`''.trim()` and `Number()`
+    /// probes over every candidate scalar): U+0085 NEL, U+200B ZWSP and
+    /// U+180E MONGOLIAN VOWEL SEPARATOR are NOT whitespace to JS. This is
+    /// why Foundation's `whitespacesAndNewlines` (which contains U+0085) is
+    /// deliberately not used — building the set from it over-trimmed NEL
+    /// (former KNOWN-DEVIATION #7, now fixed; see README.md).
+    ///
+    /// Scalar-level trimming is exact here: JS trims UTF-16 code units, but
+    /// every member of the set is a BMP scalar and surrogate halves are never
+    /// whitespace, so the two agree on all Swift-representable strings.
+    static let jsWhitespaceScalars: Set<Unicode.Scalar> = [
+        "\u{0009}", "\u{000A}", "\u{000B}", "\u{000C}", "\u{000D}", "\u{0020}",
+        "\u{00A0}", "\u{1680}",
+        "\u{2000}", "\u{2001}", "\u{2002}", "\u{2003}", "\u{2004}", "\u{2005}",
+        "\u{2006}", "\u{2007}", "\u{2008}", "\u{2009}", "\u{200A}",
+        "\u{2028}", "\u{2029}", "\u{202F}", "\u{205F}", "\u{3000}", "\u{FEFF}",
+    ]
 
     func jsTrim() -> String {
-        trimmingCharacters(in: String.jsWhitespace)
+        var s = self
+        while let first = s.unicodeScalars.first,
+            String.jsWhitespaceScalars.contains(first)
+        {
+            s.unicodeScalars.removeFirst()
+        }
+        while let last = s.unicodeScalars.last,
+            String.jsWhitespaceScalars.contains(last)
+        {
+            s.unicodeScalars.removeLast()
+        }
+        return s
     }
 
     func jsTrimEnd() -> String {
         var s = self
-        while let last = s.unicodeScalars.last, String.jsWhitespace.contains(last) {
+        while let last = s.unicodeScalars.last,
+            String.jsWhitespaceScalars.contains(last)
+        {
             s.unicodeScalars.removeLast()
         }
         return s

@@ -9,6 +9,11 @@ sweeps (CRLF chunking, combining-mark adjacency).
 - Normative spec: `spec/openui-lang.md`
 - JS reference: `spec/fixtures/generator/node_modules/@openuidev/lang-core/dist`
 - Fixture format: `spec/fixtures/README.md`
+- Probe oracle tooling: `spec/fixtures/generator/probes/` — committed,
+  regenerable scripts that emit JS-oracle expected trees for arbitrary
+  programs / streaming `set()` sequences (`expected-tree.mjs`) and regenerate
+  the `StreamingSemanticsTests` inline expectations
+  (`regen-streaming-expectations.mjs`); see `probes/README.md`
 - Entry points: `OpenUIParser.parse(_:)` (batch) and `StreamingParser.set(_:)`
   (incremental; call with the full accumulated text on every flush)
 
@@ -86,20 +91,27 @@ current fixture corpus; each is listed with the condition under which it
    IS replicated in `Pipeline.convertValue`; only the runtime-evaluation
    collision for the 18 exact kind strings is not.
 
-7. **`trim()` / `Number()` whitespace sets over-include U+0085 NEL**
-   (`Preprocess.swift`, `jsTrim`/`jsTrimEnd`; `RuntimeValue.swift`,
-   `jsStringToNumber`). JS `String.prototype.trim()` strips exactly
-   *WhiteSpace* + *LineTerminator* (TAB, VT, FF, SP, NBSP, ZWNBSP/U+FEFF,
-   category Zs, LF, CR, LS, PS) — U+0085 NEXT LINE is **not** in that set.
-   ECMAScript `Number(string)`'s *StrWhiteSpace* is the same set (it does
-   include **all** of category Zs, which the port covers). The port builds
-   both sets from Foundation's `CharacterSet.whitespacesAndNewlines`, which
-   additionally contains U+0085 — so the port trims a leading/trailing
-   U+0085 that JS would keep. Observable only for program text or
-   `Number()`-coerced strings carrying U+0085 at a trimmed boundary
-   (e.g. JS `Number("5\u{0085}")` is `NaN`; the port yields `5`).
-
 ### Implemented quirk parity (not deviations)
+
+- **Exact `trim()` / `Number()` whitespace sets** (`Preprocess.swift`,
+  `String.jsWhitespaceScalars` + `jsTrim`/`jsTrimEnd`; `RuntimeValue.swift`,
+  `jsStringToNumber`): both helpers use an explicit scalar set encoding the
+  real ECMAScript *WhiteSpace* ∪ *LineTerminator* definition (TAB, LF, VT,
+  FF, CR, SP, NBSP, OGHAM SPACE MARK, U+2000–200A, LS, PS, NNBSP, MMSP,
+  IDEOGRAPHIC SPACE, ZWNBSP/U+FEFF), verified scalar-by-scalar against node
+  v22 `''.trim()` and `Number()` probes. `Number(string)`'s *StrWhiteSpace*
+  is the same set, so `jsStringToNumber` trims via `jsTrim()`. This FIXED
+  former deviation #7: the sets were previously built from Foundation's
+  `CharacterSet.whitespacesAndNewlines`, which additionally contains U+0085
+  NEXT LINE — the port trimmed a leading/trailing U+0085 that JS keeps
+  (JS `Number("5\u{0085}")` is `NaN` → lang-core `toNumber` maps it to 0;
+  the old port yielded `5`). U+0085, U+200B ZWSP and U+180E are now
+  correctly non-whitespace. Pinned by
+  `WhitespaceSemanticsTests` (per-scalar unit coverage) and
+  `WhitespaceDifferentialProbeTests` (full programs with U+0085 / NBSP /
+  U+2028 in trim and `Number()` positions, byte-compared against JS-oracle
+  trees regenerable via `spec/fixtures/generator/probes/expected-tree.mjs`).
+  Not expressed as a corpus fixture to keep the 89-fixture CI gate stable.
 
 - **UTF-16 code-unit scanning** (`StreamCore.scanNewCompleted`,
   `Lexer.tokenize`, `Statements.autoClose`, `Preprocess.stripFences` /
@@ -114,7 +126,8 @@ current fixture corpus; each is listed with the condition under which it
   combining-mark adjacency matches JS byte-for-byte — pinned by fixtures
   `073-crlf-statements` / `074-combining-glue`, the
   `chunkBoundaryInsideCRLF` streaming scenario, and a 21-probe
-  batch+streaming differential sweep. Token values and statement slices are
+  batch+streaming differential sweep (tooling to run such sweeps is
+  committed at `spec/fixtures/generator/probes/expected-tree.mjs`). Token values and statement slices are
   rebuilt from code-unit ranges via `String(decoding:as: UTF16.self)`
   (lone-surrogate behavior stays as documented in deviation #2); all stored
   offsets/watermarks are code-unit indices.
@@ -134,3 +147,38 @@ current fixture corpus; each is listed with the condition under which it
   (-7, 21) — including integer-valued doubles beyond Int64
   (`12345678901234567168` prints `"12345678901234567000"`) — and
   `1e+21` / `1e-7` style exponential outside.
+
+## PHASE-2 HANDOFF
+
+This package covers the parser + runtime evaluator only. The spec §11
+app-level pure helpers (`spec/openui-lang.md` §11.1–11.5) live in the app
+layer (store.ts / GenOS.tsx / tools/images.ts), NOT in lang-core, and are
+therefore out of scope here — they MUST be ported byte-exact into the Phase 2
+**GenOSCore** package:
+
+- **`cleanLang(text)`** — spec §11.1. Fence stripping for whole responses:
+  removes ONE leading ` ```lang ` line and truncates at `\n``` ` only when an
+  opener was present (else strips one trailing fence). NOT string-aware —
+  deliberately different from the parser's `stripFences` (spec §4), so do not
+  reuse `Preprocess.stripFences` for it.
+- **`extractActions(content)`** — spec §11.2. Regex-scan for
+  `@ToAssistant("...")` captures (double quotes only), unescape by collapsing
+  EVERY backslash-pair (`\n` → `n`, not JSON semantics), trim, drop empties,
+  dedupe preserving first-seen order (prefetch cap `MAX_PREFETCH = 6`).
+- **`parseOsCommand(text)`** — spec §11.3. Whole-response match of
+  `@OS(back|home|switcher|open[, "arg"])` after `cleanLang` + trim;
+  case-insensitive, command lower-cased, arg double-quoted only, no partial
+  match (any other content → null).
+- **`parseGenosUrl(url)`** — spec §11.4. Hand-rolled `genos://cmd?query`
+  parser: command lower-cased, pairs split on `&`, key/value split at FIRST
+  `=` (key-only pair → value `""`), value gets `+`→space THEN
+  `decodeURIComponent`, raw fallback on decode failure.
+- **`parseImgUrl(src)`** — spec §11.5. Only `/api/img` srcs are semantic;
+  key-only query pairs are SKIPPED (unlike §11.4), `q` sanitized to
+  `[a-zA-Z0-9, -]` with default `"abstract gradient"`, `seed`/`w`/`h`
+  parseInt-with-clamp (NaN → min bound); LoremFlickr/Unsplash resolution per
+  spec.
+
+Each helper's verified behavior tables in spec §11 are normative; port them
+byte-exact and pin with an oracle harness in the GenOSCore package (the probe
+driver pattern in `spec/fixtures/generator/probes/` is the template).

@@ -3,7 +3,9 @@
 #
 # Gates:
 #   1. Fixture generator: patch applies, expected trees regenerate
-#      deterministically, tests pass, committed trees are fresh.
+#      deterministically, tests pass, committed trees are fresh. Its npm test
+#      also checks StreamingSemanticsTests.swift (Swift port) against the
+#      probe oracle's scenario data — hence the ios/ test path filter below.
 #   2. Contract schema: spec/contract/genos.schema.json matches contract.tsx.
 #   3. Prompt: spec/prompt/ assembles BYTE-IDENTICAL to the shipped
 #      SYSTEM_PROMPT (Phase 0 exit criterion, docs/NATIVE_MIGRATION_PLAN.md §9).
@@ -19,6 +21,7 @@ on:
       - "src/genos/ui/contract.tsx"
       - "src/genos/generated/**"
       - "scripts/embed-prompt.mjs"
+      - "ios/Packages/OpenUILang/Tests/**"
       - ".github/workflows/spec-gates.yml"
   pull_request:
     paths:
@@ -27,6 +30,7 @@ on:
       - "src/genos/ui/contract.tsx"
       - "src/genos/generated/**"
       - "scripts/embed-prompt.mjs"
+      - "ios/Packages/OpenUILang/Tests/**"
       - ".github/workflows/spec-gates.yml"
 
 jobs:
