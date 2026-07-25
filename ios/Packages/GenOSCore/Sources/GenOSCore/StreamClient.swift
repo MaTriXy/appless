@@ -147,7 +147,18 @@ struct UTF8StreamDecoder {
         var i = max(0, bytes.count - 3)
         while i < bytes.count {
             let b = bytes[i]
-            let need = b >= 0xF0 ? 4 : (b >= 0xE0 ? 3 : (b >= 0xC0 ? 2 : 0))
+            // Only VALID lead bytes can start an incomplete sequence worth
+            // holding back (TextDecoder emits U+FFFD immediately for invalid
+            // leads such as 0xC0/0xC1 and 0xF5-0xFF, and for stray
+            // continuation bytes - matching its emission timing, not just
+            // final totals).
+            let need: Int
+            switch b {
+            case 0xC2...0xDF: need = 2
+            case 0xE0...0xEF: need = 3
+            case 0xF0...0xF4: need = 4
+            default: need = 0
+            }
             if need > 0 && i + need > bytes.count {
                 end = i
                 break

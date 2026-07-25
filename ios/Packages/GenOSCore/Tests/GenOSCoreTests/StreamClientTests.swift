@@ -618,11 +618,13 @@ import Testing
         // day: "numeric" }) - e.g. "Friday, July 25, 2026". The DEFAULT
         // closure (host forgot to inject) must produce that same shape so
         // the prompt never degrades to "Today is ." - asserted structurally,
-        // not against a pinned date.
+        // not against a pinned date. The day alternation (1-31, no leading
+        // zero) pins toLocaleDateString's day:"numeric" shape - "July 5",
+        // never "July 05".
         let today = StreamConfig().todayString()
         let pattern = "\\A(Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday), "
             + "(January|February|March|April|May|June|July|August|September|October|November|December) "
-            + "[0-9]{1,2}, [0-9]{4}\\z"
+            + "(?:[1-9]|[12][0-9]|3[01]), [0-9]{4}\\z"
         #expect(JSRegex.test(pattern, today), "unexpected default today string: \(today)")
         // The named default closure is the same shape (no midnight-race
         // equality pin between two separate now() reads).
