@@ -127,7 +127,9 @@ import Testing
             (-0.0, "0"),
             (0.1, "0.1"),
             (0.1 + 0.2, "0.30000000000000004"),
-            (5e-324, "5e-324"),
+            // A literal 5e-324 warns ("underflows and loses precision during
+            // conversion to Double") - same value, no warning.
+            (Double.leastNonzeroMagnitude, "5e-324"),
             (1.7976931348623157e308, "1.7976931348623157e+308"),
             (pow(2, 56), "72057594037927940"),
             (pow(2, 53), "9007199254740992"),
@@ -153,9 +155,11 @@ import Testing
             "max_completion_tokens": .number(3072),
             "stream": .bool(true),
         ])
+        // Compare UTF-8 BYTES: Swift's String == is canonical equivalence and
+        // would absorb a normalization-level escaping bug.
         #expect(
-            body.stringified(keyOrder: ["model", "temperature", "max_completion_tokens", "stream"])
-                == #"{"model":"gemma-4-31b","temperature":0.8,"max_completion_tokens":3072,"stream":true}"#
+            Data(body.stringified(keyOrder: ["model", "temperature", "max_completion_tokens", "stream"]).utf8)
+                == Data(#"{"model":"gemma-4-31b","temperature":0.8,"max_completion_tokens":3072,"stream":true}"#.utf8)
         )
         // Unhinted keys sort; nested values recurse; large/tiny numbers keep
         // JSON.stringify formatting.
@@ -165,8 +169,34 @@ import Testing
             ("nested", .object(["b": .number(-0.0), "a": .array([.number(1), .null])])),
         ]
         #expect(
-            JSONValue.stringifyOrdered(form)
-                == #"{"zeta":10000000000000000,"alpha":1e-7,"nested":{"a":[1,null],"b":0}}"#
+            Data(JSONValue.stringifyOrdered(form).utf8)
+                == Data(#"{"zeta":10000000000000000,"alpha":1e-7,"nested":{"a":[1,null],"b":0}}"#.utf8)
         )
+    }
+
+    /// encodeJSONString had no direct coverage - escaping shipped pinned only
+    /// by ASCII payloads. JSON.stringify uses the two-character shortcuts,
+    /// \uXXXX for the remaining C0 controls, leaves "/" and U+007F DEL raw, and
+    /// does NOT escape U+2028/U+2029 (a classic port bug: some serializers do).
+    @Test func encodeJSONStringMatchesJsonStringifyBytes() {
+        let cases: [(String, String)] = [
+            ("plain", #""plain""#),
+            ("quote\" back\\slash", #""quote\" back\\slash""#),
+            ("tab\tnewline\ncr\r", #""tab\tnewline\ncr\r""#),
+            ("form\u{0C}back\u{08}", #""form\fback\b""#),
+            ("ctrl\u{01}\u{1F}", #""ctrl\u0001\u001f""#),
+            ("slash/and\u{7F}del", "\"slash/and\u{7F}del\""),
+            ("line\u{2028}para\u{2029}", "\"line\u{2028}para\u{2029}\""),
+            ("astral\u{1F327}end", "\"astral\u{1F327}end\""),
+            ("nbsp\u{A0}bom\u{FEFF}", "\"nbsp\u{A0}bom\u{FEFF}\""),
+            ("combining e\u{301}", "\"combining e\u{301}\""),
+        ]
+        for (input, expected) in cases {
+            let hex = input.unicodeScalars.map { String($0.value, radix: 16) }.joined(separator: " ")
+            #expect(
+                Data(JSONValue.encodeJSONString(input).utf8) == Data(expected.utf8),
+                "encodeJSONString(scalars: \(hex))"
+            )
+        }
     }
 }

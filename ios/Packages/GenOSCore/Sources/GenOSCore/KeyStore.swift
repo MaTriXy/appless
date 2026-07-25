@@ -16,7 +16,9 @@ public final class KeyStore {
     private var key: String?
     private var currentStatus: KeyStatus
     private var hydrationTask: Task<Void, Never>?
-    private var listeners: [UUID: @MainActor () -> Void] = [:]
+    // Insertion-ordered (JS `Set` iteration parity for notify order), matching
+    // ScreenStore - a Dictionary would notify subscribers in arbitrary order.
+    private var listeners: [(id: UUID, fn: @MainActor () -> Void)] = []
 
     /// - Parameters:
     ///   - envKey: build-time key override (EXPO_PUBLIC_CEREBRAS_API_KEY
@@ -97,12 +99,12 @@ public final class KeyStore {
     /// Subscribe to status changes; returns an unsubscribe closure.
     public func subscribe(_ fn: @escaping @MainActor () -> Void) -> @MainActor () -> Void {
         let id = UUID()
-        listeners[id] = fn
-        return { [weak self] in self?.listeners.removeValue(forKey: id) }
+        listeners.append((id: id, fn: fn))
+        return { [weak self] in self?.listeners.removeAll { $0.id == id } }
     }
 
     private func setStatus(_ s: KeyStatus) {
         currentStatus = s
-        for fn in listeners.values { fn() }
+        for entry in listeners { entry.fn() }
     }
 }
