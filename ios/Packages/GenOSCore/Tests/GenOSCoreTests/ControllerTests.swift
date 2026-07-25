@@ -1,0 +1,464 @@
+import Foundation
+import Testing
+@testable import GenOSCore
+
+// src/genos/store.ts controller: caches, retry, staleness, superseded streams.
+@MainActor
+@Suite struct ControllerCacheTests {
+    @Test func openAppLaunchesPendingScreenAndStartsStream() {
+        let h = ControllerHarness()
+        let id = h.controller.openApp(sampleApp)
+        let screen = h.store.get(id)
+        #expect(screen?.appId == "weather")
+        #expect(screen?.appName == "Weather")
+        #expect(screen?.request == sampleApp.request)
+        #expect(screen?.status == .pending)
+        #expect(screen?.speculative == false)
+        #expect(screen?.content == "")
+        #expect(h.streamer.count == 1)
+        #expect(h.streamer.last?.messages.last?.content == sampleApp.request)
+    }
+
+    @Test func openAppReusesDoneHomeScreenWithoutRegenerating() {
+        let h = ControllerHarness()
+        let id = h.controller.openApp(sampleApp)
+        h.finishLast(content: "root = Card()")
+        let again = h.controller.openApp(sampleApp)
+        #expect(again == id)
+        #expect(h.streamer.count == 1)
+    }
+
+    @Test func openAppReusesInFlightScreenUntilStale() {
+        let h = ControllerHarness()
+        let id = h.controller.openApp(sampleApp)
+        h.clock.advance(by: 29_999)
+        #expect(h.controller.openApp(sampleApp) == id)
+        #expect(h.streamer.count == 1)
+    }
+
+    @Test func openAppStuckPastStaleMsRetriesInPlace() {
+        let h = ControllerHarness()
+        let id = h.controller.openApp(sampleApp)
+        h.streamer.last?.handlers.onDelta("partial")
+        h.clock.advance(by: 30_001)
+        let again = h.controller.openApp(sampleApp)
+        #expect(again == id)
+        // Same id, but a fresh generation was started.
+        #expect(h.streamer.count == 2)
+        #expect(h.store.get(id)?.status == .pending)
+        #expect(h.store.get(id)?.content == "")
+    }
+
+    @Test func openAppErroredScreenRetriesInPlace() {
+        let h = ControllerHarness()
+        let id = h.controller.openApp(sampleApp)
+        h.streamer.last?.handlers.onError(StreamError("boom"))
+        #expect(h.store.get(id)?.status == .error)
+        let again = h.controller.openApp(sampleApp)
+        #expect(again == id)
+        #expect(h.streamer.count == 2)
+        #expect(h.store.get(id)?.error == nil)
+    }
+
+    @Test func deepLinkCachesByLowercasedAppIdAndRequest() {
+        let h = ControllerHarness(apps: [sampleApp])
+        let id = h.controller.openDeepLink(appId: "Weather", request: "show goa")
+        h.finishLast(content: "root = Card()")
+        // Known app resolves catalog name; repeated link reuses the screen.
+        #expect(h.store.get(id)?.appId == "weather")
+        #expect(h.store.get(id)?.appName == "Weather")
+        #expect(h.controller.openDeepLink(appId: "weather", request: "show goa") == id)
+        #expect(h.streamer.count == 1)
+    }
+
+    @Test func deepLinkUnknownAppGetsCapitalizedFallbackName() {
+        let h = ControllerHarness(apps: [sampleApp])
+        let id = h.controller.openDeepLink(appId: "stocks", request: "show AAPL")
+        #expect(h.store.get(id)?.appId == "stocks")
+        #expect(h.store.get(id)?.appName == "Stocks")
+    }
+
+    @Test func resolveActionLaunchesChildInheritingParentIdentity() {
+        let h = ControllerHarness()
+        let parentId = h.controller.openApp(sampleApp)
+        h.finishLast(content: "root = Card()")
+        let childId = h.controller.resolveAction(parentId: parentId, message: "show hourly")
+        let child = h.store.get(childId)
+        #expect(child?.appId == "weather")
+        #expect(child?.appName == "Weather")
+        #expect(child?.parentId == parentId)
+        #expect(child?.request == "show hourly")
+        #expect(child?.speculative == false)
+    }
+
+    @Test func resolveActionWithoutParentFallsBackToUnknownApp() {
+        let h = ControllerHarness()
+        let id = h.controller.resolveAction(parentId: "missing", message: "hello")
+        #expect(h.store.get(id)?.appId == "unknown")
+        #expect(h.store.get(id)?.appName == "App")
+    }
+
+    @Test func resolveActionCacheHitReturnsSameScreenWithoutNewStream() {
+        let h = ControllerHarness()
+        let parentId = h.controller.openApp(sampleApp)
+        h.finishLast(content: "root = Card()")
+        let childId = h.controller.resolveAction(parentId: parentId, message: "details")
+        h.finishLast(content: "root = Detail()")
+        let again = h.controller.resolveAction(parentId: parentId, message: "details")
+        #expect(again == childId)
+        #expect(h.streamer.count == 2)
+    }
+
+    @Test func formSubmissionBypassesCacheBothWays() {
+        let h = ControllerHarness()
+        let parentId = h.controller.openApp(sampleApp)
+        h.finishLast(content: "root = Card()")
+
+        // Cached plain action exists...
+        let plain = h.controller.resolveAction(parentId: parentId, message: "book table")
+        h.finishLast(content: "root = Booked()")
+
+        // ...but a form submission must never read it,
+        let form1 = h.controller.resolveAction(
+            parentId: parentId,
+            message: "book table",
+            formState: ["guests": .number(4)]
+        )
+        #expect(form1 != plain)
+        // ...and must never write it: a second identical submission is fresh too.
+        let form2 = h.controller.resolveAction(
+            parentId: parentId,
+            message: "book table",
+            formState: ["guests": .number(4)]
+        )
+        #expect(form2 != form1)
+        // The plain cache entry is untouched.
+        #expect(h.controller.resolveAction(parentId: parentId, message: "book table") == plain)
+    }
+
+    @Test func formSubmissionAppendsJsonToRequest() {
+        let h = ControllerHarness()
+        let parentId = h.controller.openApp(sampleApp)
+        h.finishLast(content: "root = Card()")
+        let id = h.controller.resolveAction(
+            parentId: parentId,
+            message: "book table",
+            formState: ["guests": .number(4)]
+        )
+        #expect(h.store.get(id)?.request == "book table\n\nSubmitted form values: {\"guests\":4}")
+    }
+
+    @Test func emptyFormStateBehavesLikePlainAction() {
+        let h = ControllerHarness()
+        let parentId = h.controller.openApp(sampleApp)
+        h.finishLast(content: "root = Card()")
+        let a = h.controller.resolveAction(parentId: parentId, message: "go", formState: [:])
+        h.finishLast(content: "root = X()")
+        let b = h.controller.resolveAction(parentId: parentId, message: "go")
+        #expect(a == b)
+        #expect(h.store.get(a)?.request == "go")
+    }
+
+    @Test func retryScreenResetsAllGenerationState() {
+        let h = ControllerHarness()
+        let id = h.controller.openApp(sampleApp)
+        h.streamer.last?.handlers.onDelta("junk")
+        h.streamer.last?.handlers.onError(StreamError("boom"))
+        h.clock.advance(by: 500)
+
+        h.controller.retryScreen(id)
+        let s = h.store.get(id)
+        #expect(s?.content == "")
+        #expect(s?.status == .pending)
+        #expect(s?.error == nil)
+        #expect(s?.genMs == nil)
+        #expect(s?.prefetched == nil)
+        #expect(s?.truncated == nil)
+        #expect(s?.speculative == false)
+        #expect(s?.searching == false)
+        #expect(s?.startedAt == 500)
+        #expect(h.streamer.count == 2)
+    }
+
+    @Test func supersededStreamCallbacksAreIgnored() throws {
+        let h = ControllerHarness()
+        let id = h.controller.openApp(sampleApp)
+        let old = try #require(h.streamer.last)
+        h.controller.retryScreen(id)
+        let fresh = try #require(h.streamer.last)
+
+        // The replaced stream keeps chattering - none of it may land.
+        old.handlers.onDelta("stale delta")
+        #expect(h.store.get(id)?.content == "")
+        old.handlers.onDone(StreamEndInfo(truncated: true, dropped: false))
+        #expect(h.store.get(id)?.status == .pending)
+        #expect(h.store.get(id)?.truncated == nil)
+        old.handlers.onError(StreamError("stale error"))
+        #expect(h.store.get(id)?.error == nil)
+        #expect(old.handlers.onToolRound?([]) == .abort)
+
+        // The fresh stream still works.
+        fresh.handlers.onDelta("live")
+        #expect(h.store.get(id)?.content == "live")
+        fresh.handlers.onDone(StreamEndInfo(truncated: false, dropped: false))
+        #expect(h.store.get(id)?.status == .done)
+    }
+
+    @Test func retryAbortsThePreviousInflightStream() throws {
+        let h = ControllerHarness()
+        let id = h.controller.openApp(sampleApp)
+        let old = try #require(h.streamer.last)
+        h.controller.retryScreen(id)
+        #expect(old.token.isCancelled)
+        #expect(try #require(h.streamer.last).token.isCancelled == false)
+    }
+}
+
+// src/genos/store.ts onDone/onError/onToolRound wiring.
+@MainActor
+@Suite struct ControllerLifecycleTests {
+    @Test func doneSetsGenMsTruncatedAndStatus() {
+        let h = ControllerHarness()
+        let id = h.controller.openApp(sampleApp)
+        h.clock.advance(by: 1234)
+        h.streamer.last?.handlers.onDelta("root = Card()")
+        h.streamer.last?.handlers.onDone(StreamEndInfo(truncated: true, dropped: false))
+        let s = h.store.get(id)
+        #expect(s?.status == .done)
+        #expect(s?.genMs == 1234)
+        #expect(s?.truncated == true)
+        #expect(s?.osCommand == nil)
+        #expect(s?.searching == false)
+    }
+
+    @Test func droppedStreamSurfacesRetryableError() {
+        let h = ControllerHarness()
+        let id = h.controller.openApp(sampleApp)
+        h.streamer.last?.handlers.onDelta("partial screen that looks fine")
+        h.streamer.last?.handlers.onDone(StreamEndInfo(truncated: false, dropped: true))
+        let s = h.store.get(id)
+        #expect(s?.status == .error)
+        #expect(s?.error == "The connection dropped mid-screen - retry")
+        #expect(s?.searching == false)
+    }
+
+    @Test func streamErrorPatchesScreenToError() {
+        let h = ControllerHarness()
+        let id = h.controller.openApp(sampleApp)
+        h.streamer.last?.handlers.onError(StreamError("boom"))
+        #expect(h.store.get(id)?.status == .error)
+        #expect(h.store.get(id)?.error == "boom")
+    }
+
+    @Test func osCommandParsedOnDone() {
+        let h = ControllerHarness()
+        let id = h.controller.openApp(sampleApp)
+        h.controller.setActiveScreen(id)
+        h.streamer.last?.handlers.onDelta("@OS(open, \"music\")")
+        h.streamer.last?.handlers.onDone(StreamEndInfo(truncated: false, dropped: false))
+        #expect(h.store.get(id)?.osCommand == OSCommand(cmd: .open, arg: "music"))
+        // OS-command screens never trigger prefetch.
+        #expect(h.streamer.count == 1)
+    }
+
+    @Test func nonSpeculativeToolRoundResetsScreenToSearching() {
+        let h = ControllerHarness()
+        let id = h.controller.openApp(sampleApp)
+        h.streamer.last?.handlers.onDelta("half a screen")
+        let decision = h.streamer.last?.handlers.onToolRound?([ToolRoundCall(name: "web_search", args: [:])])
+        #expect(decision == .proceed)
+        let s = h.store.get(id)
+        #expect(s?.content == "")
+        #expect(s?.status == .pending)
+        #expect(s?.searching == true)
+    }
+}
+
+// Speculative prefetch (MAX_PREFETCH, tool refusal, regenerate-on-tap).
+@MainActor
+@Suite struct PrefetchTests {
+    func doneContent(actions: [String]) -> String {
+        actions.map { "b = Button(\"x\", @ToAssistant(\"\($0)\"))" }.joined(separator: "\n")
+    }
+
+    @Test func visibleDoneScreenPrefetchesUpToMaxPrefetchChildren() {
+        let h = ControllerHarness()
+        let id = h.controller.openApp(sampleApp)
+        h.controller.setActiveScreen(id)
+        let actions = (1...8).map { "action \($0)" }
+        h.streamer.last?.handlers.onDelta(doneContent(actions: actions))
+        h.streamer.last?.handlers.onDone(StreamEndInfo(truncated: false, dropped: false))
+
+        // 1 original + 6 speculative children (cap), not 8.
+        #expect(h.streamer.count == 7)
+        let children = h.store.all().filter { $0.parentId == id }
+        #expect(children.count == 6)
+        #expect(children.allSatisfy { $0.speculative })
+        #expect(Set(children.map(\.request)) == Set((1...6).map { "action \($0)" }))
+        #expect(children.allSatisfy { $0.appId == "weather" && $0.appName == "Weather" })
+    }
+
+    @Test func noPrefetchWhenScreenIsNotActive() {
+        let h = ControllerHarness()
+        let id = h.controller.openApp(sampleApp)
+        h.controller.setActiveScreen("someone-else")
+        h.streamer.last?.handlers.onDelta(doneContent(actions: ["a"]))
+        h.streamer.last?.handlers.onDone(StreamEndInfo(truncated: false, dropped: false))
+        #expect(h.streamer.count == 1)
+        #expect(h.store.all().filter { $0.parentId == id }.isEmpty)
+    }
+
+    @Test func becomingActiveWhileAlreadyDoneTriggersPrefetch() {
+        let h = ControllerHarness()
+        let id = h.controller.openApp(sampleApp)
+        h.streamer.last?.handlers.onDelta(doneContent(actions: ["late action"]))
+        h.streamer.last?.handlers.onDone(StreamEndInfo(truncated: false, dropped: false))
+        #expect(h.streamer.count == 1)
+
+        h.controller.setActiveScreen(id)
+        #expect(h.streamer.count == 2)
+        let child = h.store.all().first { $0.parentId == id }
+        #expect(child?.request == "late action")
+        #expect(child?.speculative == true)
+    }
+
+    @Test func prefetchSkipsActionsAlreadyInTheIndex() {
+        let h = ControllerHarness()
+        let id = h.controller.openApp(sampleApp)
+        h.controller.setActiveScreen(id)
+        h.streamer.last?.handlers.onDelta(doneContent(actions: ["dup", "fresh"]))
+        h.streamer.last?.handlers.onDone(StreamEndInfo(truncated: false, dropped: false))
+        let streams = h.streamer.count
+
+        // Re-activating must not relaunch the same pairs.
+        h.controller.setActiveScreen(nil)
+        h.controller.setActiveScreen(id)
+        #expect(h.streamer.count == streams)
+    }
+
+    @Test func speculativeStreamRefusesToolRound() throws {
+        let h = ControllerHarness()
+        let id = h.controller.openApp(sampleApp)
+        h.controller.setActiveScreen(id)
+        h.streamer.last?.handlers.onDelta(doneContent(actions: ["needs web"]))
+        h.streamer.last?.handlers.onDone(StreamEndInfo(truncated: false, dropped: false))
+
+        let spec = try #require(h.streamer.last)
+        let decision = spec.handlers.onToolRound?([ToolRoundCall(name: "web_search", args: [:])])
+        #expect(decision == .abort)
+        // The refusal did not touch the screen (no searching flip).
+        let childId = try #require(h.store.all().first { $0.parentId == id }).id
+        #expect(h.store.get(childId)?.searching != true)
+    }
+
+    @Test func tappingErroredPrefetchRegeneratesNonSpeculative() throws {
+        let h = ControllerHarness()
+        let id = h.controller.openApp(sampleApp)
+        h.controller.setActiveScreen(id)
+        h.streamer.last?.handlers.onDelta(doneContent(actions: ["needs web"]))
+        h.streamer.last?.handlers.onDone(StreamEndInfo(truncated: false, dropped: false))
+
+        // The speculative stream errored with the sentinel (abort path).
+        let spec = try #require(h.streamer.last)
+        spec.handlers.onError(StreamError(GenOSConstants.needsLiveData))
+        let childId = try #require(h.store.all().first { $0.parentId == id }).id
+        #expect(h.store.get(childId)?.status == .error)
+        #expect(h.store.get(childId)?.error == "needs live data")
+
+        // Tap: same id, regenerated fresh, non-speculative → tools allowed.
+        let resolved = h.controller.resolveAction(parentId: id, message: "needs web")
+        #expect(resolved == childId)
+        #expect(h.store.get(childId)?.status == .pending)
+        #expect(h.store.get(childId)?.speculative == false)
+        let retried = try #require(h.streamer.last)
+        #expect(retried.handlers.onToolRound?([ToolRoundCall(name: "web_search", args: [:])]) == .proceed)
+        #expect(h.store.get(childId)?.searching == true)
+    }
+
+    @Test func tappingCompletedPrefetchMarksPrefetched() throws {
+        let h = ControllerHarness()
+        let id = h.controller.openApp(sampleApp)
+        h.controller.setActiveScreen(id)
+        h.streamer.last?.handlers.onDelta(doneContent(actions: ["ready"]))
+        h.streamer.last?.handlers.onDone(StreamEndInfo(truncated: false, dropped: false))
+        h.finishLast(content: "root = Prefetched()")
+
+        let childId = try #require(h.store.all().first { $0.parentId == id }).id
+        let resolved = h.controller.resolveAction(parentId: id, message: "ready")
+        #expect(resolved == childId)
+        let child = h.store.get(childId)
+        #expect(child?.speculative == false)
+        #expect(child?.prefetched == true)
+        // No regeneration for a completed prefetch.
+        #expect(h.store.get(childId)?.content == "root = Prefetched()")
+    }
+
+    @Test func tappingStillStreamingPrefetchFlipsSpeculativeWithoutPrefetchedFlag() throws {
+        let h = ControllerHarness()
+        let id = h.controller.openApp(sampleApp)
+        h.controller.setActiveScreen(id)
+        h.streamer.last?.handlers.onDelta(doneContent(actions: ["slow"]))
+        h.streamer.last?.handlers.onDone(StreamEndInfo(truncated: false, dropped: false))
+        h.streamer.last?.handlers.onDelta("still going")
+
+        let childId = try #require(h.store.all().first { $0.parentId == id }).id
+        _ = h.controller.resolveAction(parentId: id, message: "slow")
+        let child = h.store.get(childId)
+        #expect(child?.speculative == false)
+        // It was tapped mid-stream, not already fully generated.
+        #expect(child?.prefetched == false)
+    }
+}
+
+// buildMessages: CONTEXT_DEPTH ancestor replay with cleanLang.
+@MainActor
+@Suite struct BuildMessagesTests {
+    @Test func replaysAtMostContextDepthAncestorsTextOnly() throws {
+        let h = ControllerHarness()
+        let a = h.controller.openApp(sampleApp)
+        h.finishLast(content: "```openui\nroot = A()\n```")
+        let b = h.controller.resolveAction(parentId: a, message: "to b")
+        h.finishLast(content: "root = B()")
+        let c = h.controller.resolveAction(parentId: b, message: "to c")
+        h.finishLast(content: "root = C()")
+        let d = h.controller.resolveAction(parentId: c, message: "to d")
+
+        let messages = h.controller.buildMessages(for: try #require(h.store.get(d)))
+        // Chain capped at CONTEXT_DEPTH=2 ancestors (b, c) + the new request.
+        #expect(messages.map(\.role) == [.user, .assistant, .user, .assistant, .user])
+        #expect(messages[0].content == "to b")
+        #expect(messages[1].content == "root = B()")
+        #expect(messages[2].content == "to c")
+        #expect(messages[3].content == "root = C()")
+        #expect(messages[4].content == "to d")
+    }
+
+    @Test func ancestorContentIsCleanLangStripped() throws {
+        let h = ControllerHarness()
+        let a = h.controller.openApp(sampleApp)
+        h.finishLast(content: "```openui-lang\nroot = Fenced()\n```")
+        let b = h.controller.resolveAction(parentId: a, message: "next")
+
+        let messages = h.controller.buildMessages(for: try #require(h.store.get(b)))
+        #expect(messages.map(\.role) == [.user, .assistant, .user])
+        #expect(messages[1].content == "root = Fenced()")
+    }
+
+    @Test func contentlessAncestorReplaysUserTurnOnly() throws {
+        let h = ControllerHarness()
+        let a = h.controller.openApp(sampleApp)
+        // Parent never produced content.
+        let b = h.controller.resolveAction(parentId: a, message: "child")
+        let messages = h.controller.buildMessages(for: try #require(h.store.get(b)))
+        #expect(messages.map(\.role) == [.user, .user])
+        #expect(messages[0].content == sampleApp.request)
+        #expect(messages[1].content == "child")
+    }
+
+    @Test func rootScreenIsJustItsOwnRequest() throws {
+        let h = ControllerHarness()
+        let a = h.controller.openApp(sampleApp)
+        let messages = h.controller.buildMessages(for: try #require(h.store.get(a)))
+        #expect(messages == [ChatMessage(role: .user, content: sampleApp.request)])
+    }
+}
