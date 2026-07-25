@@ -311,6 +311,14 @@ public enum CdsMetrics {
         public static let placeholderDotOpacity: Double = 0.6
         /// ImageBlock aspect ratio. components.tsx L470.
         public static let imageBlockAspectRatio: Double = 16.0 / 9.0
+        /// `StyleSheet.hairlineWidth` - the separator / field-border stroke.
+        /// components.tsx L32, forms.tsx L31.
+        ///
+        /// RN resolves it per screen scale (0.5 at @2x, ~0.33 at @3x). SwiftUI
+        /// has no equivalent constant and a sub-pixel stroke is what the value
+        /// is FOR, so the port pins the @2x value: it is the thinnest line that
+        /// renders on every supported device without disappearing.
+        public static let hairline: Double = 0.5
     }
 
     // MARK: Typography
@@ -422,4 +430,114 @@ public enum CdsMetrics {
             "large": (15, 17),
         ]
     }
+}
+
+// MARK: - Metrics the renderers need
+
+/// The remaining inline RN metrics, collected when the renderers were ported.
+/// Same rule as the block above: the value is decided HERE, never in `AppLessUI`.
+extension CdsMetrics.Spacing {
+
+    // MARK: Grouped rows (`styles.row`, components.tsx L678-688)
+
+    /// Gap between a row's leading badge, its text block and its trailing value.
+    public static let rowGap: Double = 12
+    public static let rowPaddingVertical: Double = 11
+    public static let rowPaddingLeading: Double = 16
+    public static let rowPaddingTrailing: Double = 14
+    public static let rowMinHeight: Double = 46
+    /// The chevron is pulled back into the trailing padding. components.tsx L219.
+    public static let rowChevronOffset: Double = -4
+
+    // MARK: Grouped containers
+
+    /// Section header above a ListBlock / KVList. components.tsx L293-294.
+    public static let groupHeaderMarginBottom: Double = 7
+    public static let groupHeaderMarginLeading: Double = 16
+    /// Inset separator between grouped rows. components.tsx L286.
+    public static let separatorInset: Double = 16
+    /// KVList row. components.tsx L338-343.
+    public static let kvRowGap: Double = 14
+    public static let kvRowPaddingVertical: Double = 11
+    public static let kvRowPaddingHorizontal: Double = 16
+
+    // MARK: Stats
+
+    /// HeroStat block. components.tsx L371.
+    public static let heroPaddingTop: Double = 6
+    public static let heroPaddingBottom: Double = 2
+    /// StatTiles grid gap and the tile's minimum share of a row. components.tsx L411, L423.
+    public static let tileGap: Double = 10
+    public static let tileFlexBasisFraction: Double = 0.45
+    /// StatTiles label row / value row gaps. components.tsx L430, L436.
+    public static let tileLabelGap: Double = 5
+    public static let tileValueGap: Double = 7
+    public static let tileValueMarginTop: Double = 3
+
+    // MARK: Media & social
+
+    /// ImageBlock caption gradient box. components.tsx L482-484.
+    public static let captionPaddingTop: Double = 26
+    public static let captionPaddingHorizontal: Double = 14
+    public static let captionPaddingBottom: Double = 11
+    /// Bubbles stack gap, horizontal inset, and the max bubble width.
+    /// components.tsx L533, L552.
+    public static let bubbleGap: Double = 3
+    public static let bubblePaddingHorizontalOuter: Double = 2
+    public static let bubbleMaxWidthFraction: Double = 0.78
+    /// Time divider above a bubble. components.tsx L539-540.
+    public static let bubbleTimeMarginTop: Double = 8
+    public static let bubbleTimeMarginBottom: Double = 3
+
+    // MARK: Chips & tabs
+
+    /// Chips scroller: inter-chip gap, the bleed that lets chips run to the
+    /// screen edge, and its vertical padding. components.tsx L582-583.
+    public static let chipGap: Double = 8
+    public static let chipsBleed: Double = 14
+    public static let chipsPaddingVertical: Double = 2
+    /// Tabs segmented control. components.tsx L634-636, L646-648.
+    public static let tabTrackGap: Double = 2
+    public static let tabTrackPadding: Double = 2
+    public static let tabPaddingVertical: Double = 6
+    public static let tabPaddingHorizontal: Double = 4
+    /// Gap between the segmented control and the active tab's content, and
+    /// between that content's children. components.tsx L671.
+    public static let tabContentMarginTop: Double = 12
+    public static let tabContentGap: Double = 14
+
+    // MARK: Forms
+
+    /// Form field stack gap. forms.tsx L285.
+    public static let formGap: Double = 12
+    /// FormControl label/input/hint gap and the label's inset. forms.tsx L219-220.
+    public static let formControlGap: Double = 6
+    public static let formControlLabelInset: Double = 4
+    /// Buttons row/column gap. forms.tsx L273.
+    public static let buttonsGap: Double = 9
+    /// Slider: label gap, track row gap, read-out width. forms.tsx L184, L186, L200.
+    public static let sliderGap: Double = 2
+    public static let sliderRowGap: Double = 10
+    public static let sliderReadoutWidth: Double = 36
+    public static let sliderTrackHeight: Double = 32
+    /// Select sheet row padding and the modal's backdrop inset. forms.tsx L147-148, L134.
+    public static let selectRowPaddingVertical: Double = 13
+    public static let selectRowPaddingHorizontal: Double = 16
+    public static let selectModalInset: Double = 32
+}
+
+extension CdsMetrics.Size {
+    /// TextCallout / StatTiles / Select / chevron glyph sizes.
+    /// components.tsx L162, L432, L220; forms.tsx L126, L159.
+    public static let calloutGlyph: Double = 16
+    public static let tileGlyph: Double = 13
+    public static let tileGlyphStrokeWidth: Double = 2.2
+    public static let rowChevron: Double = 16
+    public static let rowChevronStrokeWidth: Double = 2.4
+    public static let selectChevron: Double = 14
+    public static let selectCheck: Double = 16
+    /// PhotoGrid tile share of a row (3 columns). components.tsx L522.
+    public static let photoGridFlexBasisFraction: Double = 0.31
+    /// MapView surface height. shared/map.tsx L50.
+    public static let mapHeight: Double = 215
 }

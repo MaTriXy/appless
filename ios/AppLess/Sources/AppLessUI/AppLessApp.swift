@@ -27,8 +27,10 @@ public struct AppLessApp: App {
     }
 }
 
-/// Root of the shell. SCAFFOLD: shows the renderer conformance state until the
-/// renderers and the GenOS shell (home screen, screen stack, ask bar) land.
+/// Root of the shell. The Cupertino renderers are wired, so this reports
+/// `renderers registered: 30/30`; it stays in place until the GenOS shell
+/// (home screen, screen stack, ask bar) lands and starts rendering real
+/// screens through ``GenosScreenView``.
 public struct RootView: View {
     @Environment(\.colorScheme) private var colorScheme
 
@@ -44,7 +46,7 @@ public struct RootView: View {
                     Text("APPLESS")
                         .cdsTextStyle(CdsMetrics.Typography.headerSubtitle)
                         .foregroundStyle(Color(theme.ink2))
-                    Text("Scaffold")
+                    Text("Renderers")
                         .cdsTextStyle(CdsMetrics.Typography.headerTitle)
                         .foregroundStyle(Color(theme.ink))
                 }
