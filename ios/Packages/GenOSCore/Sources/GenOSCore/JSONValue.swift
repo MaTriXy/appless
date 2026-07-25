@@ -85,6 +85,28 @@ public enum JSONValue: Sendable, Equatable {
         return out
     }
 
+    /// `JSON.stringify` of an object with caller-provided (insertion) key
+    /// order - RN's JSON.stringify(formState) emits keys in insertion order,
+    /// which a Swift Dictionary cannot represent. Nested values fall back to
+    /// `stringified()` (sorted keys).
+    public static func stringifyOrdered(_ pairs: [(String, JSONValue)]) -> String {
+        "{" + pairs
+            .map { encodeJSONString($0.0) + ":" + $0.1.stringified() }
+            .joined(separator: ",") + "}"
+    }
+
+    /// JS truthiness (`if (value)`): "" / 0 / NaN / false / null are falsy;
+    /// any object or array (even empty) is truthy.
+    public var isJSTruthy: Bool {
+        switch self {
+        case .string(let s): return !s.isEmpty
+        case .number(let n): return n != 0 && !n.isNaN
+        case .bool(let b): return b
+        case .null: return false
+        case .array, .object: return true
+        }
+    }
+
     public subscript(key: String) -> JSONValue? {
         if case .object(let o) = self { return o[key] }
         return nil

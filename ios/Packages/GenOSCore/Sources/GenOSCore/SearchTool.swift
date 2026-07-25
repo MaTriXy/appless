@@ -16,6 +16,13 @@ public struct SearchResult: Sendable, Equatable {
 }
 
 /// Tool execution seam offered to the stream loop.
+///
+/// Cancellation contract: execute(name:args:) runs inside the stream's Task,
+/// which StreamCancelToken.cancel() cancels (RN passes the AbortSignal into
+/// executeTool). Implementations should honor cooperative Task cancellation -
+/// URLSession-backed fetches do natively; long-running custom impls should
+/// check `Task.isCancelled` and return early. The stream loop discards all
+/// outputs and never issues the next round's request once cancelled.
 public protocol ToolExecuting: Sendable {
     /// Whether any tools should be offered (Exa key present).
     var available: Bool { get }
@@ -80,7 +87,8 @@ public struct ExaSearchTool: ToolExecuting {
 
     public func execute(name: String, args: [String: JSONValue]) async -> String {
         guard name == "web_search" else { return "ERROR: unknown tool \"\(name)\"" }
-        let query = jsStringCoerce(args["query"]).trimmingCharacters(in: .whitespacesAndNewlines)
+        // RN: String(args.query ?? "").trim().
+        let query = jsTrim(jsStringCoerce(args["query"]))
         guard !query.isEmpty else { return "ERROR: web_search requires a non-empty query" }
         do {
             return formatWebResults(query: query, results: try await webSearch(query: query))
@@ -118,8 +126,9 @@ public struct ExaSearchTool: ToolExecuting {
             guard let url = r["url"]?.stringValue, !url.isEmpty else { return nil }
             let title = r["title"]?.stringValue
             let text = r["text"]?.stringValue ?? ""
-            let snippet = JSRegex.replacingAll(#"\s+"#, in: text, with: " ")
-                .trimmingCharacters(in: .whitespacesAndNewlines)
+            // RN: (r.text ?? "").replace(/\s+/g, " ").trim() - JS \s spelled
+            // out (ICU's \s misses \v and U+FEFF, see JSRegex.swift).
+            let snippet = jsTrim(JSRegex.replacingAll("\(JSRegex.jsWS)+", in: text, with: " "))
             return SearchResult(
                 title: title ?? resultDomain(url),
                 url: url,
@@ -143,6 +152,9 @@ public func formatWebResults(query: String, results: [SearchResult]) -> String {
 }
 
 /// Hostname without leading www., or the input when not http(s).
+/// RN: /^https?:\/\/(?:www\.)?([^\/]+)/ - literals + a negated ASCII class
+/// (which matches line terminators in both engines) and `^` with no `m`
+/// flag (start-of-input in both). Identical in ICU and JS (audited).
 public func resultDomain(_ url: String) -> String {
     guard
         let m = JSRegex.first(#"^https?://(?:www\.)?([^/]+)"#, url),

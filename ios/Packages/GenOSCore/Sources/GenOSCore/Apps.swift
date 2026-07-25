@@ -119,6 +119,8 @@ public enum Apps {
     /// non-alphanumeric runs → "-", boundary dashes KEPT per the RN regex),
     /// emoji "✨", default tile, request template.
     public static func summonApp(_ name: String) -> AppDef {
+        // RN: /[^a-z0-9]+/g - negated ASCII class, no `i` flag: identical
+        // semantics in ICU and JS (audited, no change needed).
         let slug = JSRegex.replacingAll("[^a-z0-9]+", in: name.lowercased(), with: "-")
         return AppDef(
             id: "summon-\(slug)",

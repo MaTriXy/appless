@@ -137,9 +137,13 @@ public final class GenOSController {
             }
         )
 
-        let token = streamer.stream(messages: buildMessages(for: screen), handlers: handlers)
+        // RN ordering: inflight.set(id, controller) BEFORE streamScreen(...).
+        // The token is created and registered first so even a ScreenStreaming
+        // impl that fires handlers synchronously is not dropped as stale.
+        let token = StreamCancelToken()
         box.token = token
         inflight[id] = token
+        streamer.stream(messages: buildMessages(for: screen), handlers: handlers, token: token)
     }
 
     private struct LaunchInput {
@@ -233,10 +237,14 @@ public final class GenOSController {
     /// Resolve a tapped action: prefetched screen when one exists, fresh
     /// generation otherwise. Form submissions bypass the cache both ways and
     /// append "\n\nSubmitted form values: " + JSON to the request.
+    ///
+    /// `formState` is an ORDERED key/value list: RN's JSON.stringify emits
+    /// keys in object-insertion order, so the shell passes form values in UI
+    /// insertion order and the request JSON preserves it.
     @discardableResult
-    public func resolveAction(parentId: String, message: String, formState: [String: JSONValue]? = nil) -> String {
+    public func resolveAction(parentId: String, message: String, formState: [(String, JSONValue)]? = nil) -> String {
         let parent = store.get(parentId)
-        let hasFormValues = !(formState ?? [:]).isEmpty
+        let hasFormValues = !(formState ?? []).isEmpty
         let key = actionKey(parentId, message)
 
         if !hasFormValues, let hit = actionIndex[key] {
@@ -255,7 +263,7 @@ public final class GenOSController {
 
         let request: String
         if hasFormValues, let formState {
-            request = "\(message)\n\nSubmitted form values: \(JSONValue.object(formState).stringified())"
+            request = "\(message)\n\nSubmitted form values: \(JSONValue.stringifyOrdered(formState))"
         } else {
             request = message
         }

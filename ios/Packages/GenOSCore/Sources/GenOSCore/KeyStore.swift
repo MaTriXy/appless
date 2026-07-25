@@ -24,7 +24,8 @@ public final class KeyStore {
     ///   - store: persistence seam.
     public init(envKey: String?, store: SecureStore) {
         self.store = store
-        let trimmed = envKey?.trimmingCharacters(in: .whitespacesAndNewlines)
+        // RN: ENV_KEY?.trim() || null.
+        let trimmed = envKey.map(jsTrim)
         if let trimmed, !trimmed.isEmpty {
             key = trimmed
             currentStatus = .present
@@ -39,7 +40,9 @@ public final class KeyStore {
         currentStatus
     }
 
-    /// The usable key, nil when missing/rejected/still loading.
+    /// The usable key, nil when missing/rejected/still loading. May be ""
+    /// after set() of a whitespace-only key (RN parity); callers must treat
+    /// empty as missing, mirroring JS falsy checks.
     public func get() -> String? {
         key
     }
@@ -53,7 +56,8 @@ public final class KeyStore {
                 do {
                     let stored = try await store.read(KeyStore.storageKey)
                     guard let self, self.currentStatus == .loading else { return }
-                    let trimmed = stored?.trimmingCharacters(in: .whitespacesAndNewlines)
+                    // RN: this.key = stored?.trim() || null.
+                    let trimmed = stored.map(jsTrim)
                     self.key = (trimmed?.isEmpty == false) ? trimmed : nil
                     self.setStatus(self.key != nil ? .present : .missing)
                 } catch {
@@ -66,8 +70,14 @@ public final class KeyStore {
 
     /// User entered a key: trim, mark present synchronously, persist
     /// best-effort in the background.
+    ///
+    /// RN parity (config.ts set()): the TRIMMED value is stored even when it
+    /// is empty, and status flips to .present unconditionally - a
+    /// whitespace-only key therefore reads back as "" (non-nil). The stream
+    /// client treats an empty key as missing (JS falsy check), so no request
+    /// ever goes out with a blank Authorization header.
     public func set(_ key: String) {
-        let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = jsTrim(key)
         self.key = trimmed
         setStatus(.present)
         let store = self.store

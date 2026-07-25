@@ -2,7 +2,28 @@ import Foundation
 
 /// Thin NSRegularExpression wrapper matching the JS regex call-sites ported
 /// in this package. Capture groups come back as `nil` when unmatched.
+///
+/// ICU vs ECMAScript shorthand-class hazards (why the constants below exist):
+/// - `\w`/`\d` are Unicode-aware in ICU but ASCII-only in JS (no `u` flag).
+///   Ported patterns must spell `[A-Za-z0-9_]` / `[0-9]`.
+/// - `\s` in JS is WhiteSpace ∪ LineTerminator = \t \n \v \f \r U+FEFF
+///   \p{Z} U+2028 U+2029. ICU's `\s` is only [\t\n\f\r\p{Z}]: it misses
+///   U+000B (VT) and U+FEFF (BOM). Use `jsWS`.
+/// - `.` in JS (no `s` flag) excludes exactly \n \r U+2028 U+2029. ICU's `.`
+///   additionally excludes U+000B, U+000C and U+0085. Use `jsDot`.
+/// - ICU case-insensitive matching uses full Unicode case folding, so `i`
+///   patterns match U+212A (KELVIN SIGN → k) and U+017F (LONG S → s) where JS
+///   (no `u` flag) does not. Ported `i` patterns spell case variants instead.
 enum JSRegex {
+    /// ECMAScript `\s` member set, ICU-spelled (see hazards above).
+    static let jsWSMembers = #"\t\n\x{B}\f\r\p{Z}\x{FEFF}"#
+    /// ECMAScript `\s` as a character class.
+    static let jsWS = "[" + jsWSMembers + "]"
+    /// ECMAScript `[^\S\n]` (whitespace except newline).
+    static let jsWSNoNewline = #"[\t\x{B}\f\r\p{Z}\x{FEFF}]"#
+    /// ECMAScript `.` (anything but \n \r U+2028 U+2029).
+    static let jsDot = #"[^\n\r\x{2028}\x{2029}]"#
+
     static func compile(_ pattern: String, caseInsensitive: Bool = false) -> NSRegularExpression {
         var options: NSRegularExpression.Options = []
         if caseInsensitive { options.insert(.caseInsensitive) }
@@ -56,6 +77,14 @@ enum JSRegex {
     static func test(_ pattern: String, _ text: String, caseInsensitive: Bool = false) -> Bool {
         first(pattern, text, caseInsensitive: caseInsensitive) != nil
     }
+}
+
+/// JS `String.prototype.trim()`: strips the exact ECMAScript whitespace set.
+/// Foundation's `.whitespacesAndNewlines` diverges (it strips U+0085, which
+/// JS keeps, and keeps U+FEFF, which JS strips), so ported `.trim()` call
+/// sites use this instead.
+func jsTrim(_ s: String) -> String {
+    JSRegex.replacingAll("\\A\(JSRegex.jsWS)+|\(JSRegex.jsWS)+\\z", in: s, with: "")
 }
 
 /// `decodeURIComponent` analog: nil on malformed percent-escapes (the JS

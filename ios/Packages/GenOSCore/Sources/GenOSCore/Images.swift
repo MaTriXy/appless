@@ -40,8 +40,11 @@ public enum Images {
         var q = params["q"] ?? ""
         if q.isEmpty { q = "abstract gradient" }
         q = q.replacingOccurrences(of: "+", with: " ")
+        // RN: /[^a-zA-Z0-9, -]/g - explicit ASCII class + no `i` flag, so ICU
+        // and JS semantics are identical (audited, no change needed).
         q = JSRegex.replacingAll("[^a-zA-Z0-9, -]", in: q, with: "")
-        q = q.trimmingCharacters(in: .whitespacesAndNewlines)
+        // RN: .trim() - exact ECMAScript whitespace set.
+        q = jsTrim(q)
         let seedText = params["seed"].flatMap { $0.isEmpty ? nil : $0 } ?? "1"
         let wText = params["w"].flatMap { $0.isEmpty ? nil : $0 } ?? "800"
         let hText = params["h"].flatMap { $0.isEmpty ? nil : $0 } ?? "500"
@@ -55,6 +58,7 @@ public enum Images {
 
     /// https://loremflickr.com/{w}/{h}/{keywords}?lock={seed} where keywords
     /// is q with runs of spaces/commas collapsed to "," then percent-encoded.
+    /// RN: /[ ,]+/g - literal ASCII class, identical in ICU and JS (audited).
     public static func loremflickrUrl(_ query: ImgQuery) -> String {
         let keywords = jsEncodeURIComponent(JSRegex.replacingAll("[ ,]+", in: query.q, with: ","))
         return "https://loremflickr.com/\(query.w)/\(query.h)/\(keywords)?lock=\(query.seed)"

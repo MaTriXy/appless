@@ -128,6 +128,7 @@ struct ScriptedResponse: Sendable {
 actor ScriptedHTTPState {
     var responses: [ScriptedResponse] = []
     var requests: [HTTPRequest] = []
+    var chunksPulled = 0
 
     func push(_ r: ScriptedResponse) { responses.append(r) }
     func next(_ request: HTTPRequest) -> ScriptedResponse? {
@@ -136,6 +137,33 @@ actor ScriptedHTTPState {
         return responses.removeFirst()
     }
     func allRequests() -> [HTTPRequest] { requests }
+    func recordPull() { chunksPulled += 1 }
+    func pulled() -> Int { chunksPulled }
+}
+
+/// Pull-based chunk source: one chunk is handed out per consumer demand, and
+/// Task cancellation is honored between chunks (the HTTPStreaming contract),
+/// so tests can assert a cancelled stream loop stops pulling.
+actor ScriptedChunkQueue {
+    private var remaining: [Data]
+    private let trailingErrorMessage: String?
+    private let state: ScriptedHTTPState
+
+    init(chunks: [Data], trailingErrorMessage: String?, state: ScriptedHTTPState) {
+        remaining = chunks
+        self.trailingErrorMessage = trailingErrorMessage
+        self.state = state
+    }
+
+    func next() async throws -> Data? {
+        try Task.checkCancellation()
+        guard !remaining.isEmpty else {
+            if let trailingErrorMessage { throw StreamError(trailingErrorMessage) }
+            return nil
+        }
+        await state.recordPull()
+        return remaining.removeFirst()
+    }
 }
 
 struct ScriptedHTTP: HTTPStreaming, HTTPFetching {
@@ -144,6 +172,9 @@ struct ScriptedHTTP: HTTPStreaming, HTTPFetching {
     func enqueue(_ r: ScriptedResponse) async { await state.push(r) }
 
     func requests() async -> [HTTPRequest] { await state.allRequests() }
+
+    /// Total SSE body chunks the consumer has pulled across all streams.
+    func chunksPulled() async -> Int { await state.pulled() }
 
     /// Parsed JSON bodies of every request seen, oldest first.
     func requestBodies() async -> [JSONValue] {
@@ -164,14 +195,12 @@ struct ScriptedHTTP: HTTPStreaming, HTTPFetching {
         if !head.ok, chunks.isEmpty, !scripted.errorBody.isEmpty {
             chunks = [Data(scripted.errorBody.utf8)]
         }
-        let stream = AsyncThrowingStream<Data, Error> { continuation in
-            for chunk in chunks { continuation.yield(chunk) }
-            if let msg = scripted.streamErrorMessage {
-                continuation.finish(throwing: StreamError(msg))
-            } else {
-                continuation.finish()
-            }
-        }
+        let queue = ScriptedChunkQueue(
+            chunks: chunks,
+            trailingErrorMessage: scripted.streamErrorMessage,
+            state: state
+        )
+        let stream = AsyncThrowingStream<Data, Error>(unfolding: { try await queue.next() })
         return (head, stream)
     }
 
@@ -199,15 +228,26 @@ final class FakeStreamer: ScreenStreaming {
 
     private(set) var started: [Started] = []
 
-    @discardableResult
-    func stream(messages: [ChatMessage], handlers: StreamHandlers) -> StreamCancelToken {
-        let token = StreamCancelToken()
+    func stream(messages: [ChatMessage], handlers: StreamHandlers, token: StreamCancelToken) {
         started.append(Started(messages: messages, handlers: handlers, token: token))
-        return token
     }
 
     var last: Started? { started.last }
     var count: Int { started.count }
+}
+
+/// A ScreenStreaming impl that fires its handlers SYNCHRONOUSLY inside
+/// stream() - regression double for the RN inflight-before-stream ordering
+/// (a synchronous delta must not be dropped as stale).
+@MainActor
+final class SyncFiringStreamer: ScreenStreaming {
+    var deltas: [String] = ["sync delta"]
+    var finish = true
+
+    func stream(messages: [ChatMessage], handlers: StreamHandlers, token: StreamCancelToken) {
+        for d in deltas { handlers.onDelta(d) }
+        if finish { handlers.onDone(StreamEndInfo(truncated: false, dropped: false)) }
+    }
 }
 
 // MARK: - SSE payload builders

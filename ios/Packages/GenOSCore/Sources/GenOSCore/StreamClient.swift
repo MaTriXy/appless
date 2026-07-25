@@ -40,21 +40,59 @@ public struct StreamHandlers {
     }
 }
 
-/// AbortController analog. Cancelling suppresses all further callbacks.
+/// AbortController analog. Cancelling suppresses all further callbacks AND
+/// tears down the in-flight work: the stream loop runs inside a Task retained
+/// by the token, and cancel() cancels that Task so the SSE drain and any
+/// running tool execution stop (mirrors RN's AbortController aborting the
+/// fetch and the Exa call).
 @MainActor
 public final class StreamCancelToken {
     public private(set) var isCancelled = false
+    private var task: Task<Void, Never>?
+
     public init() {}
-    public func cancel() { isCancelled = true }
+
+    /// Bind the running stream Task. If the token was already cancelled the
+    /// task is cancelled immediately.
+    public func attach(_ task: Task<Void, Never>) {
+        self.task = task
+        if isCancelled { task.cancel() }
+    }
+
+    public func cancel() {
+        isCancelled = true
+        task?.cancel()
+    }
+
+    /// Await the underlying stream Task settling (teardown/test aid).
+    public func join() async {
+        await task?.value
+    }
 }
 
 /// Stream seam the controller uses; StreamClient is the production impl,
 /// tests inject a scripted fake.
+///
+/// The caller creates the token and registers it (e.g. in its inflight map)
+/// BEFORE calling stream(), mirroring RN's `inflight.set(id, controller)`
+/// then `streamScreen(...)` ordering - so even an implementation that fires
+/// handlers synchronously is never dropped as stale.
 @MainActor
 public protocol ScreenStreaming: AnyObject {
-    /// Start a full tool-loop generation. Returns the cancellation handle.
+    /// Start a full tool-loop generation bound to `token`. Implementations
+    /// must stop consuming and stop calling handlers once the token is
+    /// cancelled.
+    func stream(messages: [ChatMessage], handlers: StreamHandlers, token: StreamCancelToken)
+}
+
+extension ScreenStreaming {
+    /// Convenience: create the token, start the stream, return the handle.
     @discardableResult
-    func stream(messages: [ChatMessage], handlers: StreamHandlers) -> StreamCancelToken
+    public func stream(messages: [ChatMessage], handlers: StreamHandlers) -> StreamCancelToken {
+        let token = StreamCancelToken()
+        stream(messages: messages, handlers: handlers, token: token)
+        return token
+    }
 }
 
 public struct StreamConfig: Sendable {
@@ -157,7 +195,9 @@ public final class StreamClient: ScreenStreaming {
         token: StreamCancelToken,
         onDelta: @MainActor (String) -> Void
     ) async throws -> RoundResult {
-        guard let apiKey = keyStore.get() else {
+        // RN: `if (!apiKey) throw` - JS falsy, so an EMPTY key (whitespace-only
+        // set()) errors locally too; no request with a blank bearer goes out.
+        guard let apiKey = keyStore.get(), !apiKey.isEmpty else {
             throw StreamError("No Cerebras API key set")
         }
 
@@ -214,14 +254,19 @@ public final class StreamClient: ScreenStreaming {
         var toolCalls: [Int: ToolCall] = [:]
 
         for try await chunkData in byteStream {
+            // Stop pulling chunks the moment the token is cancelled, even if
+            // the byte-stream impl ignores Task cancellation.
+            if token.isCancelled { throw CancellationError() }
             buffer += decoder.decode(chunkData)
             var lines = buffer.components(separatedBy: "\n")
             buffer = lines.popLast() ?? ""
 
             for line in lines {
-                let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                // RN: line.trim() / payload.trim() - exact JS whitespace set
+                // (strips a BOM before "data:", keeps U+0085).
+                let trimmed = jsTrim(line)
                 guard trimmed.hasPrefix("data:") else { continue }
-                let payload = String(trimmed.dropFirst(5)).trimmingCharacters(in: .whitespacesAndNewlines)
+                let payload = jsTrim(String(trimmed.dropFirst(5)))
                 if payload.isEmpty { continue }
                 if payload == "[DONE]" {
                     sawDone = true
@@ -229,7 +274,9 @@ public final class StreamClient: ScreenStreaming {
                 }
 
                 guard let chunk = JSONValue.parse(payload) else { continue }
-                if let errorValue = chunk["error"], errorValue != .null {
+                // RN: `if (chunk.error)` - a TRUTHY guard. Falsy error values
+                // ("", 0, false, null) are skipped, not thrown.
+                if let errorValue = chunk["error"], errorValue.isJSTruthy {
                     let msg = errorValue.stringValue ?? errorValue["message"]?.stringValue
                     throw StreamError((msg?.isEmpty == false) ? msg! : "stream error")
                 }
@@ -330,6 +377,10 @@ public final class StreamClient: ScreenStreaming {
                     content: result.content.isEmpty ? nil : result.content,
                     toolCalls: result.toolCalls
                 ))
+                // Tool execution runs inside the stream's Task: token.cancel()
+                // cancels it, so a cooperative ToolExecuting impl (URLSession
+                // honors Task cancellation) tears down mid-call, and the loop
+                // below never issues the next round's request.
                 var outputs: [String] = []
                 for call in calls {
                     if let tools {
@@ -345,15 +396,16 @@ public final class StreamClient: ScreenStreaming {
                 round += 1
             }
         } catch {
-            if token.isCancelled { return }
+            // RN: `if (signal?.aborted) return` - cancellation ends silently.
+            if token.isCancelled || error is CancellationError { return }
             handlers.onError(error)
         }
     }
 
-    @discardableResult
-    public func stream(messages: [ChatMessage], handlers: StreamHandlers) -> StreamCancelToken {
-        let token = StreamCancelToken()
-        Task { await streamScreen(messages: messages, handlers: handlers, token: token) }
-        return token
+    /// Runs the tool loop in a Task retained by `token`, so token.cancel()
+    /// tears down the SSE drain and tool execution (AbortController analog).
+    public func stream(messages: [ChatMessage], handlers: StreamHandlers, token: StreamCancelToken) {
+        let task = Task { await self.streamScreen(messages: messages, handlers: handlers, token: token) }
+        token.attach(task)
     }
 }

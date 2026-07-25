@@ -122,14 +122,14 @@ import Testing
         let form1 = h.controller.resolveAction(
             parentId: parentId,
             message: "book table",
-            formState: ["guests": .number(4)]
+            formState: [("guests", .number(4))]
         )
         #expect(form1 != plain)
         // ...and must never write it: a second identical submission is fresh too.
         let form2 = h.controller.resolveAction(
             parentId: parentId,
             message: "book table",
-            formState: ["guests": .number(4)]
+            formState: [("guests", .number(4))]
         )
         #expect(form2 != form1)
         // The plain cache entry is untouched.
@@ -143,16 +143,33 @@ import Testing
         let id = h.controller.resolveAction(
             parentId: parentId,
             message: "book table",
-            formState: ["guests": .number(4)]
+            formState: [("guests", .number(4))]
         )
         #expect(h.store.get(id)?.request == "book table\n\nSubmitted form values: {\"guests\":4}")
+    }
+
+    @Test func formSubmissionJsonPreservesInsertionOrder() {
+        // RN JSON.stringify(formState) emits keys in insertion order - the
+        // ordered formState API must not re-sort them.
+        let h = ControllerHarness()
+        let parentId = h.controller.openApp(sampleApp)
+        h.finishLast(content: "root = Card()")
+        let id = h.controller.resolveAction(
+            parentId: parentId,
+            message: "submit",
+            formState: [("zeta", .string("z")), ("alpha", .number(1)), ("mid", .bool(true))]
+        )
+        #expect(
+            h.store.get(id)?.request
+                == "submit\n\nSubmitted form values: {\"zeta\":\"z\",\"alpha\":1,\"mid\":true}"
+        )
     }
 
     @Test func emptyFormStateBehavesLikePlainAction() {
         let h = ControllerHarness()
         let parentId = h.controller.openApp(sampleApp)
         h.finishLast(content: "root = Card()")
-        let a = h.controller.resolveAction(parentId: parentId, message: "go", formState: [:])
+        let a = h.controller.resolveAction(parentId: parentId, message: "go", formState: [])
         h.finishLast(content: "root = X()")
         let b = h.controller.resolveAction(parentId: parentId, message: "go")
         #expect(a == b)
@@ -211,6 +228,18 @@ import Testing
         h.controller.retryScreen(id)
         #expect(old.token.isCancelled)
         #expect(try #require(h.streamer.last).token.isCancelled == false)
+    }
+
+    @Test func synchronouslyFiringStreamerIsNotDroppedAsStale() {
+        // RN sets inflight BEFORE streamScreen; a ScreenStreaming impl that
+        // fires handlers synchronously inside stream() must land its deltas.
+        let clock = ManualClock()
+        let store = ScreenStore(clock: clock)
+        let streamer = SyncFiringStreamer()
+        let controller = GenOSController(store: store, streamer: streamer, clock: clock, apps: [])
+        let id = controller.openApp(sampleApp)
+        #expect(store.get(id)?.content == "sync delta")
+        #expect(store.get(id)?.status == .done)
     }
 }
 

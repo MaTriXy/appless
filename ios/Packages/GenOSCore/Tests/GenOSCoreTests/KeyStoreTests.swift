@@ -83,6 +83,34 @@ import Testing
         #expect(ks.get() == "new-key")
     }
 
+    @Test func whitespaceOnlyKeyStoresEmptyAndStatusPresent() async {
+        // RN parity (config.ts): set('  ') stores '' and setStatus("present")
+        // runs UNCONDITIONALLY - the gate shows present even though the key
+        // is unusable; the stream client rejects it locally (falsy check).
+        let store = MemorySecureStore()
+        let ks = KeyStore(envKey: nil, store: store)
+        await ks.hydrate()
+
+        ks.set("   ")
+        #expect(ks.status == .present)
+        #expect(ks.get() == "")
+        // The empty trimmed value is persisted, like RN's persistedWrite("").
+        for _ in 0..<50 {
+            if await store.stored(KeyStore.storageKey) != nil { break }
+            try? await Task.sleep(nanoseconds: 5_000_000)
+        }
+        #expect(await store.stored(KeyStore.storageKey) == "")
+    }
+
+    @Test func setTrimsExactEcmaScriptWhitespaceSet() async {
+        // JS key.trim() strips U+FEFF and NBSP; Foundation's
+        // .whitespacesAndNewlines would leave the BOM in place.
+        let ks = KeyStore(envKey: nil, store: MemorySecureStore())
+        await ks.hydrate()
+        ks.set("\u{FEFF} real-key \u{00A0}")
+        #expect(ks.get() == "real-key")
+    }
+
     @Test func keyEnteredWhileHydrationInFlightWins() async {
         let store = MemorySecureStore()
         await store.seed(KeyStore.storageKey, "persisted-old")

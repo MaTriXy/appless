@@ -30,6 +30,26 @@ public final class ScreenStore {
         return { [weak self] in self?.listeners.removeValue(forKey: id) }
     }
 
+    /// SwiftUI-friendly change feed: yields once per subscriber notify (same
+    /// coalescing as subscribe()). Each access creates an independent stream;
+    /// terminating/cancelling its consumer unsubscribes automatically.
+    public var updates: AsyncStream<Void> {
+        let (stream, continuation) = AsyncStream<Void>.makeStream()
+        let id = UUID()
+        listeners[id] = { continuation.yield(()) }
+        continuation.onTermination = { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.listeners.removeValue(forKey: id)
+            }
+        }
+        return stream
+    }
+
+    /// Number of active subscribers (subscribe closures + updates streams).
+    var listenerCount: Int {
+        listeners.count
+    }
+
     public func get(_ id: String) -> Screen? {
         screens[id]
     }

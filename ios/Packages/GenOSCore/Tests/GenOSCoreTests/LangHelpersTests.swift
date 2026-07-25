@@ -36,6 +36,27 @@ import Testing
     @Test func leadingWhitespaceBeforeOpenerAllowed() {
         #expect(Lang.cleanLang("  \n```openui\nPROG\n```") == "PROG")
     }
+
+    @Test func fenceInfoWordCharsAreAsciiOnlyLikeJs() {
+        // JS \w is ASCII-only: '```héllo' strips only '```h', leaving 'éllo'.
+        // ICU's Unicode-aware \w would wrongly eat the whole info string.
+        #expect(Lang.cleanLang("```héllo\nBODY\n```") == "éllo\nBODY")
+    }
+
+    @Test func verticalTabAfterFenceInfoIsWhitespaceLikeJs() {
+        // JS [^\S\n] includes \v (U+000B); ICU's \s does not.
+        #expect(Lang.cleanLang("```md\u{000B}\nBODY\n```") == "BODY")
+    }
+
+    @Test func bomBeforeOpenerIsWhitespaceLikeJs() {
+        // JS \s includes U+FEFF; ICU's \s does not.
+        #expect(Lang.cleanLang("\u{FEFF}```\nPROG\n```") == "PROG")
+    }
+
+    @Test func bomAfterTrailingFenceStillRemovedLikeJs() {
+        // /\n```\s*$/ - the trailing \s* must accept U+FEFF like JS.
+        #expect(Lang.cleanLang("PROG\n```\u{FEFF}") == "PROG")
+    }
 }
 
 // spec/openui-lang.md §11.2
@@ -67,6 +88,13 @@ import Testing
     @Test func singleQuotesAndBareTextNotMatched() {
         let content = "a = Button(\"x\", @ToAssistant('nope'))\nb = @ToAssistant(unquoted)"
         #expect(Lang.extractActions(content) == [])
+    }
+
+    @Test func ecmaWhitespaceAndDotSemanticsInsideMatcher() {
+        // \s* before the quote must accept U+FEFF (JS \s), and the escape
+        // matcher \\. must accept \v (JS . excludes only \n \r U+2028 U+2029).
+        let content = "a = @ToAssistant(\u{FEFF}\"bom ws\")\nb = @ToAssistant(\"esc\\\u{000B}aped\")"
+        #expect(Lang.extractActions(content) == ["bom ws", "esc\u{000B}aped"])
     }
 }
 
@@ -102,6 +130,19 @@ import Testing
     @Test func unknownCommandRejected() {
         #expect(Lang.parseOsCommand("@OS(reboot)") == nil)
     }
+
+    @Test func icuCaseFoldingLookalikesRejectedLikeJs() {
+        // JS /…/i (no `u` flag) does NOT fold U+212A (KELVIN) to "k" or
+        // U+017F (LONG S) to "s"; ICU's case-insensitive matching does.
+        #expect(Lang.parseOsCommand("@OS(bac\u{212A})") == nil)
+        #expect(Lang.parseOsCommand("@O\u{17F}(back)") == nil)
+        #expect(Lang.parseOsCommand("@OS(\u{17F}witcher)") == nil)
+    }
+
+    @Test func ecmaWhitespaceInsideParensAccepted() {
+        // JS \s includes U+FEFF and \v, which ICU's \s misses.
+        #expect(Lang.parseOsCommand("@OS(\u{FEFF}back\u{000B})") == OSCommand(cmd: .back))
+    }
 }
 
 // spec/openui-lang.md §11.4
@@ -131,6 +172,19 @@ import Testing
         #expect(Lang.parseGenosUrl("genos://open2") == nil)
         #expect(Lang.parseGenosUrl("genos:open") == nil)
     }
+
+    @Test func formFeedInQueryMatchesLikeJsDot() {
+        // JS `.` excludes only \n \r U+2028 U+2029; ICU's `.` also excludes
+        // \v \f U+0085 and would reject this whole URL.
+        let parsed = Lang.parseGenosUrl("genos://open?note=a\u{000C}b")
+        #expect(parsed == GenosURL(cmd: "open", params: ["note": "a\u{000C}b"]))
+    }
+
+    @Test func foldedLookalikeSchemeRejectedLikeJs() {
+        // ICU case folding would accept U+017F (LONG S) for the "s" in
+        // "genos"; JS /…/i does not.
+        #expect(Lang.parseGenosUrl("geno\u{17F}://home") == nil)
+    }
 }
 
 // capabilities.md "Summoned apps": CardHeader rename gate.
@@ -154,5 +208,12 @@ import Testing
     @Test func worksThroughFencesWithEscapedQuotes() {
         let content = "```openui\nroot = Card(CardHeader(\"Say \\\"Hi\\\"\"))\n```"
         #expect(Lang.summonedAppTitle(appId: "summon-x", stackDepth: 1, content: content) == "Say \\\"Hi\\\"")
+    }
+
+    @Test func bomWhitespaceBeforeTitleAcceptedAndTrimmedLikeJs() {
+        // \s* before the quote accepts U+FEFF, and the JS .trim() analog
+        // strips U+FEFF around the captured title.
+        let content = "root = Card(CardHeader(\u{FEFF}\"\u{FEFF}Plant Care\u{FEFF}\"))"
+        #expect(Lang.summonedAppTitle(appId: "summon-x", stackDepth: 1, content: content) == "Plant Care")
     }
 }

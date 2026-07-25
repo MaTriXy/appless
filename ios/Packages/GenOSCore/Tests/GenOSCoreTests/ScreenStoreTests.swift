@@ -101,4 +101,44 @@ import Testing
         #expect(store.get("ghost") == nil)
         #expect(store.all().isEmpty)
     }
+
+    @Test func updatesFeedYieldsPerNotifyIncludingCoalescedFlush() async {
+        let clock = ManualClock()
+        let store = ScreenStore(clock: clock)
+        var iterator = store.updates.makeAsyncIterator()
+
+        // upsert notifies immediately - the yield is buffered for the reader.
+        seed(store)
+        #expect(await iterator.next() != nil)
+
+        // Streaming appends coalesce to a single yield at the flush window.
+        store.append("s1", delta: "a")
+        store.append("s1", delta: "b")
+        clock.advance(by: 50)
+        #expect(await iterator.next() != nil)
+        #expect(store.get("s1")?.content == "ab")
+    }
+
+    @Test func updatesFeedTerminationUnsubscribes() async {
+        let clock = ManualClock()
+        let store = ScreenStore(clock: clock)
+        #expect(store.listenerCount == 0)
+
+        let stream = store.updates
+        #expect(store.listenerCount == 1)
+
+        let consumer = Task { @MainActor in
+            for await _ in stream {}
+        }
+        await Task.yield()
+        consumer.cancel()
+        _ = await consumer.value
+
+        // onTermination hops back to the MainActor - poll briefly.
+        for _ in 0..<100 {
+            if store.listenerCount == 0 { break }
+            try? await Task.sleep(nanoseconds: 1_000_000)
+        }
+        #expect(store.listenerCount == 0)
+    }
 }

@@ -112,6 +112,16 @@ import Testing
         #expect(body?["contents"]?["text"]?["maxCharacters"]?.numberValue == 400)
     }
 
+    @Test func snippetCollapseUsesEcmaScriptWhitespaceSet() async throws {
+        // RN: .replace(/\s+/g, " ") - JS \s includes \v and U+FEFF, which
+        // ICU's \s misses; both must collapse to single spaces.
+        let http = ScriptedHTTP()
+        let payload = "{\"results\":[{\"title\":\"T\",\"url\":\"https://a.com/x\",\"text\":\"a\\u000b\\ufeffb  c\"}]}"
+        await http.enqueue(ScriptedResponse(chunks: [Data(payload.utf8)]))
+        let results = try await makeTool(http: http).webSearch(query: "q")
+        #expect(results.first?.snippet == "a b c")
+    }
+
     @Test func executeFormatsSuccessfulSearch() async {
         let http = ScriptedHTTP()
         let payload = #"{"results":[{"title":"T","url":"https://a.com/x","text":"snippet"}]}"#

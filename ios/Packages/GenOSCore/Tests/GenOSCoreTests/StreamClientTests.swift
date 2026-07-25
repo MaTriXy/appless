@@ -198,6 +198,46 @@ import Testing
         #expect(recorder.doneInfos.isEmpty)
     }
 
+    @Test func falsyErrorChunksAreSkippedLikeRN() async {
+        // RN: `if (chunk.error)` is a truthy guard - "", 0, false and null
+        // error values are skipped, and the stream continues normally.
+        let http = ScriptedHTTP()
+        await http.enqueue(.sse([
+            "data: {\"error\":\"\"}\n",
+            "data: {\"error\":0}\n",
+            "data: {\"error\":false}\n",
+            "data: {\"error\":null}\n",
+            sseContent("ok"),
+            sseFinish("stop"),
+            sseDone,
+        ]))
+        let recorder = StreamRecorder()
+        let client = makeStreamClient(http: http)
+        await client.streamScreen(
+            messages: [ChatMessage(role: .user, content: "hi")],
+            handlers: recorder.handlers(),
+            token: StreamCancelToken()
+        )
+        #expect(recorder.errors.isEmpty)
+        #expect(recorder.content == "ok")
+        #expect(recorder.doneInfos == [StreamEndInfo(truncated: false, dropped: false)])
+    }
+
+    @Test func truthyErrorWithoutMessageFallsBackToStreamError() async {
+        // {} is truthy in JS even though it has no message.
+        let http = ScriptedHTTP()
+        await http.enqueue(.sse(["data: {\"error\":{}}\n"]))
+        let recorder = StreamRecorder()
+        let client = makeStreamClient(http: http)
+        await client.streamScreen(
+            messages: [ChatMessage(role: .user, content: "hi")],
+            handlers: recorder.handlers(),
+            token: StreamCancelToken()
+        )
+        #expect(recorder.errors == ["stream error"])
+        #expect(recorder.doneInfos.isEmpty)
+    }
+
     @Test func inStreamErrorStringSurfacesAsError() async {
         let http = ScriptedHTTP()
         await http.enqueue(.sse([
@@ -273,6 +313,27 @@ import Testing
         #expect(await http.requests().isEmpty)
     }
 
+    @Test func whitespaceOnlyKeyErrorsLocallyWithoutRequesting() async {
+        // set('  ') stores '' with status present (RN parity), but the falsy
+        // key check must throw locally - no request with a blank bearer.
+        let http = ScriptedHTTP()
+        let keyStore = KeyStore(envKey: nil, store: MemorySecureStore())
+        await keyStore.hydrate()
+        keyStore.set("   ")
+        #expect(keyStore.status == .present)
+        #expect(keyStore.get() == "")
+
+        let recorder = StreamRecorder()
+        let client = makeStreamClient(http: http, keyStore: keyStore)
+        await client.streamScreen(
+            messages: [ChatMessage(role: .user, content: "hi")],
+            handlers: recorder.handlers(),
+            token: StreamCancelToken()
+        )
+        #expect(recorder.errors == ["No Cerebras API key set"])
+        #expect(await http.requests().isEmpty)
+    }
+
     @Test func cancelledTokenSuppressesCallbacks() async {
         let http = ScriptedHTTP()
         await http.enqueue(ScriptedResponse(status: 500, errorBody: "boom"))
@@ -287,5 +348,147 @@ import Testing
         )
         #expect(recorder.errors.isEmpty)
         #expect(recorder.doneInfos.isEmpty)
+    }
+}
+
+// StreamCancelToken tears down the in-flight work (AbortController parity):
+// the SSE drain stops pulling chunks and tool execution cannot trigger the
+// next round's request.
+@MainActor
+@Suite struct StreamCancellationTests {
+    /// Records callbacks and cancels its token on the first delta.
+    @MainActor
+    final class CancelOnFirstDelta {
+        var token: StreamCancelToken?
+        var deltas: [String] = []
+        var doneCount = 0
+        var errorCount = 0
+
+        func handlers() -> StreamHandlers {
+            StreamHandlers(
+                onDelta: { [weak self] d in
+                    self?.deltas.append(d)
+                    self?.token?.cancel()
+                },
+                onDone: { [weak self] _ in self?.doneCount += 1 },
+                onError: { [weak self] _ in self?.errorCount += 1 }
+            )
+        }
+    }
+
+    @Test func cancelMidStreamStopsConsumingChunks() async {
+        let http = ScriptedHTTP()
+        await http.enqueue(.sse([
+            sseContent("one"),
+            sseContent("two"),
+            sseContent("three"),
+            sseDone,
+        ]))
+        let client = makeStreamClient(http: http)
+        let recorder = CancelOnFirstDelta()
+        let token = client.stream(
+            messages: [ChatMessage(role: .user, content: "hi")],
+            handlers: recorder.handlers()
+        )
+        recorder.token = token
+        await token.join()
+
+        #expect(recorder.deltas == ["one"])
+        // Only the first chunk was ever pulled from the byte stream - the
+        // drain stopped, it did not run to completion with muted callbacks.
+        #expect(await http.chunksPulled() == 1)
+        #expect(recorder.doneCount == 0)
+        #expect(recorder.errorCount == 0)
+        #expect(token.isCancelled)
+    }
+
+    /// Tool that records whether the surrounding Task was already cancelled.
+    actor ExecLog {
+        var sawCancelled: [Bool] = []
+        func record(_ cancelled: Bool) { sawCancelled.append(cancelled) }
+        func all() -> [Bool] { sawCancelled }
+    }
+
+    struct CancelAwareTool: ToolExecuting {
+        let log: ExecLog
+        var available: Bool { true }
+        var promptSection: String { "\n\n## Tools available" }
+        var toolDefs: JSONValue { FakeTool().toolDefs }
+        func execute(name: String, args: [String: JSONValue]) async -> String {
+            await log.record(Task.isCancelled)
+            return "output"
+        }
+    }
+
+    /// Cancels its token inside onToolRound, then proceeds.
+    @MainActor
+    final class CancelOnToolRound {
+        var token: StreamCancelToken?
+        var doneCount = 0
+        var errorCount = 0
+        var toolRounds = 0
+
+        func handlers() -> StreamHandlers {
+            StreamHandlers(
+                onDelta: { _ in },
+                onDone: { [weak self] _ in self?.doneCount += 1 },
+                onError: { [weak self] _ in self?.errorCount += 1 },
+                onToolRound: { [weak self] _ in
+                    self?.toolRounds += 1
+                    self?.token?.cancel()
+                    return .proceed
+                }
+            )
+        }
+    }
+
+    @Test func cancelDuringToolExecutionPreventsNextRoundRequest() async {
+        let http = ScriptedHTTP()
+        await http.enqueue(.sse([
+            sseWholeToolCall(index: 0, id: "call_1", name: "web_search", arguments: "{\"query\":\"x\"}"),
+            sseFinish("tool_calls"),
+            sseDone,
+        ]))
+        // A second scripted response exists; it must never be requested.
+        await http.enqueue(.sse([sseContent("should never stream"), sseDone]))
+
+        let log = ExecLog()
+        let client = makeStreamClient(http: http, tools: CancelAwareTool(log: log))
+        let recorder = CancelOnToolRound()
+        let token = client.stream(
+            messages: [ChatMessage(role: .user, content: "q")],
+            handlers: recorder.handlers()
+        )
+        recorder.token = token
+        await token.join()
+
+        #expect(recorder.toolRounds == 1)
+        // The tool ran inside the already-cancelled Task (cooperative impls
+        // can bail early), and its output was discarded.
+        #expect(await log.all() == [true])
+        // No second-round HTTP request went out, and no callbacks fired.
+        #expect((await http.requests()).count == 1)
+        #expect(recorder.doneCount == 0)
+        #expect(recorder.errorCount == 0)
+    }
+
+    @Test func cancelBeforeAttachCancelsTheTaskImmediately() async {
+        let http = ScriptedHTTP()
+        await http.enqueue(.sse([sseContent("never"), sseDone]))
+        let client = makeStreamClient(http: http)
+        let recorder = CancelOnFirstDelta()
+        let token = StreamCancelToken()
+        token.cancel()
+        client.stream(
+            messages: [ChatMessage(role: .user, content: "hi")],
+            handlers: recorder.handlers(),
+            token: token
+        )
+        await token.join()
+        #expect(recorder.deltas.isEmpty)
+        #expect(recorder.doneCount == 0)
+        #expect(recorder.errorCount == 0)
+        // The pre-cancelled task never pulled a single chunk.
+        #expect(await http.chunksPulled() == 0)
     }
 }
