@@ -129,6 +129,10 @@ public enum Telemetry {
     ) async {
         if optedOut(env: env) { return }
         let id = await deviceId(store: store, newId: newId)
-        _ = try? await http.fetch(launchRequest(distinctId: id, platform: platform))
+        let request = launchRequest(distinctId: id, platform: platform)
+        // RN fires fetch(...).catch(() => {}) WITHOUT awaiting - the launch
+        // event is fire-and-forget, so a hung network can never delay
+        // initTelemetry's return (same shape as the detached store write).
+        Task { _ = try? await http.fetch(request) }
     }
 }

@@ -58,6 +58,42 @@ import Testing
 }
 
 // src/genos/telemetry.ts
+
+/// HTTPFetching double whose fetch records the request, then hangs until
+/// released - simulates a hung network for the fire-and-forget launch event.
+actor GatedFetchHTTP: HTTPFetching {
+    private var requests: [HTTPRequest] = []
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+    private var gated = true
+
+    func fetch(_ request: HTTPRequest) async throws -> (HTTPResponseHead, Data) {
+        requests.append(request)
+        if gated {
+            await withCheckedContinuation { waiters.append($0) }
+        }
+        return (HTTPResponseHead(status: 200), Data())
+    }
+
+    func release() {
+        gated = false
+        for w in waiters { w.resume() }
+        waiters = []
+    }
+
+    func seen() -> [HTTPRequest] { requests }
+}
+
+/// The launch-event fetch is detached (RN fires fetch().catch() WITHOUT
+/// awaiting) - poll the fake until the request deterministically lands.
+private func pollRequests(_ http: ScriptedHTTP, minCount: Int = 1) async -> [HTTPRequest] {
+    for _ in 0..<500 {
+        let requests = await http.requests()
+        if requests.count >= minCount { return requests }
+        try? await Task.sleep(nanoseconds: 1_000_000)
+    }
+    return await http.requests()
+}
+
 @Suite struct TelemetryTests {
     @Test func optOutAcceptsOneAndTrueCaseInsensitive() {
         #expect(Telemetry.optedOut(env: ["POSTHOG_DISABLED": "1"]))
@@ -138,14 +174,40 @@ import Testing
             http: http,
             newId: { "anon-hung-1" }
         )
-        // initTelemetry returned and sent the event while the write is
-        // still hung.
-        let requests = await http.requests()
+        // initTelemetry returned while the write is still hung; the detached
+        // fetch still dispatches the event (poll for it).
+        let requests = await pollRequests(http)
         #expect(requests.count == 1)
         #expect((await http.requestBodies()).first?["distinct_id"]?.stringValue == "anon-hung-1")
         #expect(await store.stored(Telemetry.idStorageKey) == nil)
         // Unblock the abandoned write so its continuation isn't leaked.
         await store.releaseWrites()
+    }
+
+    @Test func hungFetchDoesNotDelayInitTelemetryReturn() async {
+        // RN fires fetch(...).catch(() => {}) WITHOUT awaiting - initTelemetry
+        // must return while the network call is still hung. If the fetch were
+        // awaited, this test would deadlock on the gate instead of returning.
+        let http = GatedFetchHTTP()
+        await Telemetry.initTelemetry(
+            env: [:],
+            platform: "ios",
+            store: MemorySecureStore(),
+            http: http,
+            newId: { "anon-gated-1" }
+        )
+        // initTelemetry already returned; the detached fetch has been issued
+        // (poll for the request) but is still parked on the gate.
+        var seen: [HTTPRequest] = []
+        for _ in 0..<500 {
+            seen = await http.seen()
+            if !seen.isEmpty { break }
+            try? await Task.sleep(nanoseconds: 1_000_000)
+        }
+        #expect(seen.count == 1)
+        #expect(seen.first?.url == "https://us.i.posthog.com/i/v0/e/")
+        // Unblock the abandoned fetch so its continuation isn't leaked.
+        await http.release()
     }
 
     @Test func base36FractionDigitsPinnedDeviationFromJs() {
@@ -172,7 +234,8 @@ import Testing
             http: http,
             newId: { "anon-1-x" }
         )
-        let requests = await http.requests()
+        // The fetch is fire-and-forget - poll the fake for the request.
+        let requests = await pollRequests(http)
         #expect(requests.count == 1)
         #expect(requests.first?.url == "https://us.i.posthog.com/i/v0/e/")
         let body = (await http.requestBodies()).first

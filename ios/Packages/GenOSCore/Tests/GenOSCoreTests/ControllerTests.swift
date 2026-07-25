@@ -221,6 +221,42 @@ import Testing
         #expect(h.store.get(id)?.status == .done)
     }
 
+    @Test func zombieCallbacksFromCancellationIgnoringStreamerAreSuppressed() throws {
+        // retryScreen cancels the old token, but FakeStreamer never observes
+        // cancellation - it models RN's worst case, an aborted fetch that
+        // keeps delivering callbacks. Every zombie callback must be
+        // suppressed, and the old onDone in particular must not evict the
+        // NEW token from inflight (the stale() guard fences removeValue).
+        let h = ControllerHarness()
+        let id = h.controller.openApp(sampleApp)
+        let old = try #require(h.streamer.last)
+        old.handlers.onDelta("first half")
+        h.controller.retryScreen(id)
+        let fresh = try #require(h.streamer.last)
+        #expect(old.token.isCancelled)
+        #expect(!fresh.token.isCancelled)
+
+        // The cancelled stream fires all three callbacks anyway - none land.
+        old.handlers.onDelta("zombie delta")
+        old.handlers.onDone(StreamEndInfo(truncated: true, dropped: false))
+        old.handlers.onError(StreamError("zombie error"))
+        let s = h.store.get(id)
+        #expect(s?.content == "")
+        #expect(s?.status == .pending)
+        #expect(s?.error == nil)
+        #expect(s?.truncated == nil)
+        #expect(s?.genMs == nil)
+
+        // The new token survived the zombie onDone (still inflight), so the
+        // new stream's delta and onDone land normally.
+        h.clock.advance(by: 250)
+        fresh.handlers.onDelta("live content")
+        #expect(h.store.get(id)?.content == "live content")
+        fresh.handlers.onDone(StreamEndInfo(truncated: false, dropped: false))
+        #expect(h.store.get(id)?.status == .done)
+        #expect(h.store.get(id)?.genMs == 250)
+    }
+
     @Test func retryAbortsThePreviousInflightStream() throws {
         let h = ControllerHarness()
         let id = h.controller.openApp(sampleApp)
@@ -482,6 +518,81 @@ import Testing
         #expect(messages.map(\.role) == [.user, .user])
         #expect(messages[0].content == sampleApp.request)
         #expect(messages[1].content == "child")
+    }
+
+    @Test func erroredAncestorWithPartialContentReplaysThroughCleanLang() throws {
+        // An errored ancestor that streamed some content before failing still
+        // replays its partial program - RN's `if (s.content)` only checks
+        // truthiness, never status - and it passes through cleanLang.
+        let h = ControllerHarness()
+        let a = h.controller.openApp(sampleApp)
+        h.streamer.last?.handlers.onDelta("```openui\nroot = Partial(")
+        h.streamer.last?.handlers.onError(StreamError("boom"))
+        #expect(h.store.get(a)?.status == .error)
+        let b = h.controller.resolveAction(parentId: a, message: "child")
+
+        let messages = h.controller.buildMessages(for: try #require(h.store.get(b)))
+        #expect(messages.map(\.role) == [.user, .assistant, .user])
+        #expect(messages[0].content == sampleApp.request)
+        #expect(messages[1].content == "root = Partial(")
+        #expect(messages[2].content == "child")
+    }
+
+    @Test func erroredAncestorWithEmptyContentReplaysUserTurnOnly() throws {
+        // RN `if (s.content)` - "" is falsy, so an ancestor that errored
+        // before any delta contributes only its user request, no assistant
+        // turn.
+        let h = ControllerHarness()
+        let a = h.controller.openApp(sampleApp)
+        h.streamer.last?.handlers.onError(StreamError("boom"))
+        #expect(h.store.get(a)?.status == .error)
+        #expect(h.store.get(a)?.content == "")
+        let b = h.controller.resolveAction(parentId: a, message: "child")
+
+        let messages = h.controller.buildMessages(for: try #require(h.store.get(b)))
+        #expect(messages.map(\.role) == [.user, .user])
+        #expect(messages[0].content == sampleApp.request)
+        #expect(messages[1].content == "child")
+    }
+
+    @Test func streamingAncestorReplaysItsPartialContent() throws {
+        // A still-streaming ancestor replays whatever partial content it has
+        // accumulated so far, cleanLang-stripped.
+        let h = ControllerHarness()
+        let a = h.controller.openApp(sampleApp)
+        h.streamer.last?.handlers.onDelta("```openui-lang\nroot = Half(")
+        #expect(h.store.get(a)?.status == .streaming)
+        let b = h.controller.resolveAction(parentId: a, message: "onward")
+
+        let messages = h.controller.buildMessages(for: try #require(h.store.get(b)))
+        #expect(messages.map(\.role) == [.user, .assistant, .user])
+        #expect(messages[1].content == "root = Half(")
+        #expect(messages[2].content == "onward")
+    }
+
+    @Test func chainCapsAtExactlyContextDepthAncestors() throws {
+        // Five-deep chain: exactly CONTEXT_DEPTH=2 nearest ancestors replay;
+        // the root and great-grandparent turns are absent entirely.
+        #expect(GenOSConstants.contextDepth == 2)
+        let h = ControllerHarness()
+        let a = h.controller.openApp(sampleApp)
+        h.finishLast(content: "root = A()")
+        let b = h.controller.resolveAction(parentId: a, message: "to b")
+        h.finishLast(content: "root = B()")
+        let c = h.controller.resolveAction(parentId: b, message: "to c")
+        h.finishLast(content: "root = C()")
+        let d = h.controller.resolveAction(parentId: c, message: "to d")
+        h.finishLast(content: "root = D()")
+        let e = h.controller.resolveAction(parentId: d, message: "to e")
+
+        let messages = h.controller.buildMessages(for: try #require(h.store.get(e)))
+        #expect(messages.map(\.role) == [.user, .assistant, .user, .assistant, .user])
+        #expect(messages.map(\.content) == ["to c", "root = C()", "to d", "root = D()", "to e"])
+        let replayed = messages.compactMap(\.content)
+        #expect(!replayed.contains(sampleApp.request))
+        #expect(!replayed.contains("root = A()"))
+        #expect(!replayed.contains("to b"))
+        #expect(!replayed.contains("root = B()"))
     }
 
     @Test func rootScreenIsJustItsOwnRequest() throws {

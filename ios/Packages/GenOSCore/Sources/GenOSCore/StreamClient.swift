@@ -295,6 +295,9 @@ public final class StreamClient: ScreenStreaming {
                     throw StreamError((msg?.isEmpty == false) ? msg! : "stream error")
                 }
                 let choice = chunk["choices"]?[0]
+                // RN: `if (choice?.finish_reason)` - truthy, so a NON-STRING
+                // truthy finish_reason (number/object) would land there but is
+                // dropped by stringValue here; unreachable with real providers.
                 if let fr = choice?["finish_reason"]?.stringValue, !fr.isEmpty {
                     finishReason = fr
                 }
