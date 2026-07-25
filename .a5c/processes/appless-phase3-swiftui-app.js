@@ -1,7 +1,7 @@
 /**
  * @process appless/phase3-swiftui-app-convergence
  * @description Execute Phase 3 of docs/NATIVE_MIGRATION_PLAN.md: the SwiftUI
- *   iOS app - Cupertino renderers for all 29 rendered contract components plus
+ *   iOS app - Cupertino renderers for all 30 rendered contract components plus
  *   the OS shell (home grid, ask bar, switcher, key gate, chrome, transitions),
  *   wired to OpenUILang + GenOSCore. Non-interactive (yolo).
  * @inputs { targetQuality: number, maxIterations: number }
@@ -88,7 +88,7 @@ export const scaffoldTask = defineTask('scaffold-app', (args, taskCtx) => ({
         rnReference: [
           `${REPO}/src/genos/ui/cupertino/theme.ts (design tokens - port values EXACTLY)`,
           `${REPO}/src/genos/theme.ts (useCds, dark/light)`,
-          `${REPO}/src/genos/ui/contract.tsx (the 33-component contract; 29 need renderers - TabItem, SelectItem, Series render nothing)`,
+          `${REPO}/src/genos/ui/contract.tsx (the 33-component contract; 30 need renderers - TabItem, SelectItem, Series render nothing)`,
           `${REPO}/spec/contract/genos.schema.json (paramOrder / requiredness)`,
           `${REPO}/spec/icon-map.md (icon name -> SF Symbol table)`,
         ],
@@ -98,7 +98,7 @@ export const scaffoldTask = defineTask('scaffold-app', (args, taskCtx) => ({
         'Create an SwiftPM package at ios/AppLess with: a platform-independent target AppLessCore (design tokens, icon mapping, the renderer REGISTRY and conformance checks - no SwiftUI import) and a SwiftUI target AppLessUI (renderers + shell) guarded so Linux builds skip it (#if canImport(SwiftUI)); plus an Xcode-launchable App entry point.',
         'Port design tokens from cupertino/theme.ts EXACTLY (colors, radii, spacing, font sizes/weights) into a Tokens type with light/dark variants; unit-test a sample of values against the RN source.',
         'Port the icon-name -> SF Symbol mapping table from spec/icon-map.md into a lookup with the documented dot fallback for unknown names; unit-test.',
-        'Build the CONFORMANCE HARNESS: a registry enumerating the 29 renderable contract components (source of truth: spec/contract/genos.schema.json minus the 3 structural placeholders), plus a Linux-runnable test asserting the registry covers exactly the schema components and that every registered entry has a renderer symbol. Print "renderers registered: <N>/29" for the CI gate to grep.',
+        'Build the CONFORMANCE HARNESS: a registry enumerating the 30 renderable contract components (source of truth: spec/contract/genos.schema.json minus the 3 structural placeholders), plus a Linux-runnable test asserting the registry covers exactly the schema components and that every registered entry has a renderer symbol. Print "renderers registered: <N>/29" for the CI gate to grep.',
         'swift build && swift test must pass ON LINUX for the platform-independent target. Return only the JSON summary.',
       ],
       outputFormat: 'JSON with filesCreated (array), registeredRenderers (number), linuxTestsPass (boolean), notes (array)',
@@ -123,7 +123,7 @@ export const scaffoldTask = defineTask('scaffold-app', (args, taskCtx) => ({
 
 export const renderersTask = defineTask('author-renderers', (args, taskCtx) => ({
   kind: 'agent',
-  title: 'Implement the 29 Cupertino SwiftUI renderers',
+  title: 'Implement the 30 Cupertino SwiftUI renderers',
   agent: {
     name: 'general-purpose',
     prompt: {
@@ -248,9 +248,9 @@ export const refineTask = defineTask('refine-app', (args, taskCtx) => ({
 
 export const conformanceGateTask = defineTask('conformance-gate', (args, taskCtx) => ({
   kind: 'shell',
-  title: `all 29 contract renderers registered (iteration ${args.iteration})`,
+  title: `all 30 contract renderers registered (iteration ${args.iteration})`,
   shell: {
-    command: `${SWIFT} && cd ${APP} && swift test 2>&1 | grep -q 'renderers registered: 29/29'`,
+    command: `${SWIFT} && cd ${APP} && swift test 2>&1 | grep -q 'renderers registered: 30/30'`,
     expectedExitCode: 0,
     timeout: 900000,
   },
@@ -338,7 +338,7 @@ export const commitPushTask = defineTask('commit-push', (args, taskCtx) => ({
   shell: {
     command: `cd ${REPO} && git add ios/ .github/ .a5c/processes/ && git commit -m "Add the SwiftUI iOS app (Phase 3)
 
-Cupertino renderers for all 29 rendered contract components plus the OS
+Cupertino renderers for all 30 rendered contract components plus the OS
 shell over GenOSCore. Quality-convergence score ${args.score}/99 after ${args.iteration} iteration(s)." && git push -u origin claude/repo-overview-xktv5r`,
     expectedExitCode: 0,
     timeout: 120000,
