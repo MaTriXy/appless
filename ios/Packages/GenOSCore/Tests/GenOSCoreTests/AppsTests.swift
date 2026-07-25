@@ -110,10 +110,56 @@ import Testing
         let store = MemorySecureStore()
         let first = await Telemetry.deviceId(store: store, newId: { "fresh-id" })
         #expect(first == "fresh-id")
-        #expect(await store.stored(Telemetry.idStorageKey) == "fresh-id")
+        // The persist is fire-and-forget (RN doesn't await setItemAsync) -
+        // poll briefly for the detached write to land.
+        var persisted: String?
+        for _ in 0..<100 {
+            persisted = await store.stored(Telemetry.idStorageKey)
+            if persisted != nil { break }
+            try? await Task.sleep(nanoseconds: 1_000_000)
+        }
+        #expect(persisted == "fresh-id")
         // A later call must reuse the persisted id, not mint a new one.
         let second = await Telemetry.deviceId(store: store, newId: { "other-id" })
         #expect(second == "fresh-id")
+    }
+
+    @Test func hungStoreWriteDoesNotDelayLaunchEvent() async {
+        // RN fires SecureStore.setItemAsync().catch() WITHOUT awaiting - a
+        // store whose write never completes must not block initTelemetry.
+        let store = MemorySecureStore()
+        await store.gateWrites()
+        let http = ScriptedHTTP()
+        await http.enqueue(ScriptedResponse(status: 200))
+        await Telemetry.initTelemetry(
+            env: [:],
+            platform: "ios",
+            store: store,
+            http: http,
+            newId: { "anon-hung-1" }
+        )
+        // initTelemetry returned and sent the event while the write is
+        // still hung.
+        let requests = await http.requests()
+        #expect(requests.count == 1)
+        #expect((await http.requestBodies()).first?["distinct_id"]?.stringValue == "anon-hung-1")
+        #expect(await store.stored(Telemetry.idStorageKey) == nil)
+        // Unblock the abandoned write so its continuation isn't leaked.
+        await store.releaseWrites()
+    }
+
+    @Test func base36FractionDigitsPinnedDeviationFromJs() {
+        // KNOWN DEVIATION (documented on base36FractionDigits): JS emits
+        // shortest-round-trip digits - node: (0.1).toString(36) ===
+        // "0.3lllllllllm", i.e. slice(2) === "3lllllllllm" - while the Swift
+        // greedy expansion of the same double runs to 16 digits. Pinned here
+        // so any drift is deliberate. Only the opaque fallback id embeds
+        // this; both shapes satisfy the [0-9a-z]* id alphabet.
+        #expect(Telemetry.base36FractionDigits(0.1) == "3llllllllllqsn8t")
+        #expect(Telemetry.base36FractionDigits(0.1) != "3lllllllllm")
+        // Exactly-representable fractions agree with JS.
+        #expect(Telemetry.base36FractionDigits(0.5) == "i")
+        #expect(JSRegex.test("\\A[0-9a-z]*\\z", Telemetry.base36FractionDigits(0.1)))
     }
 
     @Test func initTelemetrySendsOneEventThroughTheSeam() async {

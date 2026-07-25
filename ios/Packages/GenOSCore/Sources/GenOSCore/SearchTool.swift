@@ -121,8 +121,13 @@ public struct ExaSearchTool: ToolExecuting {
             let detail = jsSlice(String(data: data, encoding: .utf8) ?? "", upTo: 200)
             throw StreamError(detail.isEmpty ? "Exa HTTP \(head.status)" : detail)
         }
-        let json = JSONValue.parse(data)
-        let rawResults = json?["results"]?.arrayValue ?? []
+        // RN: `await res.json()` REJECTS on a malformed body, so executeTool's
+        // catch degrades to `ERROR: web search failed (...)` - never the
+        // "none found... do not fabricate" tool message. Throw to match.
+        guard let json = JSONValue.parse(data) else {
+            throw StreamError("Exa returned invalid JSON")
+        }
+        let rawResults = json["results"]?.arrayValue ?? []
         return rawResults.compactMap { r -> SearchResult? in
             guard let url = r["url"]?.stringValue, !url.isEmpty else { return nil }
             let title = r["title"]?.stringValue

@@ -122,6 +122,17 @@ import Testing
         #expect(results.first?.snippet == "a b c")
     }
 
+    @Test func malformedJsonOn200DegradesToErrorNotNoneFound() async {
+        // RN: `await res.json()` REJECTS on a malformed 200 body → executeTool
+        // catch → the ERROR shape. It must NOT map to [] and the "none
+        // found... do not fabricate" message (the opposite instruction).
+        let http = ScriptedHTTP()
+        await http.enqueue(ScriptedResponse(chunks: [Data("{not json".utf8)]))
+        let out = await makeTool(http: http).execute(name: "web_search", args: ["query": .string("q")])
+        #expect(out.hasPrefix("ERROR: web search failed ("))
+        #expect(!out.contains("none found"))
+    }
+
     @Test func executeFormatsSuccessfulSearch() async {
         let http = ScriptedHTTP()
         let payload = #"{"results":[{"title":"T","url":"https://a.com/x","text":"snippet"}]}"#

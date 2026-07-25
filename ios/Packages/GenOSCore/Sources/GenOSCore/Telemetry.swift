@@ -53,6 +53,15 @@ public enum Telemetry {
 
     /// Math.random().toString(36).slice(2) analog: the base-36 digits of the
     /// fractional part (no "0." prefix), capped at 16 digits.
+    ///
+    /// KNOWN DEVIATION (pinned in TelemetryTests): JS Number.toString(36)
+    /// emits shortest-round-trip digits with a rounded final digit -
+    /// (0.1).toString(36) === "0.3lllllllllm" (11 fraction digits) - while
+    /// this greedy expansion of the same binary double yields the 16-digit
+    /// "3llllllllllqsn8t". The string is only ever embedded in the OPAQUE
+    /// fallback analytics id (`anon-<ms>-<digits>`); nothing parses it and
+    /// both shapes match [0-9a-z]*, so the deviation is accepted rather
+    /// than reimplementing V8's dtoa.
     static func base36FractionDigits(_ value: Double) -> String {
         let digits = Array("0123456789abcdefghijklmnopqrstuvwxyz")
         var frac = value - value.rounded(.down)
@@ -99,7 +108,10 @@ public enum Telemetry {
                 return existing
             }
             let id = newId()
-            try? await store.write(idStorageKey, value: id)
+            // RN fires SecureStore.setItemAsync(KEY, id).catch(() => {})
+            // WITHOUT awaiting - the persist is fire-and-forget so a hung
+            // store write can never delay the launch event.
+            Task { try? await store.write(idStorageKey, value: id) }
             return id
         } catch {
             return newId()

@@ -38,8 +38,11 @@ public final class ScreenStore {
     /// SwiftUI-friendly change feed: yields once per subscriber notify (same
     /// coalescing as subscribe()). Each access creates an independent stream;
     /// terminating/cancelling its consumer unsubscribes automatically.
+    /// Ticks carry no payload (consumers re-read the store), so a slow
+    /// consumer keeps at most ONE buffered tick - bursts of notifies coalesce
+    /// instead of queueing an unbounded backlog of stale wake-ups.
     public var updates: AsyncStream<Void> {
-        let (stream, continuation) = AsyncStream<Void>.makeStream()
+        let (stream, continuation) = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
         let id = UUID()
         listeners.append((id: id, fn: { continuation.yield(()) }))
         continuation.onTermination = { [weak self] _ in

@@ -82,13 +82,22 @@ public enum Images {
     }
 }
 
-/// query → Unsplash raw URLs, with in-flight dedupe. Empty array = search
-/// failed, use LoremFlickr. Networking injected; Phase 3 wires a live client.
+/// query → Unsplash raw URLs, with in-flight dedupe (images.ts
+/// unsplashCache + unsplashPending). Empty array = search failed, use
+/// LoremFlickr. Networking injected via HTTPFetching; Phase 3 wires a live
+/// client.
 @MainActor
 public final class UnsplashCache {
     private var cache: [String: [String]] = [:]
+    /// images.ts unsplashPending: one shared fetch per in-flight query.
+    private var pending: [String: Task<Void, Never>] = [:]
+    private let http: HTTPFetching
+    private let accessKey: String?
 
-    public init() {}
+    public init(http: HTTPFetching, accessKey: String?) {
+        self.http = http
+        self.accessKey = accessKey
+    }
 
     public func cached(_ q: String) -> [String]? {
         cache[q]
@@ -96,5 +105,52 @@ public final class UnsplashCache {
 
     public func store(_ q: String, urls: [String]) {
         cache[q] = urls
+    }
+
+    /// ensureUnsplash parity: concurrent ensures for the same query await one
+    /// shared fetch (a pending entry is joined, never duplicated); the entry
+    /// is removed on completion (RN `finally`), so a LATER ensure fetches
+    /// again - callers consult cached() first, exactly like useSemanticImage.
+    /// Any failure (HTTP error, thrown fetch, malformed JSON) caches [].
+    public func ensure(_ q: String) async {
+        if let inFlight = pending[q] {
+            await inFlight.value
+            return
+        }
+        // Task {} inherits MainActor isolation; pending[q] is set before any
+        // suspension point, so a concurrent ensure always sees it.
+        let task = Task { [weak self, http, accessKey] in
+            let urls = await UnsplashCache.fetchCandidates(q, http: http, accessKey: accessKey)
+            guard let self else { return }
+            self.cache[q] = urls
+            self.pending[q] = nil
+        }
+        pending[q] = task
+        await task.value
+    }
+
+    /// GET https://api.unsplash.com/search/photos?query=...&per_page=10 with
+    /// Client-ID auth; maps results[].urls.raw, dropping absent/empty (RN
+    /// `.filter((u): u is string => !!u)`). Non-OK → {} → []; throw → [].
+    private static func fetchCandidates(
+        _ q: String,
+        http: HTTPFetching,
+        accessKey: String?
+    ) async -> [String] {
+        let request = HTTPRequest(
+            url: "https://api.unsplash.com/search/photos?query=\(jsEncodeURIComponent(q))&per_page=10",
+            method: "GET",
+            headers: ["Authorization": "Client-ID \(accessKey ?? "")"]
+        )
+        guard
+            let (head, data) = try? await http.fetch(request),
+            head.ok,
+            let json = JSONValue.parse(data)
+        else { return [] }
+        let results = json["results"]?.arrayValue ?? []
+        return results.compactMap { r -> String? in
+            guard let raw = r["urls"]?["raw"]?.stringValue, !raw.isEmpty else { return nil }
+            return raw
+        }
     }
 }

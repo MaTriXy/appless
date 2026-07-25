@@ -55,8 +55,11 @@ actor GatedStorage {
     var values: [String: String] = [:]
     var readWaiters: [CheckedContinuation<Void, Never>] = []
     var gated = false
+    var writeWaiters: [CheckedContinuation<Void, Never>] = []
+    var writesGated = false
 
     func setGated(_ g: Bool) { gated = g }
+    func setWritesGated(_ g: Bool) { writesGated = g }
     func set(_ key: String, _ value: String?) {
         if let value { values[key] = value } else { values.removeValue(forKey: key) }
     }
@@ -73,10 +76,23 @@ actor GatedStorage {
         readWaiters = []
         for w in waiters { w.resume() }
     }
+
+    func waitIfWritesGated() async {
+        guard writesGated else { return }
+        await withCheckedContinuation { writeWaiters.append($0) }
+    }
+
+    func releaseWrites() {
+        writesGated = false
+        let waiters = writeWaiters
+        writeWaiters = []
+        for w in waiters { w.resume() }
+    }
 }
 
 /// SecureStore test double. `gate()` blocks reads until `releaseReads()` so
-/// tests can interleave user input with hydration.
+/// tests can interleave user input with hydration; `gateWrites()` blocks
+/// writes until `releaseWrites()` to simulate a hung keychain write.
 struct MemorySecureStore: SecureStore {
     let storage = GatedStorage()
 
@@ -86,6 +102,8 @@ struct MemorySecureStore: SecureStore {
 
     func gate() async { await storage.setGated(true) }
     func releaseReads() async { await storage.releaseReads() }
+    func gateWrites() async { await storage.setWritesGated(true) }
+    func releaseWrites() async { await storage.releaseWrites() }
 
     func read(_ key: String) async throws -> String? {
         await storage.waitIfGated()
@@ -93,6 +111,7 @@ struct MemorySecureStore: SecureStore {
     }
 
     func write(_ key: String, value: String?) async throws {
+        await storage.waitIfWritesGated()
         await storage.set(key, value)
     }
 

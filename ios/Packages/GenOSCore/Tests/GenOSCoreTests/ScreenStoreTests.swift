@@ -119,6 +119,43 @@ import Testing
         #expect(store.get("s1")?.content == "ab")
     }
 
+    @Test func updatesFeedBuffersOnlyNewestTickForSlowConsumers() async {
+        // bufferingPolicy .bufferingNewest(1): a burst of notifies while the
+        // consumer isn't reading coalesces to ONE buffered tick, not a
+        // backlog of stale wake-ups.
+        let clock = ManualClock()
+        let store = ScreenStore(clock: clock)
+        let stream = store.updates
+
+        // Three immediate notifies before anyone reads.
+        seed(store)
+        store.patch("s1") { $0.status = .streaming }
+        store.patch("s1") { $0.status = .done }
+
+        let counter = NotifyCounter()
+        let consumer = Task { @MainActor in
+            for await _ in stream { counter.count += 1 }
+        }
+        // Wait for the consumer to drain the buffer, then let any (wrongly)
+        // queued extra ticks arrive.
+        for _ in 0..<100 {
+            if counter.count >= 1 { break }
+            try? await Task.sleep(nanoseconds: 1_000_000)
+        }
+        try? await Task.sleep(nanoseconds: 10_000_000)
+        #expect(counter.count == 1)
+
+        // A fresh notify still wakes the consumer - coalescing drops stale
+        // ticks, not future ones.
+        store.patch("s1") { $0.searching = true }
+        for _ in 0..<100 {
+            if counter.count >= 2 { break }
+            try? await Task.sleep(nanoseconds: 1_000_000)
+        }
+        #expect(counter.count == 2)
+        consumer.cancel()
+    }
+
     @Test func updatesFeedTerminationUnsubscribes() async {
         let clock = ManualClock()
         let store = ScreenStore(clock: clock)

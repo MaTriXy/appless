@@ -99,3 +99,93 @@ import Testing
         #expect(Images.resolveUnsplash(q, candidates: []) == "https://loremflickr.com/640/480/sushi?lock=5")
     }
 }
+
+/// HTTPFetching double whose fetch suspends until release() - lets a test
+/// hold a search "in flight" while more ensures arrive.
+actor BlockingHTTP: HTTPFetching {
+    private let body: Data
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+    private var released = false
+    private(set) var requests: [HTTPRequest] = []
+
+    init(body: String) {
+        self.body = Data(body.utf8)
+    }
+
+    var fetchCount: Int { requests.count }
+
+    func fetch(_ request: HTTPRequest) async throws -> (HTTPResponseHead, Data) {
+        requests.append(request)
+        if !released {
+            await withCheckedContinuation { waiters.append($0) }
+        }
+        return (HTTPResponseHead(status: 200), body)
+    }
+
+    func release() {
+        released = true
+        let ws = waiters
+        waiters = []
+        for w in ws { w.resume() }
+    }
+}
+
+// images.ts ensureUnsplash - shared in-flight fetch per query (pending map).
+@MainActor
+@Suite struct UnsplashCacheTests {
+    let payload = #"{"results":[{"urls":{"raw":"https://u/one"}},{"urls":{"raw":"https://u/two"}},{"urls":{}},{"urls":{"raw":""}}]}"#
+
+    @Test func concurrentEnsuresForSameQueryShareOneFetch() async {
+        let http = BlockingHTTP(body: payload)
+        let cache = UnsplashCache(http: http, accessKey: "unsplash-key")
+
+        let first = Task { @MainActor in await cache.ensure("sushi platter") }
+        let second = Task { @MainActor in await cache.ensure("sushi platter") }
+        // Wait until the shared fetch is in flight, then give the second
+        // ensure ample turns to run - while the fetch is held open, the
+        // pending entry cannot clear, so it MUST join rather than refetch.
+        for _ in 0..<1000 {
+            if await http.fetchCount >= 1 { break }
+            await Task.yield()
+        }
+        for _ in 0..<50 { await Task.yield() }
+        await http.release()
+        _ = await first.value
+        _ = await second.value
+
+        // Exactly one HTTP request despite two concurrent ensures.
+        let requests = await http.requests
+        #expect(requests.count == 1)
+        #expect(
+            requests.first?.url
+                == "https://api.unsplash.com/search/photos?query=sushi%20platter&per_page=10"
+        )
+        #expect(requests.first?.method == "GET")
+        #expect(requests.first?.headers["Authorization"] == "Client-ID unsplash-key")
+        // Mapped urls.raw, dropping absent/empty entries (RN !!u filter).
+        #expect(cache.cached("sushi platter") == ["https://u/one", "https://u/two"])
+    }
+
+    @Test func pendingEntryClearsOnCompletionSoLaterEnsureRefetches() async {
+        // RN `finally { unsplashPending.delete(q) }`: a SEQUENTIAL ensure
+        // after completion fetches again (callers consult cached() first).
+        let http = ScriptedHTTP()
+        await http.enqueue(ScriptedResponse(chunks: [Data(payload.utf8)]))
+        await http.enqueue(ScriptedResponse(chunks: [Data(payload.utf8)]))
+        let cache = UnsplashCache(http: http, accessKey: "k")
+        await cache.ensure("q")
+        await cache.ensure("q")
+        #expect(await http.requests().count == 2)
+    }
+
+    @Test func failedSearchCachesEmptyForLoremflickrFallback() async {
+        let http = ScriptedHTTP()
+        await http.enqueue(ScriptedResponse(status: 403, errorBody: "rate limited"))
+        let cache = UnsplashCache(http: http, accessKey: "k")
+        await cache.ensure("denied")
+        #expect(cache.cached("denied") == [])
+        // Thrown fetch (no scripted response) also caches [].
+        await cache.ensure("network-down")
+        #expect(cache.cached("network-down") == [])
+    }
+}
