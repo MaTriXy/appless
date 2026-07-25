@@ -114,3 +114,28 @@ unterminated strings) fail loudly with a clear message, and that the real
 - Output format is `lib/serialize.mjs`'s `stableStringify` (sorted keys,
   2-space indent, trailing newline) — the same bytes as `*.expected.json`
   fixtures and the Swift `TreeSerializer`.
+
+## `gen-utf8-fuzz.mjs` — UTF-8 streaming-decode oracle
+
+GenOSCore's `UTF8StreamDecoder` is a verbatim port of the [WHATWG utf-8
+decoder](https://encoding.spec.whatwg.org/#utf-8-decoder) state machine — the
+algorithm `new TextDecoder()` runs with `{stream: true}`. This script proves the
+port by differential testing against the real thing.
+
+```bash
+node probes/gen-utf8-fuzz.mjs                 # print JSON to stdout
+node probes/gen-utf8-fuzz.mjs --out FILE      # write JSON
+```
+
+It generates a deterministic corpus (mulberry32, fixed seed `0x5eed1234`): 8
+pinned counterexamples that defeated earlier tail-scan decoders, then ~212
+random byte sequences (mixed valid/malformed, 0–64 bytes) split at random chunk
+boundaries. Each case is decoded through node's `TextDecoder` with
+`{stream: true}` and the **per-chunk** emissions are recorded — timing, not just
+final totals.
+
+The output is committed at
+`ios/Packages/GenOSCore/Tests/GenOSCoreTests/Resources/utf8-fuzz-corpus.json`
+and asserted by `UTF8StreamDecoderTests.fuzzCorpusMatchesTextDecoderPerChunk`.
+Re-running the script must reproduce that file byte-identically; regenerate it
+(and re-run `swift test`) if the corpus is ever intentionally extended.

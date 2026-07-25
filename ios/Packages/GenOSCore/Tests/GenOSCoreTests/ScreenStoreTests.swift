@@ -136,8 +136,10 @@ import Testing
         let consumer = Task { @MainActor in
             for await _ in stream { counter.count += 1 }
         }
-        // Wait for the consumer to drain the buffer, then let any (wrongly)
-        // queued extra ticks arrive.
+        // Bounded polling is INHERENT here: the assertion is about an
+        // independent consumer Task's progress through an AsyncStream, so
+        // there is no seam to await - and the second sleep deliberately gives
+        // wrongly-queued extra ticks time to arrive (proving they do not).
         for _ in 0..<100 {
             if counter.count >= 1 { break }
             try? await Task.sleep(nanoseconds: 1_000_000)
@@ -171,7 +173,9 @@ import Testing
         consumer.cancel()
         _ = await consumer.value
 
-        // onTermination hops back to the MainActor - poll briefly.
+        // Bounded polling is INHERENT here: AsyncStream.onTermination fires on
+        // the cancelling Task's context and hops back to the MainActor, so the
+        // unsubscribe is observable only after an unspecified number of hops.
         for _ in 0..<100 {
             if store.listenerCount == 0 { break }
             try? await Task.sleep(nanoseconds: 1_000_000)

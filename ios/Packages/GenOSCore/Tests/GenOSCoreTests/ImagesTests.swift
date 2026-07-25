@@ -148,6 +148,9 @@ actor BlockingHTTP: HTTPFetching {
             if await http.fetchCount >= 1 { break }
             await Task.yield()
         }
+        // Inherent: yields let the shared in-flight fetch's continuation run;
+        // the assertion below is that NO second request happened, which has no
+        // positive event to await.
         for _ in 0..<50 { await Task.yield() }
         await http.release()
         _ = await first.value

@@ -632,12 +632,17 @@ import Testing
     }
 }
 
-// TextDecoder("utf-8", {stream:true}) emission-TIMING parity for malformed
-// input (expectations generated from node v22 TextDecoder): only VALID lead
-// bytes (0xC2-0xDF, 0xE0-0xEF, 0xF0-0xF4) may start an incomplete tail that
-// is held back across chunks. Invalid leads (0xC0/0xC1, 0xF5-0xFF) and stray
-// continuation bytes emit U+FFFD in the SAME chunk they arrive in - never
-// held back up to 3 bytes as presumed multi-byte leads.
+// FULL WHATWG parity, fuzz-verified. UTF8StreamDecoder ports the Encoding
+// Standard's utf-8 decoder state machine verbatim - the algorithm
+// TextDecoder("utf-8", {stream:true}) runs - so emission timing AND totals
+// match for every input by construction, not per patched case. This suite
+// pins: (a) invalid-lead timing, (b) valid incomplete tails, (c) the
+// out-of-range CONTINUATION counterexamples that defeated the previous
+// tail-scan decoder (it held them back, and could swallow a trailing valid
+// byte at stream end), and (d) a 220-case seeded fuzz differential whose
+// expectations come from real node TextDecoder
+// (spec/fixtures/generator/probes/gen-utf8-fuzz.mjs; re-running it must
+// reproduce Resources/utf8-fuzz-corpus.json byte-identically).
 @Suite struct UTF8StreamDecoderTests {
     private func emissions(_ chunks: [[UInt8]]) -> [String] {
         var decoder = UTF8StreamDecoder()
@@ -667,5 +672,52 @@ import Testing
         #expect(emissions([[0x61, 0xE2, 0x82], [0xAC]]) == ["a", "\u{20AC}"])
         // 0xF4 is the MAX valid 4-byte lead - still held to completion.
         #expect(emissions([[0xF4, 0x8F], [0xBF, 0xBF]]) == ["", "\u{10FFFF}"])
+    }
+
+    /// Out-of-range CONTINUATION bytes: a valid lead whose second byte falls
+    /// outside the spec's boundary window (E0 needs A0-BF, ED needs 80-9F,
+    /// F0 needs 90-BF, F4 needs 80-8F). The spec emits U+FFFD for the aborted
+    /// sequence and RE-PROCESSES the offending byte as a fresh lead, so both
+    /// land in the arriving chunk. The previous tail-scan decoder validated
+    /// only the lead and held the pair back - and for F4 90 / F0 80 it also
+    /// swallowed the following valid byte, losing it entirely at stream end.
+    @Test func outOfRangeContinuationsEmitInArrivingChunk() {
+        #expect(emissions([[0x61, 0xE0, 0x80], [0x62]]) == ["a\u{FFFD}\u{FFFD}", "b"])
+        #expect(emissions([[0x61, 0xED, 0xA0], [0x62]]) == ["a\u{FFFD}\u{FFFD}", "b"])
+        #expect(emissions([[0x61, 0xF4, 0x90], [0x62]]) == ["a\u{FFFD}\u{FFFD}", "b"])
+        #expect(emissions([[0x61, 0xF0, 0x80], [0x62]]) == ["a\u{FFFD}\u{FFFD}", "b"])
+        // Nothing is dropped when the stream ends right after the bad pair.
+        #expect(emissions([[0x61, 0xF4, 0x90, 0x62]]) == ["a\u{FFFD}\u{FFFD}b"])
+    }
+
+    // MARK: - Seeded fuzz differential vs node TextDecoder
+
+    private struct FuzzCorpus: Decodable {
+        struct Case: Decodable {
+            let chunks: [[UInt8]]
+            let perChunk: [String]
+        }
+        let seed: Int
+        let cases: [Case]
+    }
+
+    @Test func fuzzCorpusMatchesTextDecoderPerChunk() throws {
+        let url = try #require(
+            Bundle.module.url(forResource: "utf8-fuzz-corpus", withExtension: "json"),
+            "utf8-fuzz-corpus.json missing - regenerate with probes/gen-utf8-fuzz.mjs"
+        )
+        let corpus = try JSONDecoder().decode(FuzzCorpus.self, from: Data(contentsOf: url))
+        #expect(corpus.cases.count >= 200)
+
+        var mismatches: [String] = []
+        for (index, testCase) in corpus.cases.enumerated() {
+            let actual = emissions(testCase.chunks)
+            if actual != testCase.perChunk {
+                mismatches.append(
+                    "case \(index): chunks=\(testCase.chunks) expected=\(testCase.perChunk) actual=\(actual)"
+                )
+            }
+        }
+        #expect(mismatches.isEmpty, "\(mismatches.count) fuzz divergences:\n\(mismatches.prefix(5).joined(separator: "\n"))")
     }
 }

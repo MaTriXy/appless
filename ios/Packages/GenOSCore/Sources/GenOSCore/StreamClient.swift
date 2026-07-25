@@ -134,39 +134,87 @@ public struct StreamError: Error, Sendable, Equatable {
     public init(_ message: String) { self.message = message }
 }
 
-/// Incremental UTF-8 decoding (TextDecoder-stream semantics): incomplete
-/// trailing multi-byte sequences are held back between chunks.
+/// Incremental UTF-8 decoding: a byte-for-byte port of the WHATWG Encoding
+/// Standard's utf-8 decoder state machine (https://encoding.spec.whatwg.org/#utf-8-decoder),
+/// which is exactly the algorithm `new TextDecoder()` runs with `{stream: true}`
+/// and `fatal: false` - the RN reference's decoder (stream.ts createUtf8Decoder).
+///
+/// Porting the state machine rather than approximating it with a tail scan makes
+/// emission timing AND totals match TextDecoder for EVERY input by construction:
+/// valid sequences, invalid lead bytes, out-of-range continuation bytes
+/// (overlong C0/C1, surrogate ED A0, out-of-range F4 90), stray continuations,
+/// and any chunk boundary. Earlier tail-scan versions matched only the cases
+/// they were patched for; see UTF8StreamDecoderTests for the pinned
+/// counterexamples plus the seeded fuzz differential against TextDecoder.
 struct UTF8StreamDecoder {
-    private var pending: [UInt8] = []
+    private static let replacement = Unicode.Scalar(0xFFFD)!
+
+    // Spec state: carried across chunks so a sequence may span any boundary.
+    private var codePoint: UInt32 = 0
+    private var bytesSeen: Int = 0
+    private var bytesNeeded: Int = 0
+    private var lowerBoundary: UInt8 = 0x80
+    private var upperBoundary: UInt8 = 0xBF
 
     mutating func decode(_ data: Data) -> String {
-        var bytes = pending
-        bytes.append(contentsOf: data)
-        pending = []
-        var end = bytes.count
-        var i = max(0, bytes.count - 3)
-        while i < bytes.count {
-            let b = bytes[i]
-            // Only VALID lead bytes can start an incomplete sequence worth
-            // holding back (TextDecoder emits U+FFFD immediately for invalid
-            // leads such as 0xC0/0xC1 and 0xF5-0xFF, and for stray
-            // continuation bytes - matching its emission timing, not just
-            // final totals).
-            let need: Int
-            switch b {
-            case 0xC2...0xDF: need = 2
-            case 0xE0...0xEF: need = 3
-            case 0xF0...0xF4: need = 4
-            default: need = 0
-            }
-            if need > 0 && i + need > bytes.count {
-                end = i
-                break
-            }
+        let queue = Array(data)
+        var out = String.UnicodeScalarView()
+        var i = 0
+        while i < queue.count {
+            let byte = queue[i]
             i += 1
+
+            if bytesNeeded == 0 {
+                switch byte {
+                case 0x00...0x7F:
+                    out.append(Unicode.Scalar(byte))
+                case 0xC2...0xDF:
+                    bytesNeeded = 1
+                    codePoint = UInt32(byte & 0x1F)
+                case 0xE0...0xEF:
+                    if byte == 0xE0 { lowerBoundary = 0xA0 }
+                    if byte == 0xED { upperBoundary = 0x9F }
+                    bytesNeeded = 2
+                    codePoint = UInt32(byte & 0x0F)
+                case 0xF0...0xF4:
+                    if byte == 0xF0 { lowerBoundary = 0x90 }
+                    if byte == 0xF4 { upperBoundary = 0x8F }
+                    bytesNeeded = 3
+                    codePoint = UInt32(byte & 0x07)
+                default:
+                    // Invalid lead (C0, C1, F5-FF, stray continuation): error
+                    // now, no holdback.
+                    out.append(Self.replacement)
+                }
+                continue
+            }
+
+            if byte < lowerBoundary || byte > upperBoundary {
+                // Spec: reset state, emit an error, and PREPEND the offending
+                // byte back onto the stream so it is re-processed as a lead.
+                codePoint = 0
+                bytesNeeded = 0
+                bytesSeen = 0
+                lowerBoundary = 0x80
+                upperBoundary = 0xBF
+                out.append(Self.replacement)
+                i -= 1
+                continue
+            }
+
+            lowerBoundary = 0x80
+            upperBoundary = 0xBF
+            codePoint = (codePoint << 6) | UInt32(byte & 0x3F)
+            bytesSeen += 1
+            if bytesSeen != bytesNeeded { continue }
+
+            let scalarValue = codePoint
+            codePoint = 0
+            bytesNeeded = 0
+            bytesSeen = 0
+            out.append(Unicode.Scalar(scalarValue) ?? Self.replacement)
         }
-        pending = Array(bytes[end...])
-        return String(decoding: bytes[..<end], as: UTF8.self)
+        return String(out)
     }
 }
 

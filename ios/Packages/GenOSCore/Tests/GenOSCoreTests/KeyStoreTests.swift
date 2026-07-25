@@ -41,15 +41,14 @@ import Testing
 
         var notifications = 0
         let unsubscribe = ks.subscribe { notifications += 1 }
+        let writes = await store.committedWrites()
         ks.set("  fresh-key ")
         #expect(ks.status == .present)
         #expect(ks.get() == "fresh-key")
         #expect(notifications == 1)
-        // Persistence is best-effort background work - poll for it.
-        for _ in 0..<50 {
-            if await store.stored(KeyStore.storageKey) != nil { break }
-            try? await Task.sleep(nanoseconds: 5_000_000)
-        }
+        // Persistence is best-effort background work - await the store's
+        // write-observation seam rather than polling for it.
+        for await _ in writes { break }
         #expect(await store.stored(KeyStore.storageKey) == "fresh-key")
         unsubscribe()
     }
@@ -61,13 +60,12 @@ import Testing
         await ks.hydrate()
         #expect(ks.get() == "bad-key")
 
+        // The seam yields on any commit, deletions included.
+        let writes = await store.committedWrites()
         ks.markRejected("bad-key")
         #expect(ks.status == .rejected)
         #expect(ks.get() == nil)
-        for _ in 0..<50 {
-            if await store.stored(KeyStore.storageKey) == nil { break }
-            try? await Task.sleep(nanoseconds: 5_000_000)
-        }
+        for await _ in writes { break }
         #expect(await store.stored(KeyStore.storageKey) == nil)
     }
 
@@ -91,14 +89,12 @@ import Testing
         let ks = KeyStore(envKey: nil, store: store)
         await ks.hydrate()
 
+        let writes = await store.committedWrites()
         ks.set("   ")
         #expect(ks.status == .present)
         #expect(ks.get() == "")
         // The empty trimmed value is persisted, like RN's persistedWrite("").
-        for _ in 0..<50 {
-            if await store.stored(KeyStore.storageKey) != nil { break }
-            try? await Task.sleep(nanoseconds: 5_000_000)
-        }
+        for await _ in writes { break }
         #expect(await store.stored(KeyStore.storageKey) == "")
     }
 
