@@ -20,7 +20,8 @@ export async function process(inputs, ctx) {
   let iteration = 0;
   let score = 0;
   let converged = false;
-  let feedback = [
+  // seedFeedback lets follow-up runs reuse this process with fresh findings.
+  let feedback = inputs.seedFeedback || [
     'Check in the throwaway JS probe scripts (StreamingSemanticsTests expected-tree derivation + differential sweep driver) as regenerable utilities under spec/fixtures/generator/probes/ with a README',
     'Close deviation #7 exactly: build jsWhitespace/jsTrim + Number() StrWhiteSpace from explicit scalar sets matching the ECMAScript definitions (JS trim set excludes U+0085; Number() set per spec), update README KNOWN-DEVIATIONS (entry becomes a fixed former deviation), add regression tests with U+0085/U+2028/U+2029/NBSP cases',
     'Track spec section-11 app-level helpers for Phase 2: add a PHASE-2 HANDOFF section to ios/Packages/OpenUILang/README.md listing cleanLang/extractActions/parseOsCommand/parseGenosUrl/parseImgUrl as must-port-byte-exact with their spec anchors',
