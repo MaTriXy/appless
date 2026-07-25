@@ -33,13 +33,14 @@
  *       the parser fails loudly on anything it cannot extract.
  */
 import { readFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 import { createOracle, runSteps } from "./expected-tree.mjs";
 
 /**
  * Scenario table — the same names + step texts as the Swift test methods.
  * `--check` verifies this mechanically against StreamingSemanticsTests.swift.
  */
-const SCENARIOS = [
+export const SCENARIOS = [
   {
     name: "prefixExtensionCaching",
     steps: [
@@ -103,7 +104,7 @@ const SCENARIOS = [
  * literals, and the `Self.rootWithText("...", incomplete: bool)` call.
  * Anything else is a hard error: the Swift file must stay machine-readable.
  */
-class SwiftScanner {
+export class SwiftScanner {
   constructor(text, pos, label) {
     this.text = text;
     this.pos = pos;
@@ -223,17 +224,50 @@ class SwiftScanner {
       }
       const e = dedented[i + 1];
       if (e === "(") {
-        // Balanced-paren, quote-aware interpolation capture.
+        // Balanced-paren, quote-aware interpolation capture. String literals
+        // inside the expression are tracked with full escape state, so an
+        // escaped quote (\") or backslash (\\) — and parens inside the
+        // string — cannot desync the paren balance. Shapes we can't capture
+        // faithfully (nested interpolations inside those strings, multiline
+        // literals) fail loudly instead of misparsing.
         let depth = 1;
         let inString = false;
         let j = i + 2;
-        for (; j < dedented.length && depth > 0; j++) {
+        while (j < dedented.length && depth > 0) {
           const d = dedented[j];
-          if (d === '"') inString = !inString;
-          else if (!inString && d === "(") depth++;
-          else if (!inString && d === ")") depth--;
+          if (inString) {
+            if (d === "\\") {
+              if (dedented[j + 1] === "(") {
+                this.fail(
+                  "nested \\(...) interpolation inside a string literal within a " +
+                    "\\(...) interpolation is not supported — keep interpolation expressions simple"
+                );
+              }
+              j += 2; // escaped char (\" \\ \n ...) can never end the string
+              continue;
+            }
+            if (d === '"') inString = false;
+          } else if (d === '"') {
+            if (dedented.startsWith('"""', j)) {
+              this.fail(
+                'multiline (""") string literal inside a \\(...) interpolation is not supported'
+              );
+            }
+            inString = true;
+          } else if (d === "(") {
+            depth++;
+          } else if (d === ")") {
+            depth--;
+          }
+          j++;
         }
-        if (depth !== 0) this.fail("unterminated \\(...) interpolation");
+        if (depth !== 0) {
+          this.fail(
+            inString
+              ? "unterminated string literal inside \\(...) interpolation"
+              : "unterminated \\(...) interpolation"
+          );
+        }
         if (buf) {
           parts.push({ str: buf });
           buf = "";
@@ -471,26 +505,33 @@ async function check(swiftPath) {
 // entry point
 // ───────────────────────────────────────────────────────────────────────────
 
-const args = process.argv.slice(2);
-const checkIdx = args.indexOf("--check");
-if (checkIdx !== -1) {
-  const swiftPath = args[checkIdx + 1];
-  if (!swiftPath) {
-    console.error("usage: node probes/regen-streaming-expectations.mjs --check <StreamingSemanticsTests.swift>");
-    process.exit(2);
-  }
-  try {
-    await check(swiftPath);
-  } catch (e) {
-    console.error("[check] FAILED:", e instanceof Error ? e.message : e);
-    process.exit(1);
-  }
-} else {
-  const oracle = await createOracle();
-  for (const scenario of SCENARIOS) {
-    const trees = await runSteps(scenario.steps, oracle);
-    trees.forEach((tree, i) => {
-      process.stdout.write(`=== ${scenario.name} step ${i} ===\n${tree}`);
-    });
+// Run only when executed directly (`node probes/regen-streaming-expectations.mjs`);
+// importing this module (e.g. from probes/scanner-tests.mjs) must not print.
+const isMain =
+  process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (isMain) {
+  const args = process.argv.slice(2);
+  const checkIdx = args.indexOf("--check");
+  if (checkIdx !== -1) {
+    const swiftPath = args[checkIdx + 1];
+    if (!swiftPath) {
+      console.error("usage: node probes/regen-streaming-expectations.mjs --check <StreamingSemanticsTests.swift>");
+      process.exit(2);
+    }
+    try {
+      await check(swiftPath);
+    } catch (e) {
+      console.error("[check] FAILED:", e instanceof Error ? e.message : e);
+      process.exit(1);
+    }
+  } else {
+    const oracle = await createOracle();
+    for (const scenario of SCENARIOS) {
+      const trees = await runSteps(scenario.steps, oracle);
+      trees.forEach((tree, i) => {
+        process.stdout.write(`=== ${scenario.name} step ${i} ===\n${tree}`);
+      });
+    }
   }
 }

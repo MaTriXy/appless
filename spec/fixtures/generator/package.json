@@ -7,7 +7,8 @@
   "scripts": {
     "postinstall": "node apply-patch.mjs",
     "generate": "node generate.mjs",
-    "test": "node test.mjs && npm run check:streaming",
+    "test": "node test.mjs && npm run test:scanner && npm run check:streaming",
+    "test:scanner": "node probes/scanner-tests.mjs",
     "check:streaming": "node probes/regen-streaming-expectations.mjs --check ../../../ios/Packages/OpenUILang/Tests/OpenUILangTests/StreamingSemanticsTests.swift"
   },
   "dependencies": {

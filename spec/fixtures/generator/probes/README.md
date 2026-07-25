@@ -95,6 +95,18 @@ file must keep the machine-readable shape the parser understands (plain
 literals in `steps: [ (text, expected), ... ]`, shared trees only via
 `rootWithText`); the parser fails loudly on anything it cannot extract.
 
+## `scanner-tests.mjs` — SwiftScanner unit tests
+
+Scanner-level tests for the minimal Swift scanner used by `--check`
+(run by the generator's `npm test` as `test:scanner`, before the drift gate).
+Synthetic snippets prove the multiline-literal `\(...)` interpolation capture
+tracks quote/escape state (escaped quotes/backslashes and parens inside string
+literals within the expression), that unsupported shapes (nested
+interpolations inside those strings, `"""` inside an interpolation,
+unterminated strings) fail loudly with a clear message, and that the real
+`StreamingSemanticsTests.swift` still extracts byte-identically to the
+`SCENARIOS` table.
+
 ## Invariants
 
 - Neither script writes files; both print to stdout only. Fixture generation
