@@ -102,6 +102,31 @@ func jsOwnKeyLess(_ x: String, _ y: String) -> Bool {
     }
 }
 
+/// `OrdinaryOwnPropertyKeys` (ES 10.1.11.1) applied to a plain object's keys in
+/// INSERTION order — i.e. exactly what JS `Object.keys(o)` / `for…in` yields:
+/// every canonical array index first in ascending NUMERIC order, then every
+/// remaining string key in insertion order.
+///
+/// NOT the same as `jsOwnKeyLess`, which additionally sorts the string group
+/// because the reference SERIALIZER sorts before re-inserting. Public iteration
+/// accessors want this one; the serializer wants that one.
+func jsOwnPropertyKeys(_ insertionOrder: [String]) -> [String] {
+    guard insertionOrder.contains(where: { jsCanonicalArrayIndex($0) != nil }) else {
+        return insertionOrder  // overwhelmingly the common case
+    }
+    var indices: [(UInt32, String)] = []
+    var rest: [String] = []
+    for k in insertionOrder {
+        if let i = jsCanonicalArrayIndex(k) {
+            indices.append((i, k))
+        } else {
+            rest.append(k)
+        }
+    }
+    indices.sort { $0.0 < $1.0 }
+    return indices.map { $0.1 } + rest
+}
+
 /// JS `String.prototype.startsWith`: UTF-16 code-unit prefix test (Swift's
 /// `hasPrefix` matches canonically and would accept an NFC/NFD variant).
 func jsStringHasPrefix(_ s: String, _ prefix: String) -> Bool {

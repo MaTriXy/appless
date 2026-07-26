@@ -1,0 +1,41 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "TextContent",
+        "props": {}
+      },
+      {
+        "component": "ListItem",
+        "props": {
+          "subtitle": null,
+          "title": "Inline"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "after"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": [
+      {
+        "code": "inline-reserved",
+        "component": "constructor",
+        "path": "",
+        "message": "constructor() must be declared as a top-level statement, not used inline as a value",
+        "statementId": "root"
+      }
+    ]
+  },
+  "state": {},
+  "runtimeErrors": []
+}

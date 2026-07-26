@@ -36,6 +36,29 @@ struct RTObject {
     var values: [RTValue] { keys.map { storage[JSKey($0)]! } }
     func has(_ key: String) -> Bool { storage[JSKey(key)] != nil }
     var isEmpty: Bool { keys.isEmpty }
+
+    /// The one key JS object ASSIGNMENT silently swallows.
+    static let protoKey = "__proto__"
+    /// Own key that shadows `Object.prototype.toString` (see `jsToString`).
+    static let toStringKey = "toString"
+
+    /// JS plain-object ASSIGNMENT (`o[key] = value`), which is NOT the same as
+    /// defining an own property.
+    ///
+    /// A fresh `{}` inherits `Object.prototype`'s `__proto__` ACCESSOR, so
+    /// `o["__proto__"] = v` invokes that setter: it either re-points `o`'s
+    /// prototype (object/null `v`) or does nothing at all (primitive `v`).
+    /// Either way `"__proto__"` never becomes an own property and never shows
+    /// up in `Object.keys` / `JSON.stringify` (fixture `080-proto-object-key`).
+    ///
+    /// Use this at every site whose JS original is an assignment. Sites whose
+    /// original is `Object.fromEntries` / `CreateDataPropertyOrThrow` keep
+    /// using the subscript — those DO create an own `__proto__`
+    /// (evaluator.js:40).
+    mutating func assign(_ key: String, _ value: RTValue) {
+        if key == RTObject.protoKey { return }
+        self[key] = value
+    }
 }
 
 /// An element node in the materialized/evaluated tree
@@ -107,6 +130,34 @@ func jsonToRTValue(_ v: JSONValue) -> RTValue {
 }
 
 // MARK: - JS coercion helpers
+
+/// A JS `TypeError` escaping a prop evaluation.
+///
+/// `String(obj)` is `ToPrimitive(obj, string)`: call `obj.toString()` if
+/// callable, else `obj.valueOf()` if callable, else throw
+/// `TypeError: Cannot convert object to primitive value`. This value model has
+/// no function values, so an own `toString` key (whatever it holds — a number,
+/// a string, null) is never callable and the lookup falls through to
+/// `Object.prototype.valueOf`, which returns the object itself and is rejected
+/// as non-primitive. So a plain object with an own `"toString"` key ALWAYS
+/// throws; without one, `Object.prototype.toString` answers `"[object Object]"`.
+/// `"valueOf"` alone never matters at the string hint — `toString` is tried
+/// first and succeeds.
+///
+/// `Evaluator.evaluateElementProps` catches this per prop, keeps the RAW prop
+/// value and records a `runtimeErrors` entry, exactly like `evaluate-tree.js`'s
+/// try/catch. Fixture `081-tostring-shadow-throws`.
+enum JSTypeError: Error {
+    case cannotConvertObjectToPrimitive
+
+    /// The V8 message text, reproduced verbatim in the `runtimeErrors` entry.
+    var message: String {
+        switch self {
+        case .cannotConvertObjectToPrimitive:
+            return "Cannot convert object to primitive value"
+        }
+    }
+}
 
 /// ECMAScript Number-to-String (shortest round-trip); reuses the serializer's
 /// formatter for finite values.
@@ -190,7 +241,7 @@ func dslToNumber(_ v: RTValue) -> Double {
 }
 
 /// JS `String(value)` semantics.
-func jsToString(_ v: RTValue) -> String {
+func jsToString(_ v: RTValue) throws -> String {
     switch v {
     case .undefined: return "undefined"
     case .null: return "null"
@@ -198,9 +249,17 @@ func jsToString(_ v: RTValue) -> String {
     case .number(let n): return jsNumberToString(n)
     case .string(let s): return s
     case .array(let items):
-        // Array.prototype.toString → join(","); null/undefined → "".
-        return items.map { $0.isNullish ? "" : jsToString($0) }.joined(separator: ",")
-    case .object, .element, .ast:
+        // Array.prototype.toString → join(","); null/undefined → "". A member
+        // that shadows `toString` makes the join itself throw.
+        return try items.map { $0.isNullish ? "" : try jsToString($0) }.joined(separator: ",")
+    case .object(let o):
+        if o.has(RTObject.toStringKey) {
+            throw JSTypeError.cannotConvertObjectToPrimitive
+        }
+        return "[object Object]"
+    // ElementNodes and AST nodes are plain objects whose own keys are fixed
+    // (`type`/`typeName`/`props`/… and `k`/…), never `toString`.
+    case .element, .ast:
         return "[object Object]"
     }
 }
@@ -218,7 +277,7 @@ func jsTruthy(_ v: RTValue) -> Bool {
 
 /// JS ToNumber for loose equality (differs from dslToNumber: non-numeric
 /// strings yield NaN, null → 0, undefined → NaN).
-private func jsToNumberStrict(_ v: RTValue) -> Double {
+private func jsToNumberStrict(_ v: RTValue) throws -> Double {
     switch v {
     case .undefined: return .nan
     case .null: return 0
@@ -226,12 +285,12 @@ private func jsToNumberStrict(_ v: RTValue) -> Double {
     case .number(let n): return n
     case .string(let s): return jsStringToNumber(s)
     case .array, .object, .element, .ast:
-        return jsStringToNumber(jsToString(v))
+        return jsStringToNumber(try jsToString(v))
     }
 }
 
 /// JS loose equality (`==`).
-func jsLooseEquals(_ a: RTValue, _ b: RTValue) -> Bool {
+func jsLooseEquals(_ a: RTValue, _ b: RTValue) throws -> Bool {
     switch (a, b) {
     case (.undefined, .undefined), (.undefined, .null), (.null, .undefined), (.null, .null):
         return true
@@ -246,9 +305,9 @@ func jsLooseEquals(_ a: RTValue, _ b: RTValue) -> Bool {
     case (.bool(let x), .bool(let y)):
         return x == y
     case (.bool(let x), _):
-        return jsLooseEquals(.number(x ? 1 : 0), b)
+        return try jsLooseEquals(.number(x ? 1 : 0), b)
     case (_, .bool(let y)):
-        return jsLooseEquals(a, .number(y ? 1 : 0))
+        return try jsLooseEquals(a, .number(y ? 1 : 0))
     case (.number(let x), .string(let y)):
         return x == jsStringToNumber(y)
     case (.string(let x), .number(let y)):
@@ -256,10 +315,10 @@ func jsLooseEquals(_ a: RTValue, _ b: RTValue) -> Bool {
     default:
         // object-vs-primitive: ToPrimitive(object) → string, then compare.
         if a.isObjectLike && !b.isObjectLike {
-            return jsLooseEquals(.string(jsToString(a)), b)
+            return try jsLooseEquals(.string(try jsToString(a)), b)
         }
         if !a.isObjectLike && b.isObjectLike {
-            return jsLooseEquals(a, .string(jsToString(b)))
+            return try jsLooseEquals(a, .string(try jsToString(b)))
         }
         // KNOWN-DEVIATION (README.md #3): JS object == object is reference
         // identity; the port's value semantics have no identities, so this is

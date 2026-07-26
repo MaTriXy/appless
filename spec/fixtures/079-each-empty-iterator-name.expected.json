@@ -1,0 +1,25 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "Empty iterator name"
+        }
+      },
+      []
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [
+      "it"
+    ],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

@@ -1,0 +1,111 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "Deferred action steps"
+        }
+      },
+      {
+        "component": "Buttons",
+        "props": {
+          "buttons": [
+            {
+              "component": "Button",
+              "props": {
+                "action": {
+                  "$action": {
+                    "steps": [
+                      {
+                        "hasDynamicProps": true,
+                        "partial": false,
+                        "props": {
+                          "name": "bio",
+                          "placeholder": "About you",
+                          "rows": 4,
+                          "rules": null,
+                          "value": {
+                            "$ast": {
+                              "k": "StateRef",
+                              "n": "$bio"
+                            }
+                          }
+                        },
+                        "type": "element",
+                        "typeName": "TextArea"
+                      }
+                    ]
+                  }
+                },
+                "label": "Save",
+                "variant": "primary"
+              }
+            },
+            {
+              "component": "Button",
+              "props": {
+                "action": {
+                  "$action": {
+                    "steps": [
+                      {
+                        "hasDynamicProps": true,
+                        "partial": false,
+                        "props": {
+                          "input": {
+                            "component": "Input",
+                            "props": {
+                              "name": "name",
+                              "placeholder": "Type",
+                              "rules": null,
+                              "type": "text",
+                              "value": {
+                                "$ast": {
+                                  "k": "StateRef",
+                                  "n": "$who"
+                                }
+                              }
+                            }
+                          },
+                          "label": "Name"
+                        },
+                        "type": "element",
+                        "typeName": "FormControl"
+                      },
+                      {
+                        "hasDynamicProps": true,
+                        "partial": false,
+                        "props": {
+                          "subtitle": "sub",
+                          "title": "x2"
+                        },
+                        "type": "element",
+                        "typeName": "ListItem"
+                      }
+                    ]
+                  }
+                },
+                "label": "Go",
+                "variant": "secondary"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {
+    "$bio": "hello",
+    "$n": 2,
+    "$who": "Ada"
+  },
+  "runtimeErrors": []
+}

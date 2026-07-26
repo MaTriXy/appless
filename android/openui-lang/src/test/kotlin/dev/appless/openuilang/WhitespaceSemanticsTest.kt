@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test
  * fixture corpus would notice a single wrong member. No fixture pads a
  * statement with U+205F or U+1680, so dropping either (or adding U+0085, which
  * is what `Character.isWhitespace`-adjacent APIs and `\s` with
- * `UNICODE_CHARACTER_CLASS` would give you) still parses all 90 fixtures
+ * `UNICODE_CHARACTER_CLASS` would give you) still parses all 97 fixtures
  * byte-identically. The sweep below is therefore EXHAUSTIVE over the BMP
  * rather than spot-checked.
  *

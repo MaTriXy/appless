@@ -27,12 +27,10 @@ enum Pipeline {
                 errors: internalResult.errors
             ),
             state: state,
-            // KNOWN-DEVIATION (README.md #4): always empty. The JS
-            // `evaluateElementProps` errors array is only appended to from
-            // paths AppLess never reaches (QueryManager/tool providers), and
-            // the oracle emits [] across the whole corpus, so the port does
-            // not collect runtime errors at all.
-            runtimeErrors: []
+            // Populated by `Evaluator.evaluateElementProps`'s per-prop catch —
+            // the JS `evalCtx.errors` array (fixture
+            // `081-tostring-shadow-throws`).
+            runtimeErrors: evaluator.runtimeErrors
         )
     }
 
@@ -117,7 +115,7 @@ enum Pipeline {
             var out = PropObject()
             for (key, value) in o.entries {
                 if case .undefined = value { continue }
-                out[key] = convertAstPlain(value)
+                jsAssign(&out, key, convertAstPlain(value))
             }
             return .object(out)
         case .element(let el):
@@ -142,9 +140,20 @@ enum Pipeline {
         var out = PropObject()
         for (key, value) in o.entries {
             if case .undefined = value { continue }
-            out[key] = convertValue(value)
+            jsAssign(&out, key, convertValue(value))
         }
         return out
+    }
+
+    /// serialize.mjs writes its output objects with `out[key] = …` — plain JS
+    /// ASSIGNMENT, which routes `"__proto__"` through `Object.prototype`'s
+    /// setter and never creates an own key. So even where a `__proto__` entry
+    /// survived materialization/evaluation (`Object.fromEntries` in
+    /// `evaluator.js`'s Obj case does keep it), it disappears from the emitted
+    /// JSON. Fixture `080-proto-object-key`.
+    private static func jsAssign(_ out: inout PropObject, _ key: String, _ value: PropValue) {
+        if key == RTObject.protoKey { return }
+        out[key] = value
     }
 
     /// serializeStep: sorted keys (handled by the serializer), undefined

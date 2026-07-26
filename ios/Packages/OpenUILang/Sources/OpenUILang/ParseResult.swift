@@ -30,11 +30,26 @@ public indirect enum PropValue: Sendable, Equatable {
 /// "café" vs decomposed "cafe\u{301}") would collide even though JS keeps
 /// them as two distinct properties.
 public struct PropObject: Sendable, Equatable, ExpressibleByDictionaryLiteral {
-    public private(set) var keys: [String]
+    /// Raw insertion order. Public iteration goes through `keys`, which applies
+    /// JS own-key order on top.
+    private var insertionKeys: [String]
     private var storedValues: [PropValue]
 
+    /// The object's own keys in JS `Object.keys(o)` order: canonical array
+    /// indices (`"0"`–`"4294967294"`) FIRST in ascending numeric order, then
+    /// every remaining key in insertion order (`OrdinaryOwnPropertyKeys`,
+    /// ES 10.1.11.1). So `{b, "2", a, "10"}` iterates `"2", "10", b, a`.
+    ///
+    /// This is deliberately NOT the serializer's order: `TreeSerializer`
+    /// additionally sorts the string group, because the reference serializer
+    /// does `Object.keys(v).sort()` and re-inserts into a fresh object (see
+    /// `jsOwnKeyLess`, fixture `075-object-key-index-order`). A consumer
+    /// iterating props directly gets what JS would give it; a consumer wanting
+    /// the canonical byte order must serialize.
+    public var keys: [String] { jsOwnPropertyKeys(insertionKeys) }
+
     public init() {
-        keys = []
+        insertionKeys = []
         storedValues = []
     }
 
@@ -49,7 +64,7 @@ public struct PropObject: Sendable, Equatable, ExpressibleByDictionaryLiteral {
     }
 
     private func indexOf(_ key: String) -> Int? {
-        keys.firstIndex { jsStringEquals($0, key) }
+        insertionKeys.firstIndex { jsStringEquals($0, key) }
     }
 
     /// Code-unit-exact lookup / last-write-wins insertion that keeps the
@@ -61,25 +76,29 @@ public struct PropObject: Sendable, Equatable, ExpressibleByDictionaryLiteral {
                 if let newValue {
                     storedValues[i] = newValue
                 } else {
-                    keys.remove(at: i)
+                    insertionKeys.remove(at: i)
                     storedValues.remove(at: i)
                 }
             } else if let newValue {
-                keys.append(key)
+                insertionKeys.append(key)
                 storedValues.append(newValue)
             }
         }
     }
 
+    /// `keys` paired with their values, in the same JS own-key order.
     public var entries: [(key: String, value: PropValue)] {
-        zip(keys, storedValues).map { ($0, $1) }
+        keys.map { ($0, storedValues[indexOf($0)!]) }
     }
-    public var isEmpty: Bool { keys.isEmpty }
-    public var count: Int { keys.count }
+    public var isEmpty: Bool { insertionKeys.isEmpty }
+    public var count: Int { insertionKeys.count }
 
+    /// Structural equality over the RAW insertion order (which `storedValues`
+    /// is parallel to) — the JS own-key reordering `keys` applies is a
+    /// presentation concern, not an identity one.
     public static func == (l: PropObject, r: PropObject) -> Bool {
-        l.keys.count == r.keys.count
-            && zip(l.keys, r.keys).allSatisfy { jsStringEquals($0, $1) }
+        l.insertionKeys.count == r.insertionKeys.count
+            && zip(l.insertionKeys, r.insertionKeys).allSatisfy { jsStringEquals($0, $1) }
             && l.storedValues == r.storedValues
     }
 }

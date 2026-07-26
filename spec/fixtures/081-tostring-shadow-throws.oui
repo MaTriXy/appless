@@ -1,0 +1,5 @@
+$s = { toString: 1 }
+root = Card([
+  CardHeader("toString shadowing"),
+  TextContent("t" + $s)
+])

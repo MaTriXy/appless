@@ -1,0 +1,80 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "Each inside an action"
+        }
+      },
+      {
+        "component": "Buttons",
+        "props": {
+          "buttons": [
+            {
+              "component": "Button",
+              "props": {
+                "action": {
+                  "$action": {
+                    "steps": [
+                      {
+                        "hasDynamicProps": true,
+                        "partial": false,
+                        "props": {
+                          "name": "one",
+                          "placeholder": "About",
+                          "rows": 4,
+                          "rules": null,
+                          "value": {
+                            "$ast": {
+                              "k": "StateRef",
+                              "n": "$bio"
+                            }
+                          }
+                        },
+                        "type": "element",
+                        "typeName": "TextArea"
+                      },
+                      {
+                        "hasDynamicProps": true,
+                        "partial": false,
+                        "props": {
+                          "name": "two",
+                          "placeholder": "About",
+                          "rows": 4,
+                          "rules": null,
+                          "value": {
+                            "$ast": {
+                              "k": "StateRef",
+                              "n": "$bio"
+                            }
+                          }
+                        },
+                        "type": "element",
+                        "typeName": "TextArea"
+                      }
+                    ]
+                  }
+                },
+                "label": "Save",
+                "variant": "primary"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {
+    "$bio": "hello"
+  },
+  "runtimeErrors": []
+}

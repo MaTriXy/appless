@@ -1,0 +1,6 @@
+$bio = "hello"
+items = [{ n: "one" }, { n: "two" }]
+root = Card([
+  CardHeader("Each inside an action"),
+  Buttons([Button("Save", Action(@Each(items, it, TextArea(it.n, "About", 4, null, $bio))), "primary")])
+])

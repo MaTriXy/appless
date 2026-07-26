@@ -1,0 +1,3 @@
+$s = { toString: 1 }
+items = [1, 2]
+root = Card([@Each(items, it, ListItem("a" + $s, "b"))])

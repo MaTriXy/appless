@@ -1,0 +1,10 @@
+$bio = "hello"
+$who = "Ada"
+$n = 2
+root = Card([
+  CardHeader("Deferred action steps"),
+  Buttons([
+    Button("Save", Action([TextArea("bio", "About you", 4, null, $bio)]), "primary"),
+    Button("Go", Action([FormControl("Name", Input("name", "Type", "text", null, $who)), ListItem("x" + $n, "sub")]), "secondary")
+  ])
+])

@@ -119,7 +119,11 @@ private func materializeLazyBuiltin(
     case .str(let v): varName = v
     default: varName = nil
     }
-    guard let varName else { return nil }
+    // materialize.js guards with `if (!varName)` — FALSY, not null. An empty
+    // string iterator name (`@Each(items, "", …)`) therefore aborts the lazy
+    // path here too, so the template's refs resolve as ordinary refs and land
+    // in `unresolved` (fixture `079-each-empty-iterator-name`).
+    guard let varName, !varName.isEmpty else { return nil }
     var nextScoped = scopedRefs
     // JSKey: the iterator name can come from a string literal (non-ASCII);
     // JS `Set` membership is code-unit exact.
@@ -245,9 +249,12 @@ func materializeValue(_ node: ASTNode, _ ctx: MaterializeContext) -> RTValue {
         }
         return .array(items)
     case .obj(let entries):
+        // materialize.js builds this with `o[k] = …` — plain ASSIGNMENT, so a
+        // `"__proto__"` key hits Object.prototype's setter and is swallowed.
+        // (evaluator.js's Obj case uses Object.fromEntries and DOES keep it.)
         var o = RTObject()
         for (k, v) in entries {
-            o[k] = materializeValue(v, ctx)
+            o.assign(k, materializeValue(v, ctx))
         }
         return .object(o)
     case .comp(let name, let args, _):

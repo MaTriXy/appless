@@ -31,11 +31,10 @@ internal object Pipeline {
                 errors = internalResult.errors,
             ),
             state = state,
-            // KNOWN-DEVIATION (mirrors the Swift port's #4): always empty. The
-            // JS `evaluateElementProps` errors array is only appended to from
-            // paths AppLess never reaches (QueryManager / tool providers), and
-            // the oracle emits [] across the whole corpus.
-            runtimeErrors = emptyList(),
+            // Populated by `Evaluator.evaluateElementProps`'s per-prop catch —
+            // the JS `evalCtx.errors` array (fixture
+            // `081-tostring-shadow-throws`).
+            runtimeErrors = evaluator.runtimeErrors.toList(),
         )
     }
 
@@ -102,7 +101,7 @@ internal object Pipeline {
             val out = PropObject()
             for ((key, value) in v.obj.entries) {
                 if (value is RtValue.Undefined) continue
-                out[key] = convertAstPlain(value)
+                jsAssign(out, key, convertAstPlain(value))
             }
             PropValue.Obj(out)
         }
@@ -126,9 +125,22 @@ internal object Pipeline {
         val out = PropObject()
         for ((key, value) in o.entries) {
             if (value is RtValue.Undefined) continue
-            out[key] = convertValue(value)
+            jsAssign(out, key, convertValue(value))
         }
         return out
+    }
+
+    /**
+     * serialize.mjs writes its output objects with `out[key] = …` — plain JS
+     * ASSIGNMENT, which routes `"__proto__"` through `Object.prototype`'s
+     * setter and never creates an own key. So even where a `__proto__` entry
+     * survived materialization/evaluation (`Object.fromEntries` in
+     * `evaluator.js`'s Obj case does keep it), it disappears from the emitted
+     * JSON. Fixture `080-proto-object-key`.
+     */
+    private fun jsAssign(out: PropObject, key: String, value: PropValue) {
+        if (key == RtObject.PROTO_KEY) return
+        out[key] = value
     }
 
     /**

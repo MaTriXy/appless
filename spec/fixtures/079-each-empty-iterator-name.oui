@@ -1,0 +1,5 @@
+items = [1, 2]
+root = Card([
+  CardHeader("Empty iterator name"),
+  @Each(items, "", TextContent("v" + it))
+])

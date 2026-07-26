@@ -24,7 +24,7 @@ import org.junit.jupiter.api.Test
  * Twin of `ios/Packages/OpenUILang/Tests/OpenUILangTests/MathRoundSemanticsTests.swift`
  * (identical program, identical expectation).
  *
- * Not a corpus fixture: this keeps the 90-fixture CI gate stable, and the
+ * Not a corpus fixture: this keeps the 97-fixture CI gate stable, and the
  * boundary values are about the evaluator, not about the parse tree.
  *
  * `@Round(-0.5)` and `@Round(0 * -1)` are `-0` in JS; `JSON.stringify(-0)` is

@@ -31,7 +31,32 @@ internal class RtObject() {
 
     fun has(key: String): Boolean = map.containsKey(key)
 
+    /**
+     * JS plain-object ASSIGNMENT (`o[key] = value`), which is NOT the same as
+     * defining an own property.
+     *
+     * A fresh `{}` inherits `Object.prototype`'s `__proto__` ACCESSOR, so
+     * `o["__proto__"] = v` invokes that setter: it either re-points `o`'s
+     * prototype (object/null `v`) or does nothing at all (primitive `v`).
+     * Either way `"__proto__"` never becomes an own property and never shows
+     * up in `Object.keys` / `JSON.stringify` (fixture `080-proto-object-key`).
+     *
+     * Use this at every site whose JS original is an assignment. Sites whose
+     * original is `Object.fromEntries` / `CreateDataPropertyOrThrow` must keep
+     * using [put] — those DO create an own `__proto__` (evaluator.js:40).
+     */
+    fun assign(key: String, value: RtValue) {
+        if (key == PROTO_KEY) return
+        put(key, value)
+    }
+
     companion object {
+        /** The one key JS object ASSIGNMENT silently swallows. */
+        const val PROTO_KEY: String = "__proto__"
+
+        /** Own key that shadows `Object.prototype.toString` (see [jsToString]). */
+        const val PROTO_KEY_TO_STRING: String = "toString"
+
         fun of(vararg pairs: Pair<String, RtValue>): RtObject = RtObject(pairs.toList())
     }
 }
@@ -189,16 +214,45 @@ internal fun dslToNumber(v: RtValue): Double = when (v) {
     else -> 0.0
 }
 
-/** JS `String(value)` semantics. */
+/**
+ * A JS `TypeError` escaping a prop evaluation. `evaluateElementProps` catches
+ * it per prop, keeps the RAW prop value, and records a `runtimeErrors` entry —
+ * exactly like `evaluate-tree.js`'s try/catch.
+ */
+internal class JsTypeError(message: String) : RuntimeException(message)
+
+/**
+ * JS `String(value)` semantics — including the case where it THROWS.
+ *
+ * `String(obj)` is `ToPrimitive(obj, string)`: call `obj.toString()` if
+ * callable, else `obj.valueOf()` if callable, else throw
+ * `TypeError: Cannot convert object to primitive value`. This value model has
+ * no function values, so an own `toString` key (whatever it holds — a number,
+ * a string, null) is never callable and the lookup falls through to
+ * `Object.prototype.valueOf`, which returns the object itself and is rejected
+ * as non-primitive. So a plain object with an own `"toString"` key ALWAYS
+ * throws; without one, `Object.prototype.toString` answers `"[object Object]"`.
+ * `"valueOf"` alone never matters at the string hint — `toString` is tried
+ * first and succeeds. Fixture `081-tostring-shadow-throws`.
+ */
 internal fun jsToString(v: RtValue): String = when (v) {
     is RtValue.Undefined -> "undefined"
     is RtValue.Null -> "null"
     is RtValue.Bool -> if (v.value) "true" else "false"
     is RtValue.Num -> jsNumberToString(v.value)
     is RtValue.Str -> v.value
-    // Array.prototype.toString → join(","); null/undefined → "".
+    // Array.prototype.toString → join(","); null/undefined → "". A member that
+    // shadows `toString` makes the join itself throw.
     is RtValue.Arr -> v.items.joinToString(",") { if (it.isNullish) "" else jsToString(it) }
-    is RtValue.Obj, is RtValue.Element, is RtValue.Ast -> "[object Object]"
+    is RtValue.Obj ->
+        if (v.obj.has(RtObject.PROTO_KEY_TO_STRING)) {
+            throw JsTypeError("Cannot convert object to primitive value")
+        } else {
+            "[object Object]"
+        }
+    // ElementNodes and AST nodes are plain objects whose own keys are fixed
+    // (`type`/`typeName`/`props`/… and `k`/…), never `toString`.
+    is RtValue.Element, is RtValue.Ast -> "[object Object]"
 }
 
 /** JS truthiness. */

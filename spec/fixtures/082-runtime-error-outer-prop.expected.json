@@ -1,0 +1,93 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "$ast": {
+          "args": [
+            {
+              "els": [
+                {
+                  "k": "Num",
+                  "v": 1
+                },
+                {
+                  "k": "Num",
+                  "v": 2
+                }
+              ],
+              "k": "Arr"
+            },
+            {
+              "k": "Ref",
+              "n": "it"
+            },
+            {
+              "args": [
+                {
+                  "k": "BinOp",
+                  "left": {
+                    "k": "Str",
+                    "v": "a"
+                  },
+                  "op": "+",
+                  "right": {
+                    "k": "StateRef",
+                    "n": "$s"
+                  }
+                },
+                {
+                  "k": "Str",
+                  "v": "b"
+                }
+              ],
+              "k": "Comp",
+              "mappedProps": {
+                "subtitle": {
+                  "k": "Str",
+                  "v": "b"
+                },
+                "title": {
+                  "k": "BinOp",
+                  "left": {
+                    "k": "Str",
+                    "v": "a"
+                  },
+                  "op": "+",
+                  "right": {
+                    "k": "StateRef",
+                    "n": "$s"
+                  }
+                }
+              },
+              "name": "ListItem"
+            }
+          ],
+          "k": "Comp",
+          "name": "Each"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {
+    "$s": {
+      "toString": 1
+    }
+  },
+  "runtimeErrors": [
+    {
+      "source": "runtime",
+      "code": "runtime-error",
+      "message": "Evaluating prop \"children\" on Card failed: Cannot convert object to primitive value",
+      "component": "Card",
+      "statementId": "root"
+    }
+  ]
+}

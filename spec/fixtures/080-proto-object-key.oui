@@ -1,0 +1,5 @@
+$s = { "__proto__": 1, other: 2 }
+root = Card([
+  CardHeader("__proto__ keys"),
+  KVList([{ __proto__: 1, key: "a", value: 2 }])
+])

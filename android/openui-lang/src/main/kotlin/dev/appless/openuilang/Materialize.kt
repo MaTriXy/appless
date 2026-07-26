@@ -117,7 +117,12 @@ private fun materializeLazyBuiltin(
         is AstNode.Ref -> varArg.n
         is AstNode.Str -> varArg.v
         else -> null
-    } ?: return null
+    }
+    // materialize.js guards with `if (!varName)` — FALSY, not null. An empty
+    // string iterator name (`@Each(items, "", …)`) therefore aborts the lazy
+    // path here too, so the template's refs resolve as ordinary refs and land
+    // in `unresolved` (fixture `079-each-empty-iterator-name`).
+    if (varName.isNullOrEmpty()) return null
     val nextScoped = HashSet(scopedRefs).also { it.add(varName) }
     // args[1] (the iterator declaration) is skipped; scoped refs apply elsewhere.
     val recursed = node.args.mapIndexed { i, a ->
@@ -232,8 +237,11 @@ internal fun materializeValue(node: AstNode, ctx: MaterializeContext): RtValue =
     }
 
     is AstNode.Obj -> {
+        // materialize.js builds this with `o[k] = …` — plain ASSIGNMENT, so a
+        // `"__proto__"` key hits Object.prototype's setter and is swallowed.
+        // (evaluator.js's Obj case uses Object.fromEntries and DOES keep it.)
         val o = RtObject()
-        for ((k, v) in node.entries) o[k] = materializeValue(v, ctx)
+        for ((k, v) in node.entries) o.assign(k, materializeValue(v, ctx))
         RtValue.Obj(o)
     }
 

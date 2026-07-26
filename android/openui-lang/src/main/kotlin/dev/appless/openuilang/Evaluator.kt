@@ -19,6 +19,31 @@ internal class EvalContext(
 )
 
 /**
+ * Presence marker for lang-core's THIRD `evaluate(node, context, schemaCtx)`
+ * argument (`{ library }` in JS).
+ *
+ * `evaluator.js` branches on schemaCtx's PRESENCE at four sites — 61 (catalog
+ * def lookup for the reactive-prop test), 75 (`props[key] = schemaCtx ?
+ * context.getState(val.n) : val`), 89 (recursive inline evaluation of nested
+ * ElementNode props) and 421 (the `@Each` element-recursion gate) — and the
+ * ACTION-PLAN path deliberately calls the TWO-argument form
+ * (`evaluate(args[0], context)`, evaluator.js:264). So inside an `Action([…])`
+ * the third argument is absent and raw `StateRef` ASTs are PRESERVED for
+ * click-time evaluation instead of being read from the store.
+ *
+ * Only the marker's presence is observable here: site 61 exists solely to find
+ * a `reactive()`-marked prop schema, and the GenOS contract marks none (there
+ * is no `$binding<>`/reactive annotation anywhere in
+ * `spec/contract/genos.schema.json`), so the reactive branch at evaluator.js:65
+ * is dead in BOTH states. Hence a marker object rather than a library handle.
+ *
+ * Deliberately NOT defaulted: JS makes the drop visible at each call site, and
+ * so does this port. Fixtures `076-action-staterefs-preserved`,
+ * `077-action-each-staterefs`.
+ */
+internal object SchemaCtx
+
+/**
  * Port of `runtime/evaluator.js` + `runtime/evaluate-prop.js` +
  * `runtime/evaluate-tree.js` for the AppLess (non-reactive) contract
  * (spec/openui-lang.md §9 runtime evaluation).
@@ -36,30 +61,79 @@ internal class Evaluator(store: Map<String, RtValue>) {
         )
     }
 
+    /**
+     * Runtime prop-evaluation errors, in emission order — the JS
+     * `evalCtx.errors` array. Read by [Pipeline] after the root is evaluated.
+     */
+    val runtimeErrors: MutableList<RuntimeError> = ArrayList()
+
     // ── Element / prop evaluation (evaluate-tree, evaluate-prop) ────────────
 
+    /**
+     * `evaluate-tree.js` `evaluateElementProps` — the entry point, and the ONLY
+     * one that catches. Each prop is evaluated inside a try/catch; on a throw
+     * the RAW prop value is kept and a `runtimeErrors` entry is recorded.
+     */
     fun evaluateElementProps(el: RtElement): RtElement {
         if (!el.hasDynamicProps) return el
         val props = RtObject()
         for ((key, value) in el.props.entries) {
-            props[key] = evaluatePropValue(value)
+            props[key] = try {
+                evaluatePropValue(value, inline = false)
+            } catch (e: JsTypeError) {
+                runtimeErrors.add(
+                    RuntimeError(
+                        message = "Evaluating prop \"$key\" on ${el.typeName} failed: ${e.message}",
+                        component = el.typeName,
+                        statementId = el.statementId,
+                    )
+                )
+                value
+            }
         }
         return el.withProps(props)
     }
 
-    private fun evaluatePropValue(value: RtValue): RtValue = when (value) {
+    /**
+     * `evaluator.js` `evaluateElementInline` — the schema-aware re-evaluation
+     * `evaluate()` performs on nested ElementNodes (sites 89/421). Same prop
+     * loop, but deliberately WITHOUT the try/catch: a throw in here propagates
+     * out of `evaluate()` and is caught by the OUTER [evaluateElementProps],
+     * so the recorded error names the outer element and the outer prop key.
+     */
+    private fun evaluateElementInline(el: RtElement): RtElement {
+        if (!el.hasDynamicProps) return el
+        val props = RtObject()
+        for ((key, value) in el.props.entries) {
+            props[key] = evaluatePropValue(value, inline = true)
+        }
+        return el.withProps(props)
+    }
+
+    private fun recurseElement(el: RtElement, inline: Boolean): RtElement =
+        if (inline) evaluateElementInline(el) else evaluateElementProps(el)
+
+    /**
+     * `evaluate-prop.js` `evaluatePropCore`. [inline] selects the recursion
+     * callback: the inline (non-catching) element path or the tree path.
+     */
+    private fun evaluatePropValue(value: RtValue, inline: Boolean): RtValue = when (value) {
         is RtValue.Undefined, is RtValue.Null, is RtValue.Bool,
         is RtValue.Num, is RtValue.Str,
         -> value
 
         is RtValue.Ast -> {
-            val result = evaluate(value.node, ctx)
+            // The schema context IS present on every evaluate-prop entry
+            // (evaluate-tree.js builds `{ library: evalCtx.library }`).
+            val result = evaluate(value.node, ctx, SchemaCtx)
             when {
-                result is RtValue.Element -> RtValue.Element(evaluateElementProps(result.element))
+                result is RtValue.Element ->
+                    RtValue.Element(recurseElement(result.element, inline))
+
                 result is RtValue.Arr -> RtValue.Arr(
                     result.items.map {
                         if (it is RtValue.Element) {
-                            RtValue.Element(evaluateElementProps(it.element))
+                            RtValue.Element(recurseElement(it.element, inline))
                         } else {
                             it
                         }
@@ -76,8 +150,8 @@ internal class Evaluator(store: Map<String, RtValue>) {
             }
         }
 
-        is RtValue.Arr -> RtValue.Arr(value.items.map { evaluatePropValue(it) })
-        is RtValue.Element -> RtValue.Element(evaluateElementProps(value.element))
+        is RtValue.Arr -> RtValue.Arr(value.items.map { evaluatePropValue(it, inline) })
+        is RtValue.Element -> RtValue.Element(recurseElement(value.element, inline))
         is RtValue.Obj -> {
             val o = value.obj
             // ActionPlan / ActionStep — preserve as-is (deferred click-time eval).
@@ -90,8 +164,10 @@ internal class Evaluator(store: Map<String, RtValue>) {
                 o["steps"] is RtValue.Arr -> value
                 o.has("type") && o.has("valueAST") -> value
                 o.values.any { it.isObjectLike } -> {
+                    // `result[k] = …` in evaluate-prop.js — ASSIGNMENT, so a
+                    // `__proto__` key is swallowed here too.
                     val out = RtObject()
-                    for ((k, v) in o.entries) out[k] = evaluatePropValue(v)
+                    for ((k, v) in o.entries) out.assign(k, evaluatePropValue(v, inline))
                     RtValue.Obj(out)
                 }
 
@@ -105,7 +181,16 @@ internal class Evaluator(store: Map<String, RtValue>) {
 
     // ── Core AST evaluation ────────────────────────────────────────────────
 
-    fun evaluate(node: AstNode, context: EvalContext): RtValue = when (node) {
+    /**
+     * `evaluator.js` `evaluate(node, context, schemaCtx)`.
+     *
+     * [schemaCtx] is threaded EXACTLY where JS threads it: on to
+     * [evaluateLazyBuiltin] and to the recursive `mappedProps` evaluation. Every
+     * other recursion in JS calls the two-argument form, so those pass `null`
+     * here — collection elements, object entries, operator operands, ternary
+     * branches, member/index receivers and eager-builtin arguments all drop it.
+     */
+    fun evaluate(node: AstNode, context: EvalContext, schemaCtx: SchemaCtx?): RtValue = when (node) {
         is AstNode.Str -> RtValue.Str(node.v)
         is AstNode.Num -> RtValue.Num(node.v)
         is AstNode.Bool -> RtValue.Bool(node.v)
@@ -114,32 +199,36 @@ internal class Evaluator(store: Map<String, RtValue>) {
         is AstNode.StateRef -> context.getState(node.n)
         is AstNode.Ref -> context.resolveRef(node.n)
         is AstNode.RuntimeRef -> context.resolveRef(node.n)
-        is AstNode.Arr -> RtValue.Arr(node.els.map { evaluate(it, context) })
+        is AstNode.Arr -> RtValue.Arr(node.els.map { evaluate(it, context, null) })
         is AstNode.Obj -> {
+            // Object.fromEntries → CreateDataProperty, NOT assignment: unlike
+            // materialize.js's Obj case a `"__proto__"` entry DOES become an
+            // own property here (it is dropped again by the serializer, whose
+            // own `out[key] = …` is an assignment).
             val o = RtObject()
-            for ((k, v) in node.entries) o[k] = evaluate(v, context)
+            for ((k, v) in node.entries) o[k] = evaluate(v, context, null)
             RtValue.Obj(o)
         }
 
-        is AstNode.Comp -> evaluateComp(node, context)
+        is AstNode.Comp -> evaluateComp(node, context, schemaCtx)
 
         is AstNode.BinOp -> evaluateBinOp(node, context)
 
         is AstNode.UnaryOp -> when (node.op) {
-            "!" -> RtValue.Bool(!jsTruthy(evaluate(node.operand, context)))
-            "-" -> RtValue.Num(-dslToNumber(evaluate(node.operand, context)))
+            "!" -> RtValue.Bool(!jsTruthy(evaluate(node.operand, context, null)))
+            "-" -> RtValue.Num(-dslToNumber(evaluate(node.operand, context, null)))
             else -> RtValue.Null
         }
 
         is AstNode.Ternary ->
-            if (jsTruthy(evaluate(node.cond, context))) {
-                evaluate(node.then, context)
+            if (jsTruthy(evaluate(node.cond, context, null))) {
+                evaluate(node.then, context, null)
             } else {
-                evaluate(node.orElse, context)
+                evaluate(node.orElse, context, null)
             }
 
         is AstNode.Member -> {
-            val obj = evaluate(node.obj, context)
+            val obj = evaluate(node.obj, context, null)
             when {
                 obj.isNullish -> RtValue.Null
                 obj is RtValue.Arr ->
@@ -164,8 +253,8 @@ internal class Evaluator(store: Map<String, RtValue>) {
         }
 
         is AstNode.Index -> {
-            val obj = evaluate(node.obj, context)
-            val idx = evaluate(node.index, context)
+            val obj = evaluate(node.obj, context, null)
+            val idx = evaluate(node.index, context, null)
             when {
                 obj.isNullish || idx.isNullish -> RtValue.Null
                 obj is RtValue.Arr -> {
@@ -190,42 +279,60 @@ internal class Evaluator(store: Map<String, RtValue>) {
         )
     }
 
-    private fun evaluateComp(node: AstNode.Comp, context: EvalContext): RtValue {
+    private fun evaluateComp(
+        node: AstNode.Comp,
+        context: EvalContext,
+        schemaCtx: SchemaCtx?,
+    ): RtValue {
         if (Builtins.lazyBuiltins.contains(node.name)) {
-            return evaluateLazyBuiltin(node.name, node.args, context)
+            return evaluateLazyBuiltin(node.name, node.args, context, schemaCtx)
         }
         if (Builtins.dataBuiltins.contains(node.name)) {
-            return callDataBuiltin(node.name, node.args.map { evaluate(it, context) })
+            // evaluator.js:50 — eager builtin args drop the schema context.
+            return callDataBuiltin(node.name, node.args.map { evaluate(it, context, null) })
         }
         if (Builtins.actionNames.contains(node.name)) {
+            // evaluator.js:55 — evaluateActionCall takes no schemaCtx at all.
             return evaluateActionCall(node.name, node.args, context)
         }
         val mapped = node.mappedProps ?: return RtValue.Null // unmapped Comp
         val props = RtObject()
         for ((key, value) in mapped) {
             props[key] = if (value is AstNode.StateRef) {
-                context.getState(value.n)
+                // evaluator.js:75 —
+                //   props[key] = schemaCtx ? context.getState(val.n) : val
+                // Site 61 (`schemaCtx?.library.components[node.name]`) picks the
+                // prop schema for the reactive test one line above; the GenOS
+                // contract marks no prop reactive, so that branch is dead in
+                // both states and only this ternary is observable.
+                if (schemaCtx != null) context.getState(value.n) else RtValue.Ast(value)
             } else {
-                evaluate(value, context)
+                evaluate(value, context, schemaCtx)
             }
         }
-        // Recursively evaluate nested ElementNodes in props.
-        val finalProps = RtObject()
-        for ((key, v) in props.entries) {
-            finalProps[key] = when (v) {
-                is RtValue.Element -> RtValue.Element(evaluateElementProps(v.element))
-                is RtValue.Arr -> RtValue.Arr(
-                    v.items.map {
-                        if (it is RtValue.Element) {
-                            RtValue.Element(evaluateElementProps(it.element))
-                        } else {
-                            it
+        // evaluator.js:89 — nested ElementNodes in props are re-evaluated
+        // inline ONLY when the schema context is present.
+        val finalProps = if (schemaCtx == null) {
+            props
+        } else {
+            val out = RtObject()
+            for ((key, v) in props.entries) {
+                out[key] = when (v) {
+                    is RtValue.Element -> RtValue.Element(evaluateElementInline(v.element))
+                    is RtValue.Arr -> RtValue.Arr(
+                        v.items.map {
+                            if (it is RtValue.Element) {
+                                RtValue.Element(evaluateElementInline(it.element))
+                            } else {
+                                it
+                            }
                         }
-                    }
-                )
+                    )
 
-                else -> v
+                    else -> v
+                }
             }
+            out
         }
         return RtValue.Element(
             RtElement(
@@ -239,15 +346,15 @@ internal class Evaluator(store: Map<String, RtValue>) {
 
     private fun evaluateBinOp(node: AstNode.BinOp, context: EvalContext): RtValue {
         if (node.op == "&&") {
-            val left = evaluate(node.left, context)
-            return if (jsTruthy(left)) evaluate(node.right, context) else left
+            val left = evaluate(node.left, context, null)
+            return if (jsTruthy(left)) evaluate(node.right, context, null) else left
         }
         if (node.op == "||") {
-            val left = evaluate(node.left, context)
-            return if (jsTruthy(left)) left else evaluate(node.right, context)
+            val left = evaluate(node.left, context, null)
+            return if (jsTruthy(left)) left else evaluate(node.right, context, null)
         }
-        val left = evaluate(node.left, context)
-        val right = evaluate(node.right, context)
+        val left = evaluate(node.left, context, null)
+        val right = evaluate(node.right, context, null)
         return when (node.op) {
             "+" ->
                 if (left is RtValue.Str || right is RtValue.Str) {
@@ -527,7 +634,7 @@ internal class Evaluator(store: Map<String, RtValue>) {
             val stepsArg = if (args.isEmpty()) {
                 RtValue.Arr(emptyList())
             } else {
-                evaluate(args[0], context)
+                evaluate(args[0], context, null)
             }
             val rawSteps = (stepsArg as? RtValue.Arr)?.items ?: emptyList()
             // Non-object / null entries and entries without a `type` field are
@@ -561,9 +668,9 @@ internal class Evaluator(store: Map<String, RtValue>) {
             val o = RtObject()
             o["type"] = RtValue.Str("continue_conversation")
             o["message"] =
-                RtValue.Str(if (args.isEmpty()) "" else concatOperand(evaluate(args[0], context)))
+                RtValue.Str(if (args.isEmpty()) "" else concatOperand(evaluate(args[0], context, null)))
             if (args.size > 1) {
-                o["context"] = RtValue.Str(concatOperand(evaluate(args[1], context)))
+                o["context"] = RtValue.Str(concatOperand(evaluate(args[1], context, null)))
             }
             RtValue.Obj(o)
         }
@@ -572,7 +679,7 @@ internal class Evaluator(store: Map<String, RtValue>) {
             RtObject.of(
                 "type" to RtValue.Str("open_url"),
                 "url" to RtValue.Str(
-                    if (args.isEmpty()) "" else concatOperand(evaluate(args[0], context))
+                    if (args.isEmpty()) "" else concatOperand(evaluate(args[0], context, null))
                 ),
             )
         )
@@ -616,16 +723,21 @@ internal class Evaluator(store: Map<String, RtValue>) {
         name: String,
         args: List<AstNode>,
         context: EvalContext,
+        schemaCtx: SchemaCtx?,
     ): RtValue {
         if (name != "Each") return RtValue.Null
         if (args.size < 3) return RtValue.Arr(emptyList())
-        val arr = (evaluate(args[0], context) as? RtValue.Arr)?.items
+        val arr = (evaluate(args[0], context, null) as? RtValue.Arr)?.items
             ?: return RtValue.Arr(emptyList())
         val varName = when (val v = args[1]) {
             is AstNode.Ref -> v.n
             is AstNode.Str -> v.v
             else -> null
-        } ?: return RtValue.Arr(emptyList())
+        }
+        // evaluator.js:405 guards with `if (!varName)` — FALSY, so an EMPTY
+        // iterator name aborts the loop and yields `[]`, it does not iterate
+        // (fixture `079-each-empty-iterator-name`).
+        if (varName.isNullOrEmpty()) return RtValue.Arr(emptyList())
         val template = args[2]
 
         return RtValue.Arr(
@@ -637,9 +749,12 @@ internal class Evaluator(store: Map<String, RtValue>) {
                         if (refName == varName) item else context.resolveRef(refName)
                     },
                 )
-                val result = evaluate(substituted, childCtx)
-                if (result is RtValue.Element) {
-                    RtValue.Element(evaluateElementProps(result.element))
+                val result = evaluate(substituted, childCtx, schemaCtx)
+                // evaluator.js:421 — the element re-evaluation is gated on the
+                // schema context, so inside an Action the per-item element
+                // keeps whatever raw ASTs site 75 preserved.
+                if (schemaCtx != null && result is RtValue.Element) {
+                    RtValue.Element(evaluateElementInline(result.element))
                 } else {
                     result
                 }

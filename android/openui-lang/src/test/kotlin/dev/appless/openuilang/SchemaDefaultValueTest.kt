@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test
  * `missing-required` / `null-required` is reported.
  *
  * The shipped GenOS contract declares no `default` anywhere, so this branch is
- * dead across all 90 fixtures — which is exactly why it needs a unit test: a
+ * dead across all 97 fixtures — which is exactly why it needs a unit test: a
  * regression in it would be invisible to the oracle suite. The schema below is
  * hand-built for that reason.
  *

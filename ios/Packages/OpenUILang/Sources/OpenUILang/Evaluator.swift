@@ -8,6 +8,32 @@ struct EvalContext {
     let resolveRef: (String) -> RTValue
 }
 
+/// Presence marker for lang-core's THIRD `evaluate(node, context, schemaCtx)`
+/// argument (`{ library }` in JS).
+///
+/// `evaluator.js` branches on schemaCtx's PRESENCE at four sites — 61 (catalog
+/// def lookup for the reactive-prop test), 75 (`props[key] = schemaCtx ?
+/// context.getState(val.n) : val`), 89 (recursive inline evaluation of nested
+/// ElementNode props) and 421 (the `@Each` element-recursion gate) — and the
+/// ACTION-PLAN path deliberately calls the TWO-argument form
+/// (`evaluate(args[0], context)`, evaluator.js:264). So inside an `Action([…])`
+/// the third argument is absent and raw `StateRef` ASTs are PRESERVED for
+/// click-time evaluation instead of being read from the store.
+///
+/// Only the marker's presence is observable here: site 61 exists solely to find
+/// a `reactive()`-marked prop schema, and the GenOS contract marks none (there
+/// is no `$binding<>`/reactive annotation anywhere in
+/// `spec/contract/genos.schema.json`), so the reactive branch at
+/// evaluator.js:65 is dead in BOTH states. Hence a marker rather than a library
+/// handle.
+///
+/// Deliberately NOT defaulted: JS makes the drop visible at each call site, and
+/// so does this port. Fixtures `076-action-staterefs-preserved`,
+/// `077-action-each-staterefs`.
+struct SchemaCtx {
+    static let present = SchemaCtx()
+}
+
 /// Port of `runtime/evaluator.js` + `runtime/evaluate-prop.js` +
 /// `runtime/evaluate-tree.js` for the AppLess (non-reactive) contract
 /// (spec/openui-lang.md §9 runtime evaluation; §9.1 operators, §9.2 builtins,
@@ -32,35 +58,81 @@ final class Evaluator {
         )
     }
 
+    /// Runtime prop-evaluation errors, in emission order — the JS
+    /// `evalCtx.errors` array. Read by `Pipeline` after the root is evaluated.
+    private(set) var runtimeErrors: [RuntimeError] = []
+
     // MARK: - Element/prop evaluation (evaluate-tree / evaluate-prop)
 
+    /// `evaluate-tree.js` `evaluateElementProps` — the entry point, and the
+    /// ONLY one that catches. Each prop is evaluated inside a do/catch; on a
+    /// throw the RAW prop value is kept and a `runtimeErrors` entry recorded.
     func evaluateElementProps(_ el: RTElement) -> RTElement {
         if el.hasDynamicProps == false { return el }
         var out = el
         var props = RTObject()
         for (key, value) in el.props.entries {
-            props[key] = evaluatePropValue(value)
+            do {
+                props[key] = try evaluatePropValue(value, inline: false)
+            } catch let error as JSTypeError {
+                runtimeErrors.append(
+                    RuntimeError(
+                        message:
+                            "Evaluating prop \"\(key)\" on \(el.typeName) failed: \(error.message)",
+                        component: el.typeName,
+                        statementId: el.statementId
+                    )
+                )
+                props[key] = value
+            } catch {
+                props[key] = value
+            }
         }
         out.props = props
         return out
     }
 
-    private func evaluatePropValue(_ value: RTValue) -> RTValue {
+    /// `evaluator.js` `evaluateElementInline` — the schema-aware re-evaluation
+    /// `evaluate()` performs on nested ElementNodes (sites 89/421). Same prop
+    /// loop, but deliberately WITHOUT the catch: a throw in here propagates out
+    /// of `evaluate()` and is caught by the OUTER `evaluateElementProps`, so
+    /// the recorded error names the outer element and the outer prop key.
+    private func evaluateElementInline(_ el: RTElement) throws -> RTElement {
+        if el.hasDynamicProps == false { return el }
+        var out = el
+        var props = RTObject()
+        for (key, value) in el.props.entries {
+            props[key] = try evaluatePropValue(value, inline: true)
+        }
+        out.props = props
+        return out
+    }
+
+    private func recurseElement(_ el: RTElement, inline: Bool) throws -> RTElement {
+        inline ? try evaluateElementInline(el) : evaluateElementProps(el)
+    }
+
+    /// `evaluate-prop.js` `evaluatePropCore`. `inline` selects the recursion
+    /// callback: the inline (non-catching) element path or the tree path.
+    private func evaluatePropValue(_ value: RTValue, inline: Bool) throws -> RTValue {
         switch value {
         case .undefined, .null, .bool, .number, .string:
             return value
         case .ast(let node):
-            let result = evaluate(node, ctx)
+            // The schema context IS present on every evaluate-prop entry
+            // (evaluate-tree.js builds `{ library: evalCtx.library }`).
+            let result = try evaluate(node, ctx, SchemaCtx.present)
             if case .element(let el) = result {
-                return .element(evaluateElementProps(el))
+                return .element(try recurseElement(el, inline: inline))
             }
             if case .array(let items) = result {
-                return .array(items.map { item in
-                    if case .element(let el) = item {
-                        return .element(evaluateElementProps(el))
-                    }
-                    return item
-                })
+                return .array(
+                    try items.map { item in
+                        if case .element(let el) = item {
+                            return .element(try recurseElement(el, inline: inline))
+                        }
+                        return item
+                    })
             }
             // Strip ReactiveAssign in a non-reactive context.
             if isReactiveAssign(result), case .object(let o) = result,
@@ -71,9 +143,9 @@ final class Evaluator {
             }
             return result
         case .array(let items):
-            return .array(items.map { evaluatePropValue($0) })
+            return .array(try items.map { try evaluatePropValue($0, inline: inline) })
         case .element(let el):
-            return .element(evaluateElementProps(el))
+            return .element(try recurseElement(el, inline: inline))
         case .object(let o):
             // KNOWN-DEVIATION (README.md #6): a LITERAL object whose `k` is a
             // real AST kind string ({k: "Str", v: "x"}) is indistinguishable
@@ -84,9 +156,11 @@ final class Evaluator {
             if o.has("type") && o.has("valueAST") { return value }
             let needsEval = o.values.contains { $0.isObjectLike }
             if needsEval {
+                // `result[k] = …` in evaluate-prop.js — ASSIGNMENT, so a
+                // `__proto__` key is swallowed here too.
                 var out = RTObject()
                 for (k, v) in o.entries {
-                    out[k] = evaluatePropValue(v)
+                    out.assign(k, try evaluatePropValue(v, inline: inline))
                 }
                 return .object(out)
             }
@@ -103,7 +177,17 @@ final class Evaluator {
 
     // MARK: - Core AST evaluation
 
-    func evaluate(_ node: ASTNode, _ context: EvalContext) -> RTValue {
+    /// `evaluator.js` `evaluate(node, context, schemaCtx)`.
+    ///
+    /// `schemaCtx` is threaded EXACTLY where JS threads it: on to
+    /// `evaluateLazyBuiltin` and to the recursive `mappedProps` evaluation.
+    /// Every other recursion in JS calls the two-argument form, so those pass
+    /// `nil` here — collection elements, object entries, operator operands,
+    /// ternary branches, member/index receivers and eager-builtin arguments all
+    /// drop it.
+    func evaluate(_ node: ASTNode, _ context: EvalContext, _ schemaCtx: SchemaCtx?) throws
+        -> RTValue
+    {
         switch node {
         case .str(let v): return .string(v)
         case .num(let v): return .number(v)
@@ -115,45 +199,63 @@ final class Evaluator {
         case .ref(let n), .runtimeRef(let n, _):
             return context.resolveRef(n)
         case .arr(let els):
-            return .array(els.map { evaluate($0, context) })
+            return .array(try els.map { try evaluate($0, context, nil) })
         case .obj(let entries):
+            // Object.fromEntries → CreateDataProperty, NOT assignment: unlike
+            // materialize.js's Obj case a `"__proto__"` entry DOES become an
+            // own property here (the serializer's own `out[key] = …` drops it
+            // again).
             var o = RTObject()
-            for (k, v) in entries { o[k] = evaluate(v, context) }
+            for (k, v) in entries { o[k] = try evaluate(v, context, nil) }
             return .object(o)
         case .comp(let name, let args, let mappedProps):
             if Builtins.lazyBuiltins.contains(name) {
-                return evaluateLazyBuiltin(name: name, args: args, context: context)
+                return try evaluateLazyBuiltin(
+                    name: name, args: args, context: context, schemaCtx: schemaCtx)
             }
             if Builtins.dataBuiltins.contains(name) {
-                let evaluated = args.map { evaluate($0, context) }
-                return callDataBuiltin(name: name, args: evaluated)
+                // evaluator.js:50 — eager builtin args drop the schema context.
+                let evaluated = try args.map { try evaluate($0, context, nil) }
+                return try callDataBuiltin(name: name, args: evaluated)
             }
             if Builtins.actionNames.contains(name) {
-                return evaluateActionCall(name: name, args: args, context: context)
+                // evaluator.js:55 — evaluateActionCall takes no schemaCtx.
+                return try evaluateActionCall(name: name, args: args, context: context)
             }
             if let mapped = mappedProps {
                 var props = RTObject()
                 for (key, val) in mapped {
                     if case .stateRef(let n) = val {
-                        props[key] = context.getState(n)
+                        // evaluator.js:75 —
+                        //   props[key] = schemaCtx ? context.getState(val.n) : val
+                        // Site 61 (`schemaCtx?.library.components[node.name]`)
+                        // picks the prop schema for the reactive test one line
+                        // above; the GenOS contract marks no prop reactive, so
+                        // that branch is dead in both states and only this
+                        // ternary is observable.
+                        props[key] = schemaCtx != nil ? context.getState(n) : .ast(val)
                     } else {
-                        props[key] = evaluate(val, context)
+                        props[key] = try evaluate(val, context, schemaCtx)
                     }
                 }
                 var el = RTElement(
                     typeName: name, props: props, partial: false,
                     hasDynamicProps: true, statementId: nil)
-                // Recursively evaluate nested ElementNodes in props.
-                for (key, v) in el.props.entries {
-                    if case .element(let sub) = v {
-                        el.props[key] = .element(evaluateElementProps(sub))
-                    } else if case .array(let items) = v {
-                        el.props[key] = .array(items.map { item in
-                            if case .element(let sub) = item {
-                                return .element(evaluateElementProps(sub))
-                            }
-                            return item
-                        })
+                // evaluator.js:89 — nested ElementNodes in props are
+                // re-evaluated inline ONLY when the schema context is present.
+                if schemaCtx != nil {
+                    for (key, v) in el.props.entries {
+                        if case .element(let sub) = v {
+                            el.props[key] = .element(try evaluateElementInline(sub))
+                        } else if case .array(let items) = v {
+                            el.props[key] = .array(
+                                try items.map { item in
+                                    if case .element(let sub) = item {
+                                        return .element(try evaluateElementInline(sub))
+                                    }
+                                    return item
+                                })
+                        }
                     }
                 }
                 return .element(el)
@@ -161,22 +263,22 @@ final class Evaluator {
             return .null // unmapped Comp (unknown component in expression)
         case .binOp(let op, let leftNode, let rightNode):
             if op == "&&" {
-                let left = evaluate(leftNode, context)
-                return jsTruthy(left) ? evaluate(rightNode, context) : left
+                let left = try evaluate(leftNode, context, nil)
+                return jsTruthy(left) ? try evaluate(rightNode, context, nil) : left
             }
             if op == "||" {
-                let left = evaluate(leftNode, context)
-                return jsTruthy(left) ? left : evaluate(rightNode, context)
+                let left = try evaluate(leftNode, context, nil)
+                return jsTruthy(left) ? left : try evaluate(rightNode, context, nil)
             }
-            let left = evaluate(leftNode, context)
-            let right = evaluate(rightNode, context)
+            let left = try evaluate(leftNode, context, nil)
+            let right = try evaluate(rightNode, context, nil)
             switch op {
             case "+":
                 if case .string = left {
-                    return .string(concatOperand(left) + concatOperand(right))
+                    return .string(try concatOperand(left) + (try concatOperand(right)))
                 }
                 if case .string = right {
-                    return .string(concatOperand(left) + concatOperand(right))
+                    return .string(try concatOperand(left) + (try concatOperand(right)))
                 }
                 return .number(dslToNumber(left) + dslToNumber(right))
             case "-":
@@ -190,9 +292,9 @@ final class Evaluator {
                 let r = dslToNumber(right)
                 return .number(r == 0 ? 0 : dslToNumber(left).truncatingRemainder(dividingBy: r))
             case "==":
-                return .bool(jsLooseEquals(left, right))
+                return .bool(try jsLooseEquals(left, right))
             case "!=":
-                return .bool(!jsLooseEquals(left, right))
+                return .bool(!(try jsLooseEquals(left, right)))
             case ">":
                 return .bool(dslToNumber(left) > dslToNumber(right))
             case "<":
@@ -206,17 +308,19 @@ final class Evaluator {
             }
         case .unaryOp(let op, let operandNode):
             if op == "!" {
-                return .bool(!jsTruthy(evaluate(operandNode, context)))
+                return .bool(!jsTruthy(try evaluate(operandNode, context, nil)))
             }
             if op == "-" {
-                return .number(-dslToNumber(evaluate(operandNode, context)))
+                return .number(-dslToNumber(try evaluate(operandNode, context, nil)))
             }
             return .null
         case .ternary(let condNode, let thenNode, let elseNode):
-            let cond = evaluate(condNode, context)
-            return jsTruthy(cond) ? evaluate(thenNode, context) : evaluate(elseNode, context)
+            let cond = try evaluate(condNode, context, nil)
+            return jsTruthy(cond)
+                ? try evaluate(thenNode, context, nil)
+                : try evaluate(elseNode, context, nil)
         case .member(let objNode, let field):
-            let obj = evaluate(objNode, context)
+            let obj = try evaluate(objNode, context, nil)
             if obj.isNullish { return .null }
             if case .array(let items) = obj {
                 if field == "length" { return .number(Double(items.count)) }
@@ -229,8 +333,8 @@ final class Evaluator {
             }
             return propertyGet(obj, field)
         case .index(let objNode, let indexNode):
-            let obj = evaluate(objNode, context)
-            let idx = evaluate(indexNode, context)
+            let obj = try evaluate(objNode, context, nil)
+            let idx = try evaluate(indexNode, context, nil)
             if obj.isNullish || idx.isNullish { return .null }
             if case .array(let items) = obj {
                 let n = dslToNumber(idx)
@@ -239,7 +343,7 @@ final class Evaluator {
                 else { return .undefined }
                 return items[Int(n)]
             }
-            return propertyGet(obj, jsToString(idx))
+            return propertyGet(obj, try jsToString(idx))
         case .assign(let target, let value):
             var o = RTObject()
             o["__reactive"] = .string("assign")
@@ -250,8 +354,8 @@ final class Evaluator {
     }
 
     /// `String(x ?? "")` used by string concatenation and action strings.
-    private func concatOperand(_ v: RTValue) -> String {
-        v.isNullish ? "" : jsToString(v)
+    private func concatOperand(_ v: RTValue) throws -> String {
+        v.isNullish ? "" : try jsToString(v)
     }
 
     /// JS `obj[key]` property access for non-array receivers.
@@ -286,7 +390,7 @@ final class Evaluator {
 
     // MARK: - Data builtins
 
-    private func callDataBuiltin(name: String, args: [RTValue]) -> RTValue {
+    private func callDataBuiltin(name: String, args: [RTValue]) throws -> RTValue {
         func arg(_ i: Int) -> RTValue { i < args.count ? args[i] : .undefined }
 
         switch name {
@@ -330,25 +434,28 @@ final class Evaluator {
             return .number(0)
         case "Sort":
             guard case .array(let items) = arg(0) else { return arg(0) }
-            let f = arg(1).isNullish ? "" : jsToString(arg(1))
-            let desc = (arg(2).isNullish ? "asc" : jsToString(arg(2))) == "desc"
-            let sorted = items.sorted { a, b in
+            let f = arg(1).isNullish ? "" : try jsToString(arg(1))
+            let desc = (arg(2).isNullish ? "asc" : try jsToString(arg(2))) == "desc"
+            // `sorted(by:)` is `rethrows`, so a comparator that hits a
+            // `toString`-shadowing member propagates the TypeError just like
+            // `Array.prototype.sort` does in JS.
+            let sorted = try items.sorted { a, b in
                 let av = f.isEmpty ? a : resolveField(a, f)
                 let bv = f.isEmpty ? b : resolveField(b, f)
-                let cmp = sortCompare(av, bv)
+                let cmp = try sortCompare(av, bv)
                 return desc ? cmp > 0 : cmp < 0
             }
             return .array(sorted)
         case "Filter":
             guard case .array(let items) = arg(0) else { return .array([]) }
-            let f = arg(1).isNullish ? "" : jsToString(arg(1))
-            let o = arg(2).isNullish ? "==" : jsToString(arg(2))
+            let f = arg(1).isNullish ? "" : try jsToString(arg(1))
+            let o = arg(2).isNullish ? "==" : try jsToString(arg(2))
             let value = arg(3)
-            let filtered = items.filter { item in
+            let filtered = try items.filter { item in
                 let v = f.isEmpty ? item : resolveField(item, f)
                 switch o {
-                case "==": return jsLooseEquals(v, value)
-                case "!=": return !jsLooseEquals(v, value)
+                case "==": return try jsLooseEquals(v, value)
+                case "!=": return !(try jsLooseEquals(v, value))
                 case ">": return dslToNumber(v) > dslToNumber(value)
                 case "<": return dslToNumber(v) < dslToNumber(value)
                 case ">=": return dslToNumber(v) >= dslToNumber(value)
@@ -356,8 +463,8 @@ final class Evaluator {
                 case "contains":
                     // JS `String.prototype.includes` — UTF-16 code-unit
                     // subsequence, NOT Swift's canonical `contains`.
-                    let hay = v.isNullish ? "" : jsToString(v)
-                    let needle = value.isNullish ? "" : jsToString(value)
+                    let hay = v.isNullish ? "" : try jsToString(v)
+                    let needle = value.isNullish ? "" : try jsToString(value)
                     return jsStringContains(hay, needle)
                 default:
                     return false
@@ -382,7 +489,7 @@ final class Evaluator {
 
     /// Numeric-aware comparator matching Sort's JS implementation; returns
     /// negative/zero/positive like `localeCompare`.
-    private func sortCompare(_ av: RTValue, _ bv: RTValue) -> Int {
+    private func sortCompare(_ av: RTValue, _ bv: RTValue) throws -> Int {
         func isNumeric(_ v: RTValue) -> Bool {
             if case .number = v { return true }
             if case .string(let s) = v {
@@ -396,8 +503,8 @@ final class Evaluator {
             if diff > 0 { return 1 }
             return 0
         }
-        let a = av.isNullish ? "" : jsToString(av)
-        let b = bv.isNullish ? "" : jsToString(bv)
+        let a = av.isNullish ? "" : try jsToString(av)
+        let b = bv.isNullish ? "" : try jsToString(bv)
         // KNOWN-DEVIATION (README.md #1): approximates JS `localeCompare`
         // (V8 ICU collation) with Foundation's en_US comparison; agrees for
         // ASCII, may differ for locale-sensitive orderings.
@@ -468,10 +575,12 @@ final class Evaluator {
 
     // MARK: - Actions
 
-    private func evaluateActionCall(name: String, args: [ASTNode], context: EvalContext) -> RTValue {
+    private func evaluateActionCall(name: String, args: [ASTNode], context: EvalContext) throws
+        -> RTValue
+    {
         switch name {
         case "Action":
-            let stepsArg: RTValue = args.isEmpty ? .array([]) : evaluate(args[0], context)
+            let stepsArg: RTValue = args.isEmpty ? .array([]) : try evaluate(args[0], context, nil)
             var rawSteps: [RTValue] = []
             if case .array(let items) = stepsArg { rawSteps = items }
             let steps = rawSteps.filter { s in
@@ -495,16 +604,16 @@ final class Evaluator {
             }
             return .null
         case "ToAssistant":
-            let message = args.isEmpty ? "" : concatOperand(evaluate(args[0], context))
+            let message = args.isEmpty ? "" : try concatOperand(try evaluate(args[0], context, nil))
             var o = RTObject()
             o["type"] = .string("continue_conversation")
             o["message"] = .string(message)
             if args.count > 1 {
-                o["context"] = .string(concatOperand(evaluate(args[1], context)))
+                o["context"] = .string(try concatOperand(try evaluate(args[1], context, nil)))
             }
             return .object(o)
         case "OpenUrl":
-            let url = args.isEmpty ? "" : concatOperand(evaluate(args[0], context))
+            let url = args.isEmpty ? "" : try concatOperand(try evaluate(args[0], context, nil))
             var o = RTObject()
             o["type"] = .string("open_url")
             o["url"] = .string(url)
@@ -534,19 +643,24 @@ final class Evaluator {
 
     // MARK: - Each
 
-    private func evaluateLazyBuiltin(name: String, args: [ASTNode], context: EvalContext) -> RTValue {
+    private func evaluateLazyBuiltin(
+        name: String, args: [ASTNode], context: EvalContext, schemaCtx: SchemaCtx?
+    ) throws -> RTValue {
         guard name == "Each" else { return .null }
         guard args.count >= 3 else { return .array([]) }
-        guard case .array(let arr) = evaluate(args[0], context) else { return .array([]) }
+        guard case .array(let arr) = try evaluate(args[0], context, nil) else { return .array([]) }
         let varName: String?
         switch args[1] {
         case .ref(let n): varName = n
         case .str(let v): varName = v
         default: varName = nil
         }
-        guard let varName else { return .array([]) }
+        // evaluator.js:405 guards with `if (!varName)` — FALSY, so an EMPTY
+        // iterator name aborts the loop and yields `[]`, it does not iterate
+        // (fixture `079-each-empty-iterator-name`).
+        guard let varName, !varName.isEmpty else { return .array([]) }
         let template = args[2]
-        let results = arr.map { item -> RTValue in
+        let results = try arr.map { item -> RTValue in
             let substituted = substituteRef(template, varName: varName, value: toLiteralAST(item))
             let childCtx = EvalContext(
                 getState: context.getState,
@@ -556,9 +670,12 @@ final class Evaluator {
                     jsStringEquals(refName, varName) ? item : context.resolveRef(refName)
                 }
             )
-            let result = evaluate(substituted, childCtx)
-            if case .element(let el) = result {
-                return .element(evaluateElementProps(el))
+            let result = try evaluate(substituted, childCtx, schemaCtx)
+            // evaluator.js:421 — the element re-evaluation is gated on the
+            // schema context, so inside an Action the per-item element keeps
+            // whatever raw ASTs site 75 preserved.
+            if schemaCtx != nil, case .element(let el) = result {
+                return .element(try evaluateElementInline(el))
             }
             return result
         }

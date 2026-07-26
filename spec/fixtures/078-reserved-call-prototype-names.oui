@@ -1,0 +1,7 @@
+q = @toString("tool")
+p = @__proto__("x")
+root = Card([
+  TextContent(q),
+  ListItem("Inline", @constructor("boom")),
+  TextContent("after")
+])

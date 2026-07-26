@@ -62,8 +62,24 @@ public class PropObject() {
         for ((k, v) in pairs) put(k, v)
     }
 
-    public val keys: List<String> get() = map.keys.toList()
-    public val entries: List<Pair<String, PropValue>> get() = map.entries.map { it.key to it.value }
+    /**
+     * The object's own keys in JS `Object.keys(o)` order: canonical array
+     * indices (`"0"`–`"4294967294"`) FIRST in ascending numeric order, then
+     * every remaining key in insertion order (`OrdinaryOwnPropertyKeys`,
+     * ES 10.1.11.1). So `{b, "2", a, "10"}` iterates `"2", "10", b, a`.
+     *
+     * This is deliberately NOT the serializer's order: `TreeSerializer`
+     * additionally sorts the string group, because the reference serializer
+     * does `Object.keys(v).sort()` and re-inserts into a fresh object (see
+     * `StringJs.JS_OWN_KEY_ORDER`, fixture `075-object-key-index-order`).
+     * A consumer iterating props directly gets what JS would give it; a
+     * consumer wanting the canonical byte order must serialize.
+     */
+    public val keys: List<String> get() = jsOwnPropertyKeys(map.keys.toList())
+
+    /** [keys] paired with their values, in the same JS own-key order. */
+    public val entries: List<Pair<String, PropValue>>
+        get() = keys.map { it to map.getValue(it) }
     public val size: Int get() = map.size
     public fun isEmpty(): Boolean = map.isEmpty()
     public fun has(key: String): Boolean = map.containsKey(key)

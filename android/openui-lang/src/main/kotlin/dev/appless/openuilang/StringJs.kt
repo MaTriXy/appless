@@ -96,6 +96,35 @@ internal val JS_OWN_KEY_ORDER: Comparator<String> = Comparator { a, b ->
 }
 
 /**
+ * `OrdinaryOwnPropertyKeys` (ES 10.1.11.1) applied to a plain object's keys in
+ * INSERTION order — i.e. exactly what JS `Object.keys(o)` / `for…in` yields:
+ * every canonical array index first in ascending NUMERIC order, then every
+ * remaining string key in insertion order.
+ *
+ * NOT the same as [JS_OWN_KEY_ORDER], which additionally sorts the string group
+ * because the reference SERIALIZER sorts before re-inserting. Public iteration
+ * accessors want this one; the serializer wants that one.
+ */
+internal fun jsOwnPropertyKeys(insertionOrder: List<String>): List<String> {
+    var hasIndex = false
+    for (k in insertionOrder) {
+        if (jsCanonicalArrayIndex(k) >= 0) {
+            hasIndex = true
+            break
+        }
+    }
+    if (!hasIndex) return insertionOrder // overwhelmingly the common case
+    val indices = ArrayList<Pair<Long, String>>()
+    val rest = ArrayList<String>()
+    for (k in insertionOrder) {
+        val i = jsCanonicalArrayIndex(k)
+        if (i >= 0) indices.add(i to k) else rest.add(k)
+    }
+    indices.sortBy { it.first }
+    return indices.map { it.second } + rest
+}
+
+/**
  * JS `String.prototype.split(separator)` for a single separator: keeps empty
  * segments (`"a..b".split(".")` -> `["a", "", "b"]`). Kotlin's `split` already
  * keeps them (limit 0 means "no limit", NOT "drop trailing empties" the way
