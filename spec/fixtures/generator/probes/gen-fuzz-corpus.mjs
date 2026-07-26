@@ -74,6 +74,7 @@ const SALT = {
   nonmonotonic: 0x85ebca6b,
   mutation: 0xc2b2ae35,
   pinned: 0x27d4eb2f,
+  synthesis: 0x165667b1,
 };
 
 const NONMONO_SESSIONS = 48;
@@ -315,8 +316,168 @@ export function buildMutationSessions(fixtures, perFixture = MUTATIONS_PER_FIXTU
   return sessions;
 }
 
+// ── (d) SYNTHESIS ────────────────────────────────────────────────────────────
+//
+// Every other campaign DERIVES from the committed corpus, which is why 31,269
+// steps of prefix/nonmonotonic/mutation fuzzing found none of the three
+// serializer duck-typing divergences a reviewer found by hand in 61 steps: no
+// fixture contained a `{steps: […]}` row, a hand-written `valueAST`, or an
+// object spelling out `type`/`typeName`, and no single-code-point mutation can
+// invent one. Mutation fuzzing explores a ball of radius 1 around a corpus that
+// never enters the neighbourhood.
+//
+// This campaign does not derive from anything. It writes object literals from
+// an alphabet of the exact keys the serializer duck-types on, so the surface is
+// reachable by machine instead of by inspiration.
+
+/** The keys `serialize.mjs` and `evaluate-prop.js` actually branch on. */
+const SYNTH_KEYS = [
+  "steps", // isActionPlan
+  "type", // isActionStep / isElementNode
+  "typeName", // isElementNode
+  "valueAST", // isActionStep + serializeStep's by-NAME wrapping
+  "props", // isElementNode + serializeElement's Object.keys
+  "partial", // isElementNode (runtime guard only)
+  "hasDynamicProps", // evaluateElementProps' `=== false` short-circuit
+  "statementId", // copied verbatim into the emitted element
+  "k", // isAstNode (serializer + runtime)
+  "v",
+  "__proto__", // the setter that makes ALL of the above chain-aware
+];
+
+/** Values chosen so the duck-type guards actually fire some of the time. */
+const SYNTH_SCALARS = [
+  '"element"',
+  '"TextContent"',
+  '"Card"',
+  '"Str"',
+  '"set"',
+  '"ab"',
+  '""',
+  "0",
+  "1",
+  "-1",
+  "true",
+  "false",
+  "null",
+];
+
 /**
- * (d) PINNED — a small committed cross-section carrying oracle expectations, so
+ * Two shapes are DELIBERATELY not generated, because the REFERENCE THROWS on
+ * them and therefore has no expected tree to compare against — the fixture
+ * generator dies with the same `TypeError` (verified: `{steps: [null]}` and
+ * `{type: "element", typeName: "X"}` with no `props` both take
+ * `node probes/expected-tree.mjs` down at serialize.mjs:51 / :84):
+ *
+ *   1. a `null`/`undefined` STEP        — `Object.keys(step)` throws
+ *   2. an element-shaped object with no `props` — `Object.keys(el.props)` throws
+ *
+ * So the generator maintains two invariants: a `steps` array never contains a
+ * literal `null`, and `type: "element"` is only ever written alongside a
+ * non-nullish `props` in the SAME literal (which every `__proto__` inheritor
+ * then inherits too). Both shapes are listed in the ports' READMEs as the
+ * "serializer-level TypeError" deviation instead.
+ */
+function synthValue(rng, depth, allowNull) {
+  const roll = rng.int(0, 11);
+  if (depth >= 2 || roll <= 4) {
+    const scalar = rng.pick(SYNTH_SCALARS);
+    return scalar === "null" && !allowNull ? '"ab"' : scalar;
+  }
+  if (roll <= 7) {
+    const n = rng.int(0, 2);
+    const items = [];
+    for (let i = 0; i < n; i++) items.push(synthValue(rng, depth + 1, allowNull));
+    return `[${items.join(", ")}]`;
+  }
+  return synthObject(rng, depth + 1, null);
+}
+
+/** One object literal. `protoRef` (a statement name) becomes its `__proto__`. */
+function synthObject(rng, depth, protoRef) {
+  const parts = [];
+  if (protoRef) parts.push(`"__proto__": ${protoRef}`);
+  const keyCount = rng.int(1, 4);
+  const used = new Set();
+  let wroteElementType = false;
+  for (let i = 0; i < keyCount; i++) {
+    const key = rng.pick(SYNTH_KEYS);
+    if (key === "__proto__" || used.has(key)) continue;
+    used.add(key);
+    if (key === "type" && rng.int(0, 1) === 0) {
+      // The element branch: `type: "element"` always with a props sibling.
+      parts.push('type: "element"');
+      wroteElementType = true;
+      continue;
+    }
+    if (key === "steps") {
+      const n = rng.int(0, 3);
+      const items = [];
+      // Invariant 1: never a literal null inside a steps array.
+      for (let j = 0; j < n; j++) items.push(synthValue(rng, depth + 1, false));
+      parts.push(`steps: [${items.join(", ")}]`);
+      continue;
+    }
+    if (key === "props") {
+      used.add("props");
+      parts.push(`props: ${rng.int(0, 2) === 0 ? synthValue(rng, depth + 1, false) : "{ text: \"t\" }"}`);
+      continue;
+    }
+    parts.push(`${key}: ${synthValue(rng, depth + 1, true)}`);
+  }
+  // Invariant 2: `type: "element"` implies a non-nullish `props` right here.
+  if (wroteElementType && !used.has("props")) parts.push('props: { text: "t" }');
+  if (parts.length === 0) parts.push('z: 1');
+  return `{ ${parts.join(", ")} }`;
+}
+
+const SYNTH_SESSIONS = 400;
+
+/** (d) SYNTHESIS — programs written from the duck-typing key alphabet. */
+export function buildSynthesisSessions() {
+  const rng = prngFor("synthesis");
+  const sessions = [];
+  for (let s = 0; s < SYNTH_SESSIONS; s++) {
+    const lines = [];
+    const names = [];
+    const statementCount = rng.int(1, 3);
+    for (let i = 0; i < statementCount; i++) {
+      const name = `s${i}`;
+      // Chain onto an EARLIER statement roughly half the time — that is what
+      // puts `type`/`typeName`/`k`/`steps` behind a prototype link.
+      const protoRef = names.length && rng.int(0, 1) === 0 ? rng.pick(names) : null;
+      lines.push(`${name} = ${synthObject(rng, 0, protoRef)}`);
+      names.push(name);
+    }
+    const rows = names.map((n) => n).join(", ");
+    if (rng.int(0, 4) === 0) {
+      // Duck-typed ROOT: the entry statement itself answers isElementNode.
+      lines.push(
+        `root = { type: "element", typeName: "Card", props: { children: [${rows}] }, ` +
+          `partial: false${rng.int(0, 1) === 0 ? ", hasDynamicProps: false" : ""} }`
+      );
+    } else {
+      lines.push(`root = Card([CardHeader("synth ${s}"), KVList([${rows}])])`);
+    }
+    const text = lines.join("\n") + "\n";
+    // One fresh parser per program, plus a mid-program cut so the streaming
+    // scanner sees the same shapes half-written.
+    const cut = safeCut(text, Math.floor(text.length * 0.6));
+    sessions.push({
+      campaign: "synthesis",
+      name: `synthesis/${String(s).padStart(3, "0")}`,
+      sources: [text],
+      steps: [
+        [0, cut],
+        [0, text.length],
+      ],
+    });
+  }
+  return sessions;
+}
+
+/**
+ * (e) PINNED — a small committed cross-section carrying oracle expectations, so
  * `run-differential.mjs --campaign pinned` is a self-contained smoke test (and
  * a regression gate on the JS oracle itself).
  */
@@ -378,11 +539,12 @@ export function buildPinnedSessions(corpus) {
 
 // ── Assembly ─────────────────────────────────────────────────────────────────
 
-const KNOWN = ["prefix", "nonmonotonic", "mutation", "pinned"];
+const KNOWN = ["prefix", "nonmonotonic", "mutation", "synthesis", "pinned"];
 
 export function buildCampaign(which, { mutationsPerFixture } = {}) {
   const fixtures = discoverCorpus();
-  const names = which === "all" ? ["prefix", "nonmonotonic", "mutation"] : which.split(",");
+  const names =
+    which === "all" ? ["prefix", "nonmonotonic", "mutation", "synthesis"] : which.split(",");
   for (const n of names) {
     if (!KNOWN.includes(n)) throw new Error(`unknown campaign: ${n} (known: ${KNOWN.join(", ")})`);
   }
@@ -394,6 +556,7 @@ export function buildCampaign(which, { mutationsPerFixture } = {}) {
       sessions = sessions.concat(
         buildMutationSessions(fixtures, mutationsPerFixture ?? MUTATIONS_PER_FIXTURE)
       );
+    else if (n === "synthesis") sessions = sessions.concat(buildSynthesisSessions());
     else if (n === "pinned") sessions = sessions.concat(buildPinnedSessions(fixtures));
   }
   return {
