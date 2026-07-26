@@ -143,7 +143,7 @@ private class JsonReader(private val src: String) {
                         '\\' -> { sb.append('\\'); i++ }
                         '/' -> { sb.append('/'); i++ }
                         'b' -> { sb.append('\b'); i++ }
-                        'f' -> { sb.append(''); i++ }
+                        'f' -> { sb.append('\u000C'); i++ }
                         'n' -> { sb.append('\n'); i++ }
                         'r' -> { sb.append('\r'); i++ }
                         't' -> { sb.append('\t'); i++ }
