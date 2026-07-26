@@ -353,6 +353,19 @@ public enum CdsMetrics {
             self.fontWeight = fontWeight
             self.letterSpacing = letterSpacing
         }
+
+        /// Extra leading a toolkit whose "line spacing" means the GAP BETWEEN
+        /// lines must add to reproduce RN's absolute `lineHeight`, which is a
+        /// line BOX height.
+        ///
+        /// A style with no `lineHeight` adds nothing (the system leading
+        /// stands), and a `lineHeight` SMALLER than the font size clamps to 0
+        /// rather than going negative - SwiftUI would happily overlap the
+        /// lines, RN would not.
+        public var extraLineSpacing: Double {
+            guard let lineHeight else { return 0 }
+            return Swift.max(0, lineHeight - fontSize)
+        }
     }
 
     public enum Typography {

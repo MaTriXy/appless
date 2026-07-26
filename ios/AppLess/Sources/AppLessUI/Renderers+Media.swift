@@ -29,7 +29,7 @@ struct ImageBlockView: View {
                 SemanticImageView(src: p.string("src"), placeholder: Color(ctx.theme.fill))
             }
             .overlay(alignment: .bottom) {
-                if p.isTruthy("caption"), let caption = p.string("caption") {
+                if p.isTruthy("caption"), let caption = p.text("caption") {
                     Text(caption)
                         .cdsTextStyle(CdsMetrics.Typography.imageCaption)
                         .foregroundStyle(Color.white)
@@ -63,16 +63,16 @@ struct PhotoGridView: View {
 
     var body: some View {
         let images = GenosProps.imageRefs(PropReader(node).value("images"))
-        let rows = images.cdsChunked(into: 3)
+        let rows = FlexWrap.rows(count: images.count, perRow: 3)
         VStack(spacing: CdsMetrics.Spacing.photoGridGap) {
             ForEach(rows.indices, id: \.self) { rowIndex in
                 HStack(spacing: CdsMetrics.Spacing.photoGridGap) {
-                    ForEach(rows[rowIndex].indices, id: \.self) { columnIndex in
+                    ForEach(rows[rowIndex], id: \.self) { imageIndex in
                         Color.clear
                             .aspectRatio(1, contentMode: .fit)
                             .overlay {
                                 SemanticImageView(
-                                    src: rows[rowIndex][columnIndex].src,
+                                    src: images[imageIndex].src,
                                     placeholder: Color(ctx.theme.fill))
                             }
                             .clipped()
@@ -119,11 +119,10 @@ struct BubblesView: View {
         }
     }
 
-    /// `maxWidth: "78%"`. Before the first layout pass the width is unknown, so
-    /// the cap is simply not applied - the bubble is never invisible.
+    /// `maxWidth: "78%"`, or nil before the first layout pass has measured
+    /// the thread. `BubblePresentation` owns the rule.
     private func bubbleMaxWidth(in width: CGFloat) -> CGFloat? {
-        guard width > 0 else { return nil }
-        return width * CdsMetrics.Spacing.bubbleMaxWidthFraction
+        BubblePresentation.maxWidth(threadWidth: Double(width)).map { CGFloat($0) }
     }
 
     private func bubble(_ message: BubbleMessage, maxWidth: CGFloat?) -> some View {
@@ -146,12 +145,11 @@ struct BubbleShape: Shape {
     let isMine: Bool
 
     func path(in rect: CGRect) -> Path {
-        let big = CGFloat(CdsMetrics.Radius.bubble)
-        let tail = CGFloat(CdsMetrics.Radius.bubbleTail)
-        let topLeft = big
-        let topRight = big
-        let bottomRight = isMine ? tail : big
-        let bottomLeft = isMine ? big : tail
+        let corners = BubblePresentation.corners(isMine: isMine)
+        let topLeft = CGFloat(corners.topLeft)
+        let topRight = CGFloat(corners.topRight)
+        let bottomRight = CGFloat(corners.bottomRight)
+        let bottomLeft = CGFloat(corners.bottomLeft)
 
         var path = Path()
         path.move(to: CGPoint(x: rect.minX + topLeft, y: rect.minY))
@@ -199,9 +197,10 @@ struct ChipsView: View {
                     Button {
                         // Re-tapping the active chip is a no-op (it would ask
                         // the model to re-render the screen it is already on).
-                        guard index != active else { return }
+                        guard ChipsPresentation.shouldDispatch(tapped: index, active: active)
+                        else { return }
                         active = index
-                        ctx.scoped(formName: nil)
+                        ctx.scoped(formName: ChipsPresentation.dispatchesWithFormName)
                             .trigger(GenosActions.chipsMessage(labels[index]))
                     } label: {
                         Text(labels[index])
@@ -250,14 +249,15 @@ struct TabsView: View {
         let items = StructuralProps.tabItems(of: node)
         // `items[Math.min(active, max(items.length - 1, 0))]` - a shrinking
         // tab list must not strand the selection out of range.
-        let current = items.isEmpty ? nil : items[min(active, items.count - 1)]
+        let current = TabsPresentation.contentIndex(active: active, count: items.count)
+            .map { items[$0] }
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: CdsMetrics.Spacing.tabTrackGap) {
                 ForEach(items.indices, id: \.self) { index in
                     Button {
                         active = index
                     } label: {
-                        Text(items[index].label.isEmpty ? "Tab \(index + 1)" : items[index].label)
+                        Text(TabsPresentation.title(label: items[index].label, index: index))
                             .cdsTextStyle(CdsMetrics.Typography.tab)
                             .foregroundStyle(Color(ctx.theme.ink))
                             .lineLimit(1)
@@ -265,7 +265,7 @@ struct TabsView: View {
                             .padding(.vertical, CdsMetrics.Spacing.tabPaddingVertical)
                             .padding(.horizontal, CdsMetrics.Spacing.tabPaddingHorizontal)
                             .background {
-                                if index == min(active, max(items.count - 1, 0)) {
+                                if TabsPresentation.isHighlighted(index: index, active: active) {
                                     RoundedRectangle(
                                         cornerRadius: CdsMetrics.Radius.segment,
                                         style: .continuous

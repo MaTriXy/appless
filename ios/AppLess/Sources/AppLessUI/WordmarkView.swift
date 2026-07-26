@@ -34,17 +34,14 @@ public struct WordmarkShape: Shape {
                 path.closeSubpath()
             }
         }
-        // The commands are in viewBox space; scale them into `rect` the way
-        // SVG's default `preserveAspectRatio="xMidYMid meet"` would.
-        let boxWidth = CGFloat(AppLessWordmark.viewBoxWidth)
-        let boxHeight = CGFloat(AppLessWordmark.viewBoxHeight)
-        let scale = min(rect.width / boxWidth, rect.height / boxHeight)
-        let width = boxWidth * scale
-        let height = boxHeight * scale
+        // The commands are in viewBox space; `AppLessWordmark.fit` applies
+        // SVG's default `preserveAspectRatio="xMidYMid meet"`.
+        let fit = AppLessWordmark.fit(
+            into: Double(rect.width), Double(rect.height),
+            originX: Double(rect.minX), originY: Double(rect.minY))
         let transform = CGAffineTransform(
-            translationX: rect.minX + (rect.width - width) / 2,
-            y: rect.minY + (rect.height - height) / 2
-        ).scaledBy(x: scale, y: scale)
+            translationX: CGFloat(fit.offsetX), y: CGFloat(fit.offsetY)
+        ).scaledBy(x: CGFloat(fit.scale), y: CGFloat(fit.scale))
         return path.applying(transform)
     }
 }

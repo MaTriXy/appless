@@ -36,17 +36,45 @@ import Testing
 
     // MARK: - Rows
 
-    @Test func kvRowsDropNonObjectEntries() {
+    /// `(props.rows ?? []).filter(Boolean)` (`components.tsx` L328) filters on
+    /// TRUTHINESS, not on "is an object". Verified in node:
+    ///
+    ///     [{label:"Total",value:"$12"}, null, "nope", {label:"Tax"}]
+    ///       .filter(Boolean).map(r => [r.label, r.value])
+    ///     // [["Total","$12"], [undefined,undefined], ["Tax",undefined]]
+    ///
+    /// so the string entry survives as a BLANK row that still costs a
+    /// separator. Dropping it would shorten the list and move every later
+    /// separator up one row.
+    @Test func kvRowsKeepEveryTruthyEntryIncludingNonObjects() {
         let rows = PropValue.array([
             .object(["label": .string("Total"), "value": .string("$12")]),
-            .null,
-            .string("nope"),
+            .null,        // falsy - dropped
+            .number(0),   // falsy - dropped
+            .string(""),  // falsy - dropped
+            .string("nope"),  // truthy non-object - kept, renders blank
             .object(["label": .string("Tax")]),
         ])
         let decoded = GenosProps.kvRows(rows)
-        #expect(decoded.count == 2)
+        #expect(decoded.count == 3)
         #expect(decoded[0] == KVRow(label: "Total", value: "$12"))
-        #expect(decoded[1] == KVRow(label: "Tax", value: ""))
+        #expect(decoded[1] == KVRow(label: "", value: ""))
+        #expect(decoded[2] == KVRow(label: "Tax", value: ""))
+    }
+
+    /// `<Text>{r.value}</Text>` renders a number; the old `stringValue` read
+    /// dropped it and printed an empty cell.
+    @Test func kvRowsRenderNumericCellsAsDigits() {
+        let rows = PropValue.array([
+            .object(["label": .string("Qty"), "value": .number(3)]),
+            .object(["label": .number(2024), "value": .number(1234567.89)]),
+            // React skips booleans entirely, so this cell really is blank.
+            .object(["label": .string("On"), "value": .bool(true)]),
+        ])
+        let decoded = GenosProps.kvRows(rows)
+        #expect(decoded[0] == KVRow(label: "Qty", value: "3"))
+        #expect(decoded[1] == KVRow(label: "2024", value: "1234567.89"))
+        #expect(decoded[2] == KVRow(label: "On", value: ""))
     }
 
     @Test func statTileDeltaSignFollowsTheRNOrder() {
@@ -89,9 +117,20 @@ import Testing
             GenosProps.imageRefs(images) == [ImageRef(src: "a"), ImageRef(src: "b", alt: "B")])
     }
 
-    @Test func chipLabelsDropEmptyStrings() {
-        let labels = PropValue.array([.string("All"), .string(""), .number(2), .string("Unread")])
-        #expect(GenosProps.chipLabels(labels) == ["All", "Unread"])
+    /// `(props.labels ?? []).filter(Boolean)` (`components.tsx` L577). Node:
+    ///
+    ///     ["All","",2,"Unread"].filter(Boolean)  // ["All", 2, "Unread"]
+    ///
+    /// The numeric chip survives and prints its digits; only falsy entries go.
+    @Test func chipLabelsKeepTruthyNonStrings() {
+        let labels = PropValue.array([
+            .string("All"), .string(""), .number(2), .string("Unread"),
+            .number(0), .null, .bool(false),
+        ])
+        #expect(GenosProps.chipLabels(labels) == ["All", "2", "Unread"])
+        // A truthy value React cannot paint leaves an EMPTY chip, not a
+        // dropped one - the pill is still there to tap.
+        #expect(GenosProps.chipLabels(.array([.bool(true)])) == [""])
     }
 
     // MARK: - TextContent / TextCallout

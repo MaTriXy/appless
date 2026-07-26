@@ -80,8 +80,7 @@ public final class GenOSShellModel: ObservableObject {
     private var keyUnsubscribe: (@MainActor () -> Void)?
     /// Last `(id, status)` reported to the controller, so prefetch is only
     /// re-armed on a real change (RN's `[topId, top?.status]` effect deps).
-    private var reportedActiveScreen: String??
-    private var reportedActiveStatus: ScreenStatus?
+    private var activeScreenReport = ActiveScreenReport<ScreenStatus>()
 
     public init(
         controller: GenOSController,
@@ -140,8 +139,9 @@ public final class GenOSShellModel: ObservableObject {
 
     /// RN `generating`: the top screen is pending or streaming.
     public var isGenerating: Bool {
-        guard let status = topScreen?.status else { return false }
-        return status == .pending || status == .streaming
+        let status = topScreen?.status
+        return ShellActivity.isGenerating(
+            isPending: status == .pending, isStreaming: status == .streaming)
     }
 
     /// RN `top?.searching` - the model is running `web_search`.
@@ -380,11 +380,7 @@ public final class GenOSShellModel: ObservableObject {
     private func reportActiveScreen() {
         let id = shell.topScreenId
         let status = id.flatMap { controller.store.get($0)?.status }
-        if let reported = reportedActiveScreen, reported == id, reportedActiveStatus == status {
-            return
-        }
-        reportedActiveScreen = .some(id)
-        reportedActiveStatus = status
+        guard activeScreenReport.shouldReport(id: id, status: status) else { return }
         controller.setActiveScreen(id)
     }
 
@@ -394,16 +390,14 @@ public final class GenOSShellModel: ObservableObject {
     /// active app's top screen, plus every session's top screen (the switcher
     /// renders live miniatures of those).
     private func refreshTrees() {
-        var wanted: Set<String> = []
-        if let topId = shell.topScreenId { wanted.insert(topId) }
-        for app in shell.runningApps {
-            if let id = shell.topScreenId(of: app.id) { wanted.insert(id) }
-        }
+        let wanted = ScreenTreeCache.wantedIds(
+            topScreenId: shell.topScreenId,
+            sessionTopIds: shell.runningApps.map { shell.topScreenId(of: $0.id) })
 
         for id in wanted { refreshTree(id) }
 
         // Drop everything else, so a long session does not accumulate parsers.
-        if trees.keys.contains(where: { !wanted.contains($0) }) {
+        if !ScreenTreeCache.staleIds(cached: trees.keys, wanted: wanted).isEmpty {
             trees = trees.filter { wanted.contains($0.key) }
         }
         parsers = parsers.filter { wanted.contains($0.key) }

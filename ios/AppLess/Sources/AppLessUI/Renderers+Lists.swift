@@ -24,11 +24,12 @@ struct ListItemView: View {
     var body: some View {
         let p = PropReader(node)
         let action = p.action("action")
-        if GenosActions.isTappable(action: action) {
+        if ListItemPresentation.isInteractive(action: action) {
             Button {
                 // `useTap` dispatches with NO form name (`shared/actions.ts`
                 // L14), so a row tap always carries the whole-store snapshot.
-                ctx.scoped(formName: nil).trigger(p.string("title") ?? "", action: action)
+                ctx.scoped(formName: ListItemPresentation.dispatchesWithFormName)
+                    .trigger(p.text("title") ?? "", action: action)
             } label: {
                 row(p, showsChevron: true)
             }
@@ -59,11 +60,11 @@ struct ListItemView: View {
             }
 
             VStack(alignment: .leading, spacing: 0) {
-                Text(p.string("title") ?? "")
+                Text(p.text("title") ?? "")
                     .cdsTextStyle(CdsMetrics.Typography.rowTitle)
                     .foregroundStyle(Color(ctx.theme.ink))
                     .lineLimit(1)
-                if p.isTruthy("subtitle"), let subtitle = p.string("subtitle") {
+                if p.isTruthy("subtitle"), let subtitle = p.text("subtitle") {
                     Text(subtitle)
                         .cdsTextStyle(CdsMetrics.Typography.rowSubtitle)
                         .foregroundStyle(Color(ctx.theme.ink2))
@@ -73,7 +74,7 @@ struct ListItemView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            if p.isTruthy("trailing"), let trailing = p.string("trailing") {
+            if p.isTruthy("trailing"), let trailing = p.text("trailing") {
                 Text(trailing)
                     .cdsTextStyle(CdsMetrics.Typography.rowTrailing)
                     .foregroundStyle(Color(ctx.theme.ink2))
@@ -118,15 +119,15 @@ struct ToggleView: View {
             override = !isOn
         } label: {
             HStack(spacing: CdsMetrics.Spacing.rowGap) {
-                if p.isTruthy("icon"), let icon = p.string("icon") {
+                if p.isTruthy("icon"), let icon = p.text("icon") {
                     IconBadge(icon)
                 }
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(p.string("title") ?? "")
+                    Text(p.text("title") ?? "")
                         .cdsTextStyle(CdsMetrics.Typography.rowTitle)
                         .foregroundStyle(Color(ctx.theme.ink))
                         .lineLimit(1)
-                    if p.isTruthy("subtitle"), let subtitle = p.string("subtitle") {
+                    if p.isTruthy("subtitle"), let subtitle = p.text("subtitle") {
                         Text(subtitle)
                             .cdsTextStyle(CdsMetrics.Typography.rowSubtitle)
                             .foregroundStyle(Color(ctx.theme.ink2))
@@ -183,9 +184,9 @@ struct ListBlockView: View {
 
     var body: some View {
         let p = PropReader(node)
-        let items = p.elements("items")
+        let items = p.elementList("items")
         VStack(alignment: .leading, spacing: 0) {
-            if p.isTruthy("header"), let header = p.string("header") {
+            if p.isTruthy("header"), let header = p.text("header") {
                 GroupHeaderLabel(text: header, theme: ctx.theme)
             }
             VStack(spacing: 0) {
@@ -212,7 +213,7 @@ struct KVListView: View {
         let p = PropReader(node)
         let rows = GenosProps.kvRows(p.value("rows"))
         VStack(alignment: .leading, spacing: 0) {
-            if p.isTruthy("header"), let header = p.string("header") {
+            if p.isTruthy("header"), let header = p.text("header") {
                 GroupHeaderLabel(text: header, theme: ctx.theme)
             }
             VStack(spacing: 0) {

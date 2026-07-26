@@ -126,7 +126,11 @@ struct SwitcherView: View {
     @ViewBuilder
     private func previewContent(for app: RunningAppInfo) -> some View {
         let screen = topScreen(app.id)
-        if let screen, !screen.content.isEmpty, let element = root(screen.id) {
+        let element = screen.flatMap { root($0.id) }
+        if SwitcherPresentation.showsPreview(
+            hasScreen: screen != nil, content: screen?.content, hasRoot: element != nil),
+            let element
+        {
             GenosScreenView(root: element)
                 .padding(ShellChrome.Switcher.previewPadding)
                 .frame(

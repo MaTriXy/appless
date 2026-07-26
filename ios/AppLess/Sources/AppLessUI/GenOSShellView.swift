@@ -129,10 +129,13 @@ public struct GenOSShellView: View {
             // bound to the left-edge swipe instead. Simultaneous, so a
             // horizontal drag inside the screen still scrolls it.
             .simultaneousGesture(
-                DragGesture(minimumDistance: 24)
+                DragGesture(minimumDistance: ShellChrome.BackGesture.edgeWidth)
                     .onEnded { value in
-                        guard value.startLocation.x < 24, value.translation.width > 60,
-                            abs(value.translation.height) < 60
+                        guard
+                            ShellChrome.BackGesture.isBackSwipe(
+                                startX: Double(value.startLocation.x),
+                                translationX: Double(value.translation.width),
+                                translationY: Double(value.translation.height))
                         else { return }
                         model.handleBackGesture()
                     }
@@ -148,10 +151,9 @@ public struct GenOSShellView: View {
                 theme: theme,
                 stackDepth: model.stack.count,
                 action: {
-                    if model.stack.count > 1 {
-                        model.goBack()
-                    } else {
-                        model.goHome()
+                    switch ShellActivity.leadingIntent(stackDepth: model.stack.count) {
+                    case .back: model.goBack()
+                    case .home: model.goHome()
                     }
                 }
             )

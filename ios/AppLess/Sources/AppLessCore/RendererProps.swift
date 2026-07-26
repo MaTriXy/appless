@@ -320,53 +320,68 @@ public enum GenosProps {
     // MARK: Rows
 
     /// `KVList.rows` - `(props.rows ?? []).filter(Boolean)`. `components.tsx` L328.
-    /// Non-object entries are dropped; missing `label` / `value` read as `""`
-    /// (RN would render `undefined` as nothing).
+    ///
+    /// The filter is JS TRUTHINESS, not "is an object": a truthy non-object
+    /// entry survives it and then renders a row whose two `<Text>` children
+    /// are `undefined`, i.e. a blank row that still costs a separator and its
+    /// padding. Dropping it instead (the previous behavior) shortened the list
+    /// and moved every later separator.
+    ///
+    /// A missing `label` / `value` reads as `""`; a numeric one reads as its
+    /// digits, because `<Text>{r.value}</Text>` renders numbers.
     public static func kvRows(_ value: PropValue?) -> [KVRow] {
-        (value?.arrayValue ?? []).compactMap { entry in
-            guard let object = entry.objectValue else { return nil }
+        (value?.arrayValue ?? []).filter(\.isJSTruthy).map { entry in
+            let object = entry.objectValue
             return KVRow(
-                label: object["label"]?.stringValue ?? "",
-                value: object["value"]?.stringValue ?? ""
+                label: object?["label"]?.jsText ?? "",
+                value: object?["value"]?.jsText ?? ""
             )
         }
     }
 
     /// `StatTiles.items` - `(Array.isArray(items) ? items : []).filter(Boolean)`.
-    /// `components.tsx` L409.
+    /// `components.tsx` L409. Same truthiness rule as ``kvRows(_:)``.
     public static func statTiles(_ value: PropValue?) -> [StatTile] {
-        (value?.arrayValue ?? []).compactMap { entry in
-            guard let object = entry.objectValue else { return nil }
+        (value?.arrayValue ?? []).filter(\.isJSTruthy).map { entry in
+            let object = entry.objectValue
             return StatTile(
-                label: object["label"]?.stringValue ?? "",
-                value: object["value"]?.stringValue ?? "",
-                delta: object["delta"]?.stringValue,
-                icon: object["icon"]?.stringValue
+                label: object?["label"]?.jsText ?? "",
+                value: object?["value"]?.jsText ?? "",
+                // `!!it.delta` / `!!it.icon` gate the two optional slots, so an
+                // empty string reads the same as an absent prop.
+                delta: object?["delta"].flatMap { $0.isJSTruthy ? $0.jsText : nil },
+                icon: object?["icon"].flatMap { $0.isJSTruthy ? $0.jsText : nil }
             )
         }
     }
 
     /// `Bubbles.messages` - `(props.messages ?? []).filter((m) => m?.text)`;
-    /// an empty `text` is falsy and drops the bubble. `components.tsx` L531.
+    /// an empty `text` is falsy and drops the bubble, and so does a non-object
+    /// entry (a string has no `.text`). `components.tsx` L531.
     public static func bubbleMessages(_ value: PropValue?) -> [BubbleMessage] {
         (value?.arrayValue ?? []).compactMap { entry in
             guard let object = entry.objectValue,
-                  let text = object["text"]?.stringValue,
-                  !text.isEmpty
+                  let raw = object["text"], raw.isJSTruthy,
+                  let text = raw.jsText
             else { return nil }
             return BubbleMessage(
                 text: text,
                 me: object["me"]?.isJSTruthy ?? false,
                 // `!!m.time` - an empty time string shows no divider.
-                time: object["time"]?.stringValue.flatMap { $0.isEmpty ? nil : $0 }
+                time: object["time"].flatMap { $0.isJSTruthy ? $0.jsText : nil }
             )
         }
     }
 
-    /// `Chips.labels` / chart `labels` - `(props.labels ?? []).filter(Boolean)`.
+    /// `Chips.labels` - `(props.labels ?? []).filter(Boolean)`.
     /// `components.tsx` L577.
+    ///
+    /// The filter drops `""`, `0`, `false` and `null`; everything else keeps
+    /// its slot, including a number, which the chip then prints. A truthy
+    /// value React cannot paint (`true`, an object) leaves an empty chip -
+    /// which is what RN draws.
     public static func chipLabels(_ value: PropValue?) -> [String] {
-        (value?.arrayValue ?? []).compactMap(\.stringValue).filter { !$0.isEmpty }
+        (value?.arrayValue ?? []).filter(\.isJSTruthy).map { $0.jsText ?? "" }
     }
 
     // MARK: Slider

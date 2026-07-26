@@ -115,7 +115,7 @@ struct InputView: View {
         let p = PropReader(node)
         let name = p.string("name") ?? ""
         let type = p.string("type")
-        let placeholder = p.string("placeholder") ?? ""
+        let placeholder = p.text("placeholder") ?? ""
         ZStack(alignment: .leading) {
             PlaceholderOverlay(
                 text: placeholder,
@@ -155,7 +155,7 @@ struct TextAreaView: View {
     var body: some View {
         let p = PropReader(node)
         let name = p.string("name") ?? ""
-        let placeholder = p.string("placeholder") ?? ""
+        let placeholder = p.text("placeholder") ?? ""
         let minHeight = FieldMetrics.textAreaMinHeight(rows: p.int("rows"))
         ZStack(alignment: .topLeading) {
             PlaceholderOverlay(
@@ -237,14 +237,20 @@ struct SelectView: View {
         let name = p.string("name") ?? ""
         let items = StructuralProps.selectItems(of: node)
         let size = FieldMetrics.selectSize(p.string("size"))
-        let selected = items.first { $0.value == selection }
+        let selected = SelectPresentation.selected(in: items, value: selection)
         Button {
             isOpen = true
         } label: {
             HStack {
-                Text(selected?.label ?? p.string("placeholder") ?? "Select\u{2026}")
+                Text(
+                    SelectPresentation.triggerLabel(
+                        selected: selected, placeholder: p.text("placeholder"))
+                )
                     .font(.system(size: size.fontSize))
-                    .foregroundStyle(Color(selected == nil ? ctx.theme.ink3 : ctx.theme.ink))
+                    .foregroundStyle(
+                        Color(
+                            SelectPresentation.triggerShowsSelection(selected)
+                                ? ctx.theme.ink : ctx.theme.ink3))
                     .lineLimit(1)
                 Spacer(minLength: 8)
                 LucideIcon(
@@ -297,7 +303,7 @@ private struct SelectOptionList: View {
                         onChoose(items[index].value)
                     } label: {
                         HStack {
-                            Text(items[index].label)
+                            Text(items[index].optionLabel)
                                 .font(CdsMetrics.Typography.fieldText.font)
                                 .foregroundStyle(Color(theme.ink))
                             Spacer(minLength: 8)
@@ -335,14 +341,12 @@ struct SliderView: View {
     var body: some View {
         let p = PropReader(node)
         let name = p.string("name") ?? ""
-        let minimum = p.number("min") ?? 0
-        let maximum = p.number("max") ?? 1
-        // A model can emit max <= min; keep the range non-degenerate so the
-        // control cannot trap.
-        let upper = maximum > minimum ? maximum : minimum + 1
+        let range = SliderPresentation.bounds(min: p.number("min"), max: p.number("max"))
+        let minimum = range.lower
+        let upper = range.upper
         let step = GenosProps.sliderStep(variant: p.string("variant"), step: p.number("step"))
         VStack(alignment: .leading, spacing: CdsMetrics.Spacing.sliderGap) {
-            if p.isTruthy("label"), let label = p.string("label") {
+            if p.isTruthy("label"), let label = p.text("label") {
                 Text(label)
                     .font(.system(size: CdsMetrics.Typography.fieldLabel.fontSize))
                     .foregroundStyle(Color(ctx.theme.ink2))
@@ -375,7 +379,8 @@ struct SliderView: View {
         .onAppear {
             // Seed `value ?? defaultValue ?? [min]` exactly like RN, so the
             // field exists in form state before anyone touches it.
-            let seed = p.value("value") ?? p.value("defaultValue") ?? .array([.number(minimum)])
+            let seed = FieldSeeding.sliderSeed(
+                value: p.value("value"), defaultValue: p.value("defaultValue"), min: minimum)
             ctx.forms.seed(
                 form: ctx.formName, name: name, componentType: "Slider", prop: seed)
             let stored = ctx.forms.value(form: ctx.formName, name: name)?.numbersValue
@@ -391,12 +396,8 @@ struct SliderView: View {
         }
     }
 
-    /// `Math.round(current * 100) / 100`, printed without a trailing `.0`.
-    private var readout: String {
-        let rounded = GenosProps.sliderReadout(value)
-        if rounded == rounded.rounded() { return String(Int(rounded)) }
-        return String(format: "%g", rounded)
-    }
+    /// `Math.round(current * 100) / 100`, stringified the way JS does it.
+    private var readout: String { SliderPresentation.readoutText(value) }
 }
 
 // MARK: - FormControl
@@ -409,12 +410,12 @@ struct FormControlView: View {
     var body: some View {
         let p = PropReader(node)
         VStack(alignment: .leading, spacing: CdsMetrics.Spacing.formControlGap) {
-            Text(p.string("label") ?? "")
+            Text(p.text("label") ?? "")
                 .cdsTextStyle(CdsMetrics.Typography.fieldLabel)
                 .foregroundStyle(Color(ctx.theme.ink2))
                 .padding(.leading, CdsMetrics.Spacing.formControlLabelInset)
             ctx.renderNode(p.value("input"))
-            if p.isTruthy("hint"), let hint = p.string("hint") {
+            if p.isTruthy("hint"), let hint = p.text("hint") {
                 Text(hint)
                     .cdsTextStyle(CdsMetrics.Typography.fieldHint)
                     .foregroundStyle(Color(ctx.theme.ink3))
@@ -442,9 +443,9 @@ struct ButtonView: View {
         Button {
             // `triggerAction(label ?? "", formName, action)`: the form name
             // comes from the enclosing Form, so the tap carries its values.
-            ctx.trigger(p.string("label") ?? "", action: p.action("action"))
+            ctx.trigger(p.text("label") ?? "", action: p.action("action"))
         } label: {
-            Text(p.string("label") ?? "")
+            Text(p.text("label") ?? "")
                 .cdsTextStyle(appearance.textStyle)
                 .foregroundStyle(Color(appearance.foreground(ctx.theme)))
                 .padding(.vertical, appearance.paddingVertical)
@@ -470,8 +471,8 @@ struct ButtonsView: View {
 
     var body: some View {
         let p = PropReader(node)
-        let buttons = p.elements("buttons")
-        let isColumn = p.string("direction") == "column"
+        let buttons = p.elementList("buttons")
+        let isColumn = ButtonsPresentation.isColumn(direction: p.string("direction"))
         if isColumn {
             VStack(spacing: CdsMetrics.Spacing.buttonsGap) {
                 ForEach(buttons.indices, id: \.self) { index in
@@ -502,7 +503,7 @@ struct FormView: View {
     var body: some View {
         let p = PropReader(node)
         let scoped = ctx.scoped(formName: p.string("name"))
-        let fields = p.elements("fields")
+        let fields = p.elementList("fields")
         VStack(alignment: .leading, spacing: CdsMetrics.Spacing.formGap) {
             ForEach(fields.indices, id: \.self) { index in
                 GenosNodeView(node: fields[index], context: scoped)
@@ -525,7 +526,7 @@ private func seedField(
     prop: PropValue?
 ) -> String {
     ctx.forms.seed(form: ctx.formName, name: name, componentType: componentType, prop: prop)
-    return ctx.forms.value(form: ctx.formName, name: name)?.textValue ?? ""
+    return FieldSeeding.displayedText(ctx.forms.value(form: ctx.formName, name: name)?.textValue)
 }
 
 #endif

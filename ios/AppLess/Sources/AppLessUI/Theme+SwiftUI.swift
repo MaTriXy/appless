@@ -45,12 +45,9 @@ extension CdsMetrics.TextStyle {
     }
 
     /// Extra leading to add so the rendered line box matches RN's absolute
-    /// `lineHeight`. SwiftUI's `lineSpacing` is the GAP between lines, not the
-    /// line box, so subtract the font size.
-    public var lineSpacing: CGFloat {
-        guard let lineHeight else { return 0 }
-        return max(0, lineHeight - fontSize)
-    }
+    /// `lineHeight`. The formula lives in `AppLessCore` (`extraLineSpacing`)
+    /// so a Linux test can pin it; this only converts the unit.
+    public var lineSpacing: CGFloat { CGFloat(extraLineSpacing) }
 }
 
 extension View {

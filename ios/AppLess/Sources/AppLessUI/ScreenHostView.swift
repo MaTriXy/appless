@@ -65,9 +65,12 @@ struct ScreenHostView: View {
     var body: some View {
         ZStack {
             pageGradient
-            if screen.status == .error {
-                errorState
-            } else {
+            switch ScreenHostPresentation.state(
+                isError: screen.status == .error, hasRoot: root != nil, error: screen.error)
+            {
+            case .error(let message):
+                errorState(message: message)
+            case .skeleton, .content:
                 content
             }
         }
@@ -108,9 +111,9 @@ struct ScreenHostView: View {
         }
     }
 
-    private var errorState: some View {
+    private func errorState(message: String) -> some View {
         VStack(spacing: ShellChrome.ScreenHost.errorGap) {
-            Text(errorMessage)
+            Text(message)
                 .font(.system(size: ShellChrome.ScreenHost.errorFontSize))
                 .foregroundStyle(
                     Color(theme.ink).opacity(ShellChrome.ScreenHost.errorInkOpacity)
@@ -135,11 +138,6 @@ struct ScreenHostView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    /// RN `top.error || "Generation failed"`.
-    private var errorMessage: String {
-        let message = screen.error ?? ""
-        return message.isEmpty ? ShellChrome.ScreenHost.errorFallbackMessage : message
-    }
 }
 
 // MARK: - Skeleton

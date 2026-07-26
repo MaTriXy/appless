@@ -51,7 +51,8 @@ struct ChartLegend: View {
     let theme: CdsTheme
 
     var body: some View {
-        let rows = Array(entries.indices).cdsChunked(into: 3)
+        let rows = FlexWrap.rows(
+            count: entries.count, perRow: ChartData.legendEntriesPerRow)
         VStack(spacing: 3) {
             ForEach(rows.indices, id: \.self) { rowIndex in
                 HStack(spacing: 12) {
@@ -75,59 +76,6 @@ struct ChartLegend: View {
     }
 }
 
-/// One plotted point, flattened so Swift Charts can iterate it.
-struct ChartPoint: Identifiable {
-    let id: Int
-    let seriesIndex: Int
-    let category: String
-    let label: String
-    let value: Double
-}
-
-/// The `{labels, series, variant, xLabel, yLabel}` bundle every cartesian
-/// chart decodes, plus the flattened points Swift Charts plots.
-struct CartesianInput {
-    let labels: [String]
-    let series: [StructuralProps.Series]
-    let variant: String?
-    let xLabel: String?
-    let yLabel: String?
-
-    init(node: ElementNode) {
-        let p = PropReader(node)
-        labels = p.strings("labels")
-        series = ChartData.usableSeries(StructuralProps.series(of: node))
-        variant = p.string("variant")
-        xLabel = p.string("xLabel")
-        yLabel = p.string("yLabel")
-    }
-
-    var hasData: Bool { ChartData.hasCartesianData(labels: labels, series: series) }
-    var categories: [String] { series.map(\.category) }
-
-    /// Every (series, label) cell, with a missing value read as 0 - the RN
-    /// `s.values[i] ?? 0`.
-    var points: [ChartPoint] {
-        var out: [ChartPoint] = []
-        var id = 0
-        for (seriesIndex, entry) in series.enumerated() {
-            for (labelIndex, label) in labels.enumerated() {
-                let value =
-                    entry.values.indices.contains(labelIndex) ? entry.values[labelIndex] : 0
-                out.append(
-                    ChartPoint(
-                        id: id,
-                        seriesIndex: seriesIndex,
-                        category: entry.category,
-                        label: label,
-                        value: value))
-                id += 1
-            }
-        }
-        return out
-    }
-}
-
 // MARK: - Bar charts
 
 /// `BarChart` and `HorizontalBarChart`: the same data, rotated.
@@ -138,7 +86,7 @@ struct CartesianBarChartView: View {
     let horizontal: Bool
 
     var body: some View {
-        let input = CartesianInput(node: node)
+        let input = CartesianChartInput(node: node, horizontal: horizontal)
         if input.hasData {
             let layout = ChartData.barLayout(input.variant)
             let domainMax = ChartData.domainMax(
@@ -159,25 +107,25 @@ struct CartesianBarChartView: View {
 
     /// Grouped bars get one position group per series; stacked bars share a
     /// single group, which is what makes Swift Charts stack them.
-    private func positionKey(_ point: ChartPoint, layout: ChartData.BarLayout) -> String {
-        layout == .grouped ? point.category : ""
+    private func positionKey(_ point: CartesianChartInput.Point, layout: ChartData.BarLayout)
+        -> String
+    {
+        ChartData.barPositionKey(category: point.category, layout: layout)
     }
 
     @ViewBuilder
     private func plot(
-        _ input: CartesianInput,
+        _ input: CartesianChartInput,
         layout: ChartData.BarLayout,
         domainMax: Double
     ) -> some View {
         #if canImport(Charts)
         if horizontal {
-            let height =
-                ChartData.gutterTop
-                + Double(input.labels.count) * ChartData.horizontalRowHeight + 24
+            let height = ChartData.horizontalChartHeight(labelCount: input.labels.count)
             Chart(input.points) { point in
                 BarMark(
                     x: .value("Value", point.value),
-                    y: .value("Category", ChartData.truncateRowLabel(point.label))
+                    y: .value("Category", point.label)
                 )
                 .foregroundStyle(
                     Color(ChartData.paletteColor(point.seriesIndex, theme: ctx.theme))
@@ -193,7 +141,7 @@ struct CartesianBarChartView: View {
         } else {
             Chart(input.points) { point in
                 BarMark(
-                    x: .value("Category", ChartData.truncateAxisLabel(point.label)),
+                    x: .value("Category", point.label),
                     y: .value("Value", point.value)
                 )
                 .foregroundStyle(
@@ -250,7 +198,7 @@ struct CartesianLineChartView: View {
     let area: Bool
 
     var body: some View {
-        let input = CartesianInput(node: node)
+        let input = CartesianChartInput(node: node)
         if input.hasData {
             // Lines never stack: the domain is always the raw maximum.
             let domainMax = ChartData.domainMax(
@@ -270,13 +218,13 @@ struct CartesianLineChartView: View {
     }
 
     @ViewBuilder
-    private func plot(_ input: CartesianInput, domainMax: Double) -> some View {
+    private func plot(_ input: CartesianChartInput, domainMax: Double) -> some View {
         #if canImport(Charts)
         let showsPoints = input.labels.count <= ChartData.maxPointsWithMarkers
         Chart(input.points) { point in
             if area {
                 AreaMark(
-                    x: .value("Category", ChartData.truncateAxisLabel(point.label)),
+                    x: .value("Category", point.label),
                     y: .value("Value", point.value),
                     series: .value("Series", point.category)
                 )
@@ -288,7 +236,7 @@ struct CartesianLineChartView: View {
             }
 
             LineMark(
-                x: .value("Category", ChartData.truncateAxisLabel(point.label)),
+                x: .value("Category", point.label),
                 y: .value("Value", point.value),
                 series: .value("Series", point.category)
             )
@@ -299,7 +247,7 @@ struct CartesianLineChartView: View {
 
             if showsPoints {
                 PointMark(
-                    x: .value("Category", ChartData.truncateAxisLabel(point.label)),
+                    x: .value("Category", point.label),
                     y: .value("Value", point.value)
                 )
                 .symbolSize(pointSymbolArea)
@@ -335,10 +283,7 @@ struct CartesianLineChartView: View {
     }
 
     /// `symbolSize` is an AREA; RN draws a radius-2.4 dot.
-    private var pointSymbolArea: CGFloat {
-        let radius = CGFloat(ChartData.pointRadius)
-        return CGFloat.pi * radius * radius
-    }
+    private var pointSymbolArea: CGFloat { CGFloat(ChartData.pointSymbolArea) }
 
     #if canImport(Charts)
     /// `linear` / `natural` (Catmull-Rom) / `step` - RN's step holds the
@@ -363,10 +308,11 @@ struct PieChartView: View {
     var body: some View {
         let p = PropReader(node)
         let values = ChartData.pieValues(from: p.value("values"))
-        let labels = p.strings("labels")
+        let labels = ChartData.axisLabels(p.value("labels"))
         let semiCircular = ChartData.isSemiCircular(appearance: p.string("appearance"))
         let innerFactor = ChartData.innerRadiusFactor(variant: p.string("variant"))
         let slices = ChartData.pieSlices(values: values, semiCircular: semiCircular)
+        let boxHeight = ChartData.pieChartHeight(semiCircular: semiCircular)
         if !slices.isEmpty {
             VStack(spacing: 0) {
                 ZStack {
@@ -379,17 +325,13 @@ struct PieChartView: View {
                         .fill(Color(ChartData.paletteColor(slice.index, theme: ctx.theme)))
                     }
                 }
-                .frame(
-                    maxWidth: .infinity,
-                    minHeight: semiCircular
-                        ? ChartData.semiCircularHeight : ChartData.height,
-                    maxHeight: semiCircular
-                        ? ChartData.semiCircularHeight : ChartData.height)
+                .frame(maxWidth: .infinity, minHeight: boxHeight, maxHeight: boxHeight)
 
                 // The legend lists every label - including zero-value slices,
                 // which keep their palette color. shared/charts.tsx L507-519.
                 ChartLegend(
-                    entries: Array(labels.prefix(values.count)),
+                    entries: ChartData.pieLegendEntries(
+                        labels: labels, valueCount: values.count),
                     theme: ctx.theme)
             }
             .frame(maxWidth: .infinity)
@@ -406,15 +348,17 @@ struct PieSliceShape: Shape {
     let semiCircular: Bool
 
     func path(in rect: CGRect) -> Path {
-        let radius: CGFloat =
-            semiCircular
-            ? min(rect.width / 2 - 8, 92)
-            : min(rect.height / 2 - 8, 78)
-        guard radius > 0 else { return Path() }
+        let disc = ChartData.pieDisc(
+            width: Double(rect.width),
+            height: Double(rect.height),
+            semiCircular: semiCircular,
+            innerRadiusFactor: innerRadiusFactor)
+        guard disc.isDrawable else { return Path() }
+        let radius = CGFloat(disc.radius)
         let center = CGPoint(
-            x: rect.midX,
-            y: semiCircular ? rect.maxY - 6 : rect.midY)
-        let inner = radius * innerRadiusFactor
+            x: rect.minX + CGFloat(disc.centerX),
+            y: rect.minY + CGFloat(disc.centerY))
+        let inner = CGFloat(disc.innerRadius)
         let start = Angle(radians: slice.startAngle)
         let end = Angle(radians: slice.drawnEndAngle)
 

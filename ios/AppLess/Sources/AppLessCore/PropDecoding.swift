@@ -249,7 +249,7 @@ public enum StructuralProps {
             return Series(
                 // `String(p.category ?? "")` - an explicit coercion, so a
                 // number or boolean category keeps its text.
-                category: p.value("category").map(\.jsStringCoerced) ?? "",
+                category: p.coerced("category"),
                 values: p.numbers("values").map(clampChartValue)
             )
         }

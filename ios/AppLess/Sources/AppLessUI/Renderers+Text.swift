@@ -41,14 +41,14 @@ struct CardHeaderView: View {
     var body: some View {
         let p = PropReader(node)
         VStack(alignment: .leading, spacing: 0) {
-            if p.isTruthy("subtitle"), let subtitle = p.string("subtitle") {
+            if p.isTruthy("subtitle"), let subtitle = p.text("subtitle") {
                 Text(subtitle)
                     .textCase(.uppercase)
                     .cdsTextStyle(CdsMetrics.Typography.headerSubtitle)
                     .foregroundStyle(Color(ctx.theme.ink2))
                     .padding(.bottom, 1)
             }
-            Text(p.string("title") ?? "")
+            Text(p.text("title") ?? "")
                 .cdsTextStyle(CdsMetrics.Typography.headerTitle)
                 .foregroundStyle(Color(ctx.theme.ink))
                 .fixedSize(horizontal: false, vertical: true)
@@ -73,7 +73,7 @@ struct TextContentView: View {
         let key = p.string("style")
         let style = CdsMetrics.Typography.textContentStyle(key)
         let isSecondary = GenosProps.textContentIsSecondary(style: key)
-        Text(p.string("text") ?? "")
+        Text(p.text("text") ?? "")
             .cdsTextStyle(style)
             .foregroundStyle(Color(isSecondary ? ctx.theme.ink2 : ctx.theme.ink))
             .fixedSize(horizontal: false, vertical: true)
@@ -112,11 +112,11 @@ struct TextCalloutView: View {
                 .padding(.top, 1)
 
             VStack(alignment: .leading, spacing: 0) {
-                Text(p.string("title") ?? "")
+                Text(p.text("title") ?? "")
                     .cdsTextStyle(CdsMetrics.Typography.calloutTitle)
                     .foregroundStyle(Color(ctx.theme.ink))
                     .fixedSize(horizontal: false, vertical: true)
-                if p.isTruthy("description"), let description = p.string("description") {
+                if p.isTruthy("description"), let description = p.text("description") {
                     Text(description)
                         .cdsTextStyle(CdsMetrics.Typography.calloutBody)
                         .foregroundStyle(Color(ctx.theme.ink2))

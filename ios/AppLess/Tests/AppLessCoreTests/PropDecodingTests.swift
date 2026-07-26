@@ -80,18 +80,47 @@ import Testing
         #expect(PropReader(chart).strings("labels") == ["Mon", "Tue"])
     }
 
-    @Test func selectItemsFallBackToValueForLabel() {
+    /// `label` is decoded as OPTIONAL, because `forms.tsx` reads it through
+    /// two different fallbacks - `it.label ?? it.value` for an open row (L157)
+    /// and `selected?.label ?? props.placeholder ?? "Select…"` for the closed
+    /// control (L124). Collapsing them here would make the control print the
+    /// raw value where RN prints the placeholder.
+    @Test func selectItemsKeepALabellessItemLabelless() {
         let select = element(
             "Select",
             ["items": .array([
                 .element(element("SelectItem", ["value": .string("in"), "label": .string("India")])),
                 .element(element("SelectItem", ["value": .string("us")])),
+                // Explicit null is nullish, so it is NOT a label either.
+                .element(element("SelectItem", ["value": .string("fr"), "label": .null])),
+                // A non-SelectItem child of `items` is dropped by the
+                // component filter, not decoded into a blank option.
+                .element(element("ListItem", ["title": .string("nope")])),
             ])])
         let items = StructuralProps.selectItems(of: select)
         #expect(items == [
             .init(value: "in", label: "India"),
-            .init(value: "us", label: "us"),
+            .init(value: "us", label: nil),
+            .init(value: "fr", label: nil),
         ])
+        // The open list falls back to the value; the closed control does not.
+        #expect(items[1].optionLabel == "us")
+        #expect(
+            SelectPresentation.triggerLabel(selected: items[1], placeholder: "Country")
+                == "Country")
+    }
+
+    /// `Array.isArray(items) ? items : []` (`shared/forms.ts` L62) - a lone
+    /// element is NOT promoted to a one-item list, unlike `renderNode`'s
+    /// single-child slot.
+    @Test func arrayTypedElementPropsRejectALoneElement() {
+        let lone = element(
+            "Select",
+            ["items": .element(element("SelectItem", ["value": .string("in")]))])
+        #expect(StructuralProps.selectItems(of: lone).isEmpty)
+        // …while the flattening reader, which `renderNode(props.input)` needs,
+        // still sees it.
+        #expect(PropReader(lone).elements("items").count == 1)
     }
 
     @Test func tabItemsCarryTheirChildren() {
