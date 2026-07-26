@@ -170,28 +170,40 @@ public object TreeSerializer {
     }
 
     /**
-     * Serializes a `Map<String, PropValue>` as an object with keys sorted in
-     * UTF-16 code-unit order (`Object.keys(...).sort()` in the reference
-     * serializer). On the JVM `String.compareTo` IS code-unit order, so
-     * `sortedWith(JS_STRING_ORDER)` is exact — unlike Swift, where `String`
-     * ordering is canonical and can place NFC/NFD keys differently.
+     * Serializes a `Map<String, PropValue>` (props, `state`) as an object in
+     * [JS_OWN_KEY_ORDER] — canonical array indices first in ascending numeric
+     * order, then the remaining keys in UTF-16 code-unit order.
+     *
+     * The reference serializer sorts with `Object.keys(v).sort()` and
+     * re-inserts into a fresh object, but the bytes come out of
+     * `JSON.stringify`, which re-derives the order from
+     * `OrdinaryOwnPropertyKeys` and hoists the integer-index keys. A flat
+     * code-unit sort matches only for objects with no index-shaped keys
+     * (fixture `075-object-key-index-order`).
+     *
+     * The code-unit half is exact on the JVM for free: `String.compareTo`
+     * compares `char`s — unlike Swift, where `String` ordering is canonical
+     * and can place NFC/NFD keys differently.
      */
     private fun serializeStringKeyedObject(entries: Map<String, PropValue>, indent: Int): String {
         if (entries.isEmpty()) return "{}"
         return "{\n" +
-            entries.keys.sortedWith(JS_STRING_ORDER).joinToString(",\n") { key ->
+            entries.keys.sortedWith(JS_OWN_KEY_ORDER).joinToString(",\n") { key ->
                 pad(indent + 1) + quote(key) + ": " +
                     serializeValue(entries.getValue(key), indent + 1)
             } +
             "\n" + pad(indent) + "}"
     }
 
-    /** Serializes a [PropObject] with keys sorted by UTF-16 code units. */
+    /**
+     * Serializes a [PropObject] — plain data objects, `$ast` nodes and action
+     * steps — in the same [JS_OWN_KEY_ORDER] as [serializeStringKeyedObject].
+     */
     private fun serializePropObject(obj: PropObject, indent: Int): String {
         if (obj.isEmpty()) return "{}"
         return "{\n" +
             obj.entries
-                .sortedWith { a, b -> a.first.compareTo(b.first) }
+                .sortedWith { a, b -> JS_OWN_KEY_ORDER.compare(a.first, b.first) }
                 .joinToString(",\n") { (key, value) ->
                     pad(indent + 1) + quote(key) + ": " + serializeValue(value, indent + 1)
                 } +

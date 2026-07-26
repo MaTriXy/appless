@@ -168,16 +168,24 @@ public enum TreeSerializer {
         }
     }
 
-    /// Serializes a dictionary as an object with sorted keys. Key order is
-    /// UTF-16 code-unit order (`Object.keys(...).sort()` in the reference
-    /// serializer) — Swift's `String` ordering is canonical and can place
+    /// Serializes a dictionary (props, `state`) as an object in `jsOwnKeyLess`
+    /// order — canonical array indices first in ascending numeric order, then
+    /// the remaining keys in UTF-16 code-unit order.
+    ///
+    /// The reference serializer sorts with `Object.keys(v).sort()` and
+    /// re-inserts into a fresh object, but the bytes come out of
+    /// `JSON.stringify`, which re-derives the order from
+    /// `OrdinaryOwnPropertyKeys` and hoists the integer-index keys. A flat
+    /// code-unit sort matches only for objects with no index-shaped keys
+    /// (fixture `075-object-key-index-order`). The code-unit half must stay
+    /// explicit because Swift's `String` ordering is canonical and would place
     /// NFC/NFD keys differently.
     private static func serializeObjectBody(
         _ entries: [String: PropValue], indent: Int
     ) -> String {
         if entries.isEmpty { return "{}" }
         var out = "{\n"
-        out += entries.keys.sorted(by: jsStringLess)
+        out += entries.keys.sorted(by: jsOwnKeyLess)
             .map { key in
                 pad(indent + 1) + quote(key) + ": "
                     + serializeValue(entries[key]!, indent: indent + 1)
@@ -187,15 +195,16 @@ public enum TreeSerializer {
         return out
     }
 
-    /// Serializes a `PropObject` (code-unit-exact keys) with keys sorted by
-    /// UTF-16 code units, matching `Object.keys(...).sort()`.
+    /// Serializes a `PropObject` (code-unit-exact keys) — plain data objects,
+    /// `$ast` nodes and action steps — in the same `jsOwnKeyLess` order as
+    /// `serializeObjectBody`.
     private static func serializePropObject(
         _ object: PropObject, indent: Int
     ) -> String {
         if object.isEmpty { return "{}" }
         var out = "{\n"
         out += object.entries
-            .sorted { jsStringLess($0.key, $1.key) }
+            .sorted { jsOwnKeyLess($0.key, $1.key) }
             .map { entry in
                 pad(indent + 1) + quote(entry.key) + ": "
                     + serializeValue(entry.value, indent: indent + 1)

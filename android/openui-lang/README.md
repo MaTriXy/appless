@@ -3,7 +3,7 @@
 Kotlin port of the `@openuidev/lang-core` openui-lang parser + runtime
 evaluator, oracle-verified byte-for-byte against the JS reference
 implementation over the golden fixture corpus in `spec/fixtures/`
-(89 fixtures) plus differential probe sweeps.
+(90 fixtures) plus differential probe sweeps.
 
 - Normative spec: `spec/openui-lang.md`
 - JS reference: `spec/fixtures/generator/node_modules/@openuidev/lang-core/dist`

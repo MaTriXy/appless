@@ -479,9 +479,36 @@ internal class Evaluator(store: Map<String, RtValue>) {
     private fun jsMathMax(a: Double, b: Double): Double =
         if (a.isNaN() || b.isNaN()) Double.NaN else maxOf(a, b)
 
-    /** JS `Math.round`: `floor(x + 0.5)`, NOT Kotlin's half-away-from-zero. */
-    private fun jsMathRound(x: Double): Double =
-        if (x.isNaN() || x.isInfinite()) x else floor(x + 0.5)
+    /**
+     * ECMAScript `Math.round` (ES2025 21.3.2.28) — "the integral Number
+     * closest to x, preferring the Number closer to +∞ in case of a tie".
+     *
+     * NOT Kotlin's `Math.round`/`roundToInt` (half-AWAY-from-zero: disagrees on
+     * -0.5, -1.5, -2.5, …) and NOT the popular `floor(x + 0.5)` shorthand
+     * either. `floor(x + 0.5)` is wrong twice:
+     *
+     * - `x + 0.5` can round UP to the next double before the floor sees it.
+     *   `Math.round(0.49999999999999994)` is `0` in JS, but
+     *   `0.49999999999999994 + 0.5` is exactly `1.0` in binary64, so the
+     *   shorthand answers `1`. `@Round(x, digits)` scales first
+     *   (`round(x * 10^d) / 10^d`), so the same input reappears as
+     *   `@Round(0.049999999999999994, 1)` → JS `0`, shorthand `0.1`.
+     * - it loses the negative zero: JS `Math.round(-0.5)` is `-0`, the
+     *   shorthand gives `+0`.
+     *
+     * The comparison below is exact. A non-integral double always has
+     * |x| < 2^52, so `floor(x) + 0.5` is representable without rounding and
+     * `x >= floor(x) + 0.5` decides the tie by the spec's rule directly —
+     * unlike `x - floor(x) >= 0.5`, where the subtraction itself can round.
+     */
+    private fun jsMathRound(x: Double): Double {
+        if (x.isNaN() || x.isInfinite()) return x
+        val r = floor(x)
+        if (r == x) return x // integral Number (incl. -0.0) is returned as-is
+        // ES step 4: -0.5 <= x < 0 rounds to -0, not +0.
+        if (x < 0.0 && x >= -0.5) return -0.0
+        return if (x >= r + 0.5) r + 1.0 else r
+    }
 
     // ── Actions ────────────────────────────────────────────────────────────
 

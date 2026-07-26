@@ -14,7 +14,7 @@ contract: [`../contract/genos.schema.json`](../contract/genos.schema.json)
 
 ```
 spec/fixtures/
-├── NNN-name.oui            complete-program fixtures (001–074)
+├── NNN-name.oui            complete-program fixtures (001–075)
 ├── NNN-name.expected.json  GENERATED — never edit by hand
 ├── partial/                prefix-truncated streaming snapshots (101–115)
 │   ├── NNN-name.oui        NO trailing newline — the cut point is the last byte
@@ -146,6 +146,7 @@ Notes for implementers:
 | 064 | kitchen sink: realistic screen combining most of the surface |
 | 065–069 | single-fixture-component hardening: ImageBlock explicit `null` caption vs omitted; Bubbles messages with `me`/`time` omitted per-message; AreaChart `"step"` + single series; LineChart `"natural"` + xLabel/yLabel; HorizontalBarChart `"stacked"`. All five positional args are passed on the charts, so the `variant` **prop** is actually populated (in 054 the 3rd positional lands in `xLabel` — contract order is labels, series, xLabel, yLabel, variant) |
 | 070–072 | serializer/runtime edge cases: `{k: ...}` data object duck-typed as `$ast` (070); `Number::toString` boundaries (071); Unicode NFC/NFD code-unit semantics — `==`/`!=` on canonically-equivalent strings, `@Filter` `contains`, distinct precomposed/decomposed object keys surviving into `state`, code-unit key sort (072) |
+| 075 | serializer key ORDER: `Object.keys(v).sort()` is not what `JSON.stringify` emits — canonical array-index keys (`"0"`–`"4294967294"`, `ToString(ToUint32(k)) === k`) are hoisted ahead of every string key in ascending NUMERIC order by `OrdinaryOwnPropertyKeys`, so `"10"` follows `"2"` and `"4294967295"` stays in the string group. Exercised in both key-sorting paths: a plain-object KVList row (props) and a `$state` declaration |
 | partial/101–115 | streaming snapshots: cut mid-string, mid-call, mid-array, before root, mid-escape (lone `\`), inside a comment, partial/unclosed fence, mid-object, mid-ternary, mid-statement-name, pending duplicate id (ignored), mid-action message, mid-number exponent (NaN), comment-with-apostrophe glue hazard |
 
 ## Coverage matrix (33 contract components × fixtures)
@@ -162,7 +163,7 @@ its **dropping** rules (e.g. Toggle in 037 is dropped with `missing-required`).
 | ListItem | 007, 030, 031, 036, 048, 050, 052, 058, 059, 064, p103, p115 |
 | Toggle | 037, 038, 052, 064 |
 | ListBlock | 007, 030, 031, 036, 048, 050, 052, 058, 059, 064, p103, p115 |
-| KVList | 019, 021, 022, 023, 026, 029, 032, 042, 052 |
+| KVList | 019, 021, 022, 023, 026, 029, 032, 042, 052, 070, 075 |
 | HeroStat | 040, 051, 053, 064 |
 | StatTiles | 053, 064, p109 |
 | ImageBlock | 056, 065 (explicit `null` caption vs omitted) |

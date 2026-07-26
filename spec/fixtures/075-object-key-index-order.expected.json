@@ -1,0 +1,78 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "Index-key hoisting"
+        }
+      },
+      {
+        "component": "KVList",
+        "props": {
+          "header": "IDX",
+          "rows": [
+            {
+              "0": 8,
+              "2": 3,
+              "10": 2,
+              "4294967294": 11,
+              "": 6,
+              " space": 5,
+              "$usd": 9,
+              "(paren)": 10,
+              "+plus": 7,
+              "-dash": 1,
+              "4294967295": 12,
+              "alpha": 4
+            },
+            {
+              "9": "f",
+              " 1": "e",
+              "-0": "d",
+              "007": "a",
+              "01": "b",
+              "1.5": "c",
+              "1e2": "g"
+            },
+            {
+              "label": "plain",
+              "value": "row"
+            }
+          ]
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "two=3"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {
+    "$idx": {
+      "0": 8,
+      "2": 3,
+      "10": 2,
+      "4294967294": 11,
+      "": 6,
+      " space": 5,
+      "$usd": 9,
+      "(paren)": 10,
+      "+plus": 7,
+      "-dash": 1,
+      "4294967295": 12,
+      "alpha": 4
+    }
+  },
+  "runtimeErrors": []
+}

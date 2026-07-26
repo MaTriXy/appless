@@ -2,7 +2,7 @@
 
 Swift port of the `@openuidev/lang-core` openui-lang parser + runtime
 evaluator, oracle-verified byte-for-byte against the JS reference
-implementation over the golden fixture corpus in `spec/fixtures/` (89
+implementation over the golden fixture corpus in `spec/fixtures/` (90
 fixtures) plus multi-`set()` streaming scenarios and differential probe
 sweeps (CRLF chunking, combining-mark adjacency).
 
@@ -111,7 +111,7 @@ current fixture corpus; each is listed with the condition under which it
   `WhitespaceDifferentialProbeTests` (full programs with U+0085 / NBSP /
   U+2028 in trim and `Number()` positions, byte-compared against JS-oracle
   trees regenerable via `spec/fixtures/generator/probes/expected-tree.mjs`).
-  Not expressed as a corpus fixture to keep the 89-fixture CI gate stable.
+  Not expressed as a corpus fixture to keep the 90-fixture CI gate stable.
 
 - **UTF-16 code-unit scanning** (`StreamCore.scanNewCompleted`,
   `Lexer.tokenize`, `Statements.autoClose`, `Preprocess.stripFences` /
