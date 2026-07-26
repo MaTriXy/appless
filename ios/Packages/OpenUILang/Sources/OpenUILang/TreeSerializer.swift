@@ -105,9 +105,38 @@ public enum TreeSerializer {
         }
         if let statementId = error.statementId {
             lines.append(
-                pad(inner) + "\"statementId\": " + serializeValue(statementId, indent: inner))
+                pad(inner) + "\"statementId\": " + serializeRawValue(statementId, indent: inner))
         }
         return "{\n" + lines.joined(separator: ",\n") + "\n" + pad(indent) + "}"
+    }
+
+    /// A value the reference serializer copies VERBATIM rather than rebuilding
+    /// (`out.statementId = el.statementId`): the bytes come straight from
+    /// `JSON.stringify`, which uses `OrdinaryOwnPropertyKeys` — canonical array
+    /// indices first, then **INSERTION** order. The rest of the document is
+    /// additionally SORTED because `serializeValue` re-inserts keys from
+    /// `Object.keys(v).sort()` into a fresh object; nothing sorts this one.
+    ///
+    /// `PropObject.entries` is already in `Object.keys` order, so this is
+    /// `serializeValue` minus the sort — and minus every wrapper shape, since
+    /// `Pipeline.rawJSON` only ever produces plain JSON.
+    private static func serializeRawValue(_ value: PropValue, indent: Int) -> String {
+        switch value {
+        case .array(let items):
+            if items.isEmpty { return "[]" }
+            return "[\n"
+                + items.map { pad(indent + 1) + serializeRawValue($0, indent: indent + 1) }
+                .joined(separator: ",\n") + "\n" + pad(indent) + "]"
+        case .object(let obj):
+            if obj.isEmpty { return "{}" }
+            return "{\n"
+                + obj.entries.map {
+                    pad(indent + 1) + quote($0.key) + ": "
+                        + serializeRawValue($0.value, indent: indent + 1)
+                }.joined(separator: ",\n") + "\n" + pad(indent) + "}"
+        default:
+            return serializeValue(value, indent: indent)
+        }
     }
 
     private static func serializeElement(_ element: ElementNode, indent: Int) -> String {
@@ -121,7 +150,7 @@ public enum TreeSerializer {
         }
         if let statementId = element.statementId {
             lines.append(
-                pad(inner) + "\"statementId\": " + serializeValue(statementId, indent: inner))
+                pad(inner) + "\"statementId\": " + serializeRawValue(statementId, indent: inner))
         }
         lines.append(pad(inner) + "\"props\": " + serializeObjectBody(element.props, indent: inner))
         if let children = element.children {

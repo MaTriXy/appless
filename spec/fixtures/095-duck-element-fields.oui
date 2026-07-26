@@ -6,10 +6,10 @@
 #
 # A row written INLINE is never a named statement, so materialize.js does not
 # stamp its `statementId` — whatever the author wrote survives.
-elBase = { type: "element", typeName: "TextContent", props: { text: "inherited" }, partial: false, hasDynamicProps: false }
-numProps = { type: "element", typeName: "Weird", props: 7 }
-strProps = { type: "element", typeName: "Weird2", props: "ab" }
-arrProps = { type: "element", typeName: "Weird3", props: [10, 20] }
+elBase = { type: "element", props: { text: "inherited" }, partial: false, hasDynamicProps: false, typeName: "TextContent" }
+numProps = { type: "element", props: 7, typeName: "Weird" }
+strProps = { type: "element", props: "ab", typeName: "Weird2" }
+arrProps = { type: "element", props: [10, 20], typeName: "Weird3" }
 root = Card([
   CardHeader("Serializer-level element fields"),
   KVList([{ "__proto__": elBase, statementId: 42 }]),

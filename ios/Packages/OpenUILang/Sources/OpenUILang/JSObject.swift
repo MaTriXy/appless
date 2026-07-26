@@ -472,12 +472,12 @@ enum JSObjects {
     ///
     /// Returns the underlying node when the port can name it. A value inherits
     /// AST-ness from a real `.ast` link in its chain; a plain object that
-    /// merely *looks* like an AST node without one is KNOWN-DEVIATION #6 (see
+    /// merely *looks* like an AST node without one is KNOWN-DEVIATION #5 (see
     /// README) and answers `nil` here, as before.
     static func astNodeView(_ v: RTValue) -> ASTNode? {
         if case .ast(let node) = v { return node }
         guard case .object(let o) = v else { return nil }
-        // An own `k` shadows the chain — deviation #6 territory.
+        // An own `k` shadows the chain — deviation #5 territory.
         if o.has("k") { return nil }
         var cur = prototypeOf(v)
         while let link = cur {

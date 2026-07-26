@@ -16,6 +16,7 @@
  *   node probes/gen-fuzz-corpus.mjs --campaign prefix        --out FILE
  *   node probes/gen-fuzz-corpus.mjs --campaign nonmonotonic  --out FILE
  *   node probes/gen-fuzz-corpus.mjs --campaign mutation      --out FILE
+ *   node probes/gen-fuzz-corpus.mjs --campaign synthesis     --out FILE
  *   node probes/gen-fuzz-corpus.mjs --campaign pinned        --out FILE --with-expected
  *   node probes/gen-fuzz-corpus.mjs --campaign all           --out FILE
  *   node probes/gen-fuzz-corpus.mjs --campaign prefix --stats     # counts only
@@ -38,6 +39,10 @@
  *                 using a hazard alphabet (quotes, brackets, backslash, CR, LF,
  *                 NBSP, U+FEFF, combining acute, `@`, `$`, `#`, `//`). One
  *                 fresh parser per mutant.
+ *   synthesis     Programs SYNTHESIZED from the serializer's duck-typing key
+ *                 alphabet instead of derived from the corpus — the only
+ *                 campaign that can reach a shape no fixture contains. See the
+ *                 long comment above `buildSynthesisSessions`.
  *   pinned        A small, committed cross-section of all three (smoke test /
  *                 self-check; carries `expected` so it needs no JS at replay).
  *
@@ -363,6 +368,29 @@ const SYNTH_SCALARS = [
 ];
 
 /**
+ * `k` gets its own value set, and this is a DELIBERATE carve-out around a
+ * LISTED deviation rather than an accident.
+ *
+ * There are two `isAstNode`s. The SERIALIZER's (serialize.mjs:14) fires on any
+ * object whose `k` is a string, and the ports replicate it exactly — so `k` is
+ * generated freely from strings that are not AST discriminants. The RUNTIME's
+ * (`parser/ast.js`, `k in AST_KINDS`) additionally makes `evaluate-prop.js`
+ * EVALUATE the object as an AST node, and that is KNOWN-DEVIATION #4 in both
+ * READMEs: the typed ports cannot build an `AstNode` out of an arbitrary
+ * object literal (`{k: "Str", v: -1}` evaluates to the NUMBER -1 in JS, and
+ * `AstNode.Str` holds a `String`).
+ *
+ * The first run of this campaign found exactly that, in 3 of 400 programs
+ * (`synthesis/027`, `/173`, `/209`) — good evidence the campaign reaches the
+ * surface it was built for. Leaving AST kinds in would pin a divergence that
+ * is documented, not fixed, so they are excluded here and the deviation is
+ * carried by the READMEs with those three programs as its reproduction.
+ */
+const SYNTH_NON_ELEMENT_SCALARS = SYNTH_SCALARS.filter((v) => v !== '"element"');
+
+const SYNTH_K_VALUES = ['"element"', '"TextContent"', '"set"', '"ab"', '""', '"kind"'];
+
+/**
  * Two shapes are DELIBERATELY not generated, because the REFERENCE THROWS on
  * them and therefore has no expected tree to compare against — the fixture
  * generator dies with the same `TypeError` (verified: `{steps: [null]}` and
@@ -404,10 +432,17 @@ function synthObject(rng, depth, protoRef) {
     const key = rng.pick(SYNTH_KEYS);
     if (key === "__proto__" || used.has(key)) continue;
     used.add(key);
-    if (key === "type" && rng.int(0, 1) === 0) {
-      // The element branch: `type: "element"` always with a props sibling.
-      parts.push('type: "element"');
-      wroteElementType = true;
+    if (key === "type") {
+      // `type` is handled here and ONLY here, because `"element"` is the one
+      // value that obliges the literal to carry a `props` sibling (invariant 2
+      // below). Letting the generic scalar pool assign it would leak an
+      // element-shaped object with no props, which crashes the REFERENCE.
+      if (rng.int(0, 1) === 0) {
+        parts.push('type: "element"');
+        wroteElementType = true;
+      } else {
+        parts.push(`type: ${rng.pick(SYNTH_NON_ELEMENT_SCALARS)}`);
+      }
       continue;
     }
     if (key === "steps") {
@@ -423,6 +458,10 @@ function synthObject(rng, depth, protoRef) {
       parts.push(`props: ${rng.int(0, 2) === 0 ? synthValue(rng, depth + 1, false) : "{ text: \"t\" }"}`);
       continue;
     }
+    if (key === "k") {
+      parts.push(`k: ${rng.pick(SYNTH_K_VALUES)}`);
+      continue;
+    }
     parts.push(`${key}: ${synthValue(rng, depth + 1, true)}`);
   }
   // Invariant 2: `type: "element"` implies a non-nullish `props` right here.
@@ -431,7 +470,7 @@ function synthObject(rng, depth, protoRef) {
   return `{ ${parts.join(", ")} }`;
 }
 
-const SYNTH_SESSIONS = 400;
+const SYNTH_SESSIONS = 1200;
 
 /** (d) SYNTHESIS — programs written from the duck-typing key alphabet. */
 export function buildSynthesisSessions() {

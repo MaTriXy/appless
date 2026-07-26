@@ -99,7 +99,28 @@ log(
 /** The canonical per-step record every program emits. */
 const header = (name, index) => `=== ${name} step ${index} ===\n`;
 
+/**
+ * Body written for a step where the REFERENCE ITSELF throws — there is no
+ * expected tree, so the step cannot be compared against the oracle.
+ *
+ * Two shapes reach it, both in `lib/serialize.mjs` and both `Object.keys` on a
+ * nullish value: a `null`/`undefined` ACTION STEP (`{steps: [null]}`,
+ * serialize.mjs:51) and an object that duck-types as an element but has no
+ * `props` (`{type: "element", typeName: "X"}`, serialize.mjs:84). Prefix and
+ * mutation fuzzing over the element-shaped fixtures (094-097) can construct
+ * both by truncating or damaging a literal. The fixture generator dies the same
+ * way, which is why no fixture pins these shapes and both READMEs carry them as
+ * the "serializer-level TypeError" deviation.
+ *
+ * Rather than crash the run or silently drop the step, those steps are compared
+ * BETWEEN THE PORTS instead — the two must still agree with each other — and
+ * the count is reported.
+ */
+const ORACLE_THREW = "<<oracle-threw>>\n";
+
 const timings = {};
+/** Steps where the reference implementation threw (see ORACLE_THREW). */
+const oracleThrows = [];
 
 /** JS reference oracle — in-process, same pipeline as the fixture generator. */
 async function runNode() {
@@ -117,7 +138,13 @@ async function runNode() {
     for (const session of campaign.sessions) {
       const sp = oracle.langCore.createStreamingParser(oracle.schema, oracle.library.root);
       session.steps.forEach((step, index) => {
-        const tree = serializeResult(oracle, sp.set(stepText(session, step)));
+        let tree;
+        try {
+          tree = serializeResult(oracle, sp.set(stepText(session, step)));
+        } catch (e) {
+          oracleThrows.push({ step: `=== ${session.name} step ${index} ===`, error: String(e) });
+          tree = ORACLE_THREW;
+        }
         chunks.push(header(session.name, index), tree.endsWith("\n") ? tree : tree + "\n");
       });
     }
@@ -285,9 +312,36 @@ function excerpt(tree, offset, context = 120) {
   }
 
   const total = Math.min(...programs.map((p) => parsed[p].length));
+  const others = programs.filter((p) => p !== "node");
   let compared = 0;
+  let skipped = 0;
   for (let i = 0; i < total; i++) {
     const [refHead, refTree] = parsed.node[i];
+    // No oracle answer for this step: hold the PORTS to each other instead.
+    if (refTree === ORACLE_THREW) {
+      skipped++;
+      compared++;
+      if (others.length > 1) {
+        const [baseHead, baseTree] = parsed[others[0]][i];
+        for (const program of others.slice(1)) {
+          const [head, tree] = parsed[program][i];
+          if (head === baseHead && tree === baseTree) continue;
+          const d = firstByteDivergence(baseTree, tree);
+          divergences.push({
+            step: baseHead,
+            otherStep: head,
+            program: `${program} (vs ${others[0]}; oracle threw)`,
+            kind: head !== baseHead ? "step-desync" : "tree",
+            offset: d.offset,
+            nodeTree: baseTree,
+            otherTree: tree,
+            lengths: [d.aLen, d.bLen],
+          });
+        }
+      }
+      if (divergences.length >= maxDivergences) break;
+      continue;
+    }
     for (const program of programs) {
       if (program === "node") continue;
       const [head, tree] = parsed[program][i];
@@ -314,6 +368,14 @@ function excerpt(tree, offset, context = 120) {
   log(`campaign      : ${campaign.campaigns?.join(",") ?? campaignName}`);
   log(`sessions      : ${campaign.sessions.length}`);
   log(`steps         : ${expectedSteps}   (compared: ${compared})`);
+  if (skipped) {
+    log(
+      `oracle threw  : ${skipped} step(s) — no expected tree exists ` +
+        `(serialize.mjs Object.keys on a nullish value); ports cross-compared instead`
+    );
+    for (const t of oracleThrows.slice(0, 3)) log(`                ${t.step}`);
+    if (oracleThrows.length > 3) log(`                … and ${oracleThrows.length - 3} more`);
+  }
   log(`programs      : ${programs.join(", ")}`);
   for (const [k, v] of Object.entries(timings)) log(`runtime ${k.padEnd(6)}: ${v.toFixed(2)}s`);
   log(`divergences   : ${divergences.length}`);

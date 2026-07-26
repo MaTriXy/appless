@@ -361,7 +361,7 @@ internal fun jsTruthy(v: RtValue): Boolean = when (v) {
 /**
  * JS loose equality (`==`), spec §9.1.
  *
- * KNOWN-DEVIATION (mirrors the Swift port's #3): object-vs-object comparison
+ * KNOWN-DEVIATION #3 (both READMEs, same number): object-vs-object comparison
  * is reference identity in JS; this port has value semantics and no stable
  * identities, so object == object is uniformly `false` — which is what the
  * oracle produces too, because the materializer always builds freshly

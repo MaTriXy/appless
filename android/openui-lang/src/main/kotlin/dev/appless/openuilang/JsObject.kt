@@ -511,7 +511,7 @@ internal object JsObjects {
      *
      * Returns the underlying node when the port can name it. A value inherits
      * AST-ness from a real [RtValue.Ast] link in its chain; a plain object that
-     * merely *looks* like an AST node without one is KNOWN-DEVIATION #6 (see
+     * merely *looks* like an AST node without one is KNOWN-DEVIATION #5 (see
      * README) and answers `null` here, as before.
      */
     fun astNodeView(v: RtValue): AstNode? {
@@ -519,7 +519,7 @@ internal object JsObjects {
             is RtValue.Ast -> return v.node
             is RtValue.Obj -> {
                 var cur: RtValue? = prototypeOf(v)
-                // An own `k` shadows the chain — deviation #6 territory.
+                // An own `k` shadows the chain — deviation #5 territory.
                 if (v.obj.has("k")) return null
                 while (cur != null && cur !is RtValue.Null) {
                     if (cur is RtValue.Ast) return cur.node

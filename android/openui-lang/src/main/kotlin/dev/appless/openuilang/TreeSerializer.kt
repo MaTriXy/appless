@@ -111,9 +111,45 @@ public object TreeSerializer {
         lines.add(pad(inner) + "\"message\": " + quote(error.message))
         error.component?.let { lines.add(pad(inner) + "\"component\": " + quote(it)) }
         error.statementId?.let {
-            lines.add(pad(inner) + "\"statementId\": " + serializeValue(it, inner))
+            lines.add(pad(inner) + "\"statementId\": " + serializeRawValue(it, inner))
         }
         return "{\n" + lines.joinToString(",\n") + "\n" + pad(indent) + "}"
+    }
+
+    /**
+     * A value the reference serializer copies VERBATIM rather than rebuilding
+     * (`out.statementId = el.statementId`): the bytes come straight from
+     * `JSON.stringify`, which uses `OrdinaryOwnPropertyKeys` — canonical array
+     * indices first, then **INSERTION** order. The rest of the document is
+     * additionally SORTED because `serializeValue` re-inserts keys from
+     * `Object.keys(v).sort()` into a fresh object; nothing sorts this one.
+     *
+     * [PropObject.entries] is already in `Object.keys` order, so this is
+     * [serializeValue] minus the sort — and minus every wrapper shape, since
+     * [Pipeline.rawJson] only ever produces plain JSON.
+     */
+    private fun serializeRawValue(value: PropValue, indent: Int): String = when (value) {
+        is PropValue.Arr ->
+            if (value.items.isEmpty()) {
+                "[]"
+            } else {
+                "[\n" + value.items.joinToString(",\n") {
+                    pad(indent + 1) + serializeRawValue(it, indent + 1)
+                } + "\n" + pad(indent) + "]"
+            }
+
+        is PropValue.Obj -> {
+            val entries = value.entries.entries
+            if (entries.isEmpty()) {
+                "{}"
+            } else {
+                "{\n" + entries.joinToString(",\n") { (key, v) ->
+                    pad(indent + 1) + quote(key) + ": " + serializeRawValue(v, indent + 1)
+                } + "\n" + pad(indent) + "}"
+            }
+        }
+
+        else -> serializeValue(value, indent)
     }
 
     private fun serializeElement(element: ElementNode, indent: Int): String {
@@ -126,7 +162,7 @@ public object TreeSerializer {
             lines.add(pad(inner) + "\"component\": " + quote(element.component))
         }
         element.statementId?.let {
-            lines.add(pad(inner) + "\"statementId\": " + serializeValue(it, inner))
+            lines.add(pad(inner) + "\"statementId\": " + serializeRawValue(it, inner))
         }
         lines.add(pad(inner) + "\"props\": " + serializeStringKeyedObject(element.props, inner))
         element.children?.let {

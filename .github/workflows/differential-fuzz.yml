@@ -9,21 +9,33 @@
 # Campaigns (spec/fixtures/generator/probes/gen-fuzz-corpus.mjs, fixed seed):
 #   prefix        every UTF-16 code-unit prefix of every fixture, fed
 #                 cumulatively to ONE streaming parser per fixture
-#                 (109 sessions / 28,087 steps — the streaming/incremental path)
+#                 (118 sessions / 34,661 steps — the streaming/incremental path)
 #   nonmonotonic  seeded shrink / cross-fixture switch sequences — the
 #                 cache-reset path prefix fuzzing can never reach
 #                 (48 sessions / 566 steps)
 #   mutation      seeded single-code-point insert/delete/replace over every
 #                 fixture using a hazard alphabet (quotes, brackets, backslash,
 #                 CR, LF, NBSP, U+FEFF, combining acute, @, $, #, //)
-#                 (2,616 sessions / 2,616 steps)
+#                 (2,832 sessions / 2,832 steps)
+#   synthesis     programs SYNTHESIZED from the serializer's duck-typing key
+#                 alphabet (steps, type, typeName, valueAST, props, partial, k,
+#                 __proto__) rather than derived from the corpus — the only
+#                 campaign that can reach a shape no fixture contains
+#                 (1,200 sessions / 2,400 steps)
 #   pinned        a small COMMITTED cross-section that also carries the oracle's
 #                 expected output, so it regression-gates the JS oracle itself
 #                 (49 sessions / 389 steps)
 #
 # Step counts are derived from the corpus, so they move when it grows; they are
-# recorded here as of the 105-fixture corpus to make an unexpected collapse in
-# coverage visible in review.
+# recorded here as of the 114-fixture corpus (+4 hazard seeds) to make an
+# unexpected collapse in coverage visible in review. Total: 40,459 steps.
+#
+# Why `synthesis` exists: prefix/nonmonotonic/mutation all DERIVE from the
+# committed corpus, and mutation only explores a ball of radius one around it.
+# 31,269 steps of those three found none of the three serializer duck-typing
+# divergences a reviewer found by hand in 61 steps. Measured after the fix: the
+# synthesis campaign alone produces 1,208 divergences against the pre-fix ports
+# (worktree at 3141d3a) and 0 against the current ones.
 #
 # Topology: two jobs, each a two-way byte comparison against the SAME JS oracle
 # (node+Kotlin on plain ubuntu, node+Swift in the official Swift container).
@@ -97,14 +109,22 @@ jobs:
             --out probes/fuzz-campaign-pinned.json
           git diff --exit-code probes/fuzz-campaign-pinned.json
 
-      - name: Exhaustive-prefix + non-monotonic + mutation campaigns
+      - name: Prefix + non-monotonic + mutation + synthesis campaigns
         working-directory: spec/fixtures/generator
         run: |
           node probes/run-differential.mjs \
-            --campaign prefix,nonmonotonic,mutation \
+            --campaign prefix,nonmonotonic,mutation,synthesis \
             --out-dir "$RUNNER_TEMP/difffuzz" \
             --max-divergences 5 \
             --skip-swift
+
+      - name: Collation — V8 vs the Kotlin CLDR-root ASCII table
+        working-directory: spec/fixtures/generator
+        run: node probes/verify-collation.mjs --skip-swift
+
+      - name: Intrinsic tables — the committed V8 dump still matches this node
+        working-directory: spec/fixtures/generator
+        run: node probes/gen-js-intrinsics.mjs --check probes/js-intrinsics.json
 
       - name: Upload diverging streams
         if: failure()
@@ -151,14 +171,22 @@ jobs:
             --campaign-file probes/fuzz-campaign-pinned.json \
             --skip-kotlin
 
-      - name: Exhaustive-prefix + non-monotonic + mutation campaigns
+      - name: Prefix + non-monotonic + mutation + synthesis campaigns
         working-directory: spec/fixtures/generator
         run: |
           node probes/run-differential.mjs \
-            --campaign prefix,nonmonotonic,mutation \
+            --campaign prefix,nonmonotonic,mutation,synthesis \
             --out-dir "$RUNNER_TEMP/difffuzz" \
             --max-divergences 5 \
             --skip-kotlin
+
+      - name: Collation — V8 vs the Swift CLDR-root ASCII table
+        working-directory: spec/fixtures/generator
+        run: node probes/verify-collation.mjs --skip-kotlin
+
+      - name: Intrinsic tables — the committed V8 dump still matches this node
+        working-directory: spec/fixtures/generator
+        run: node probes/gen-js-intrinsics.mjs --check probes/js-intrinsics.json
 
       - name: Upload diverging streams
         if: failure()

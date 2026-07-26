@@ -5,8 +5,8 @@
 # `props` + its own keys. The sibling row pins the `=== false` short-circuit
 # that keeps the identity.
 $n = 5
-dynBase = { type: "element", typeName: "TextContent", props: { text: $n }, partial: false }
-staticBase = { type: "element", typeName: "TextContent", props: { text: $n }, partial: false, hasDynamicProps: false }
+dynBase = { type: "element", props: { text: $n }, partial: false, typeName: "TextContent" }
+staticBase = { type: "element", props: { text: $n }, partial: false, hasDynamicProps: false, typeName: "TextContent" }
 spreads = { "__proto__": dynBase, z: 1 }
 keeps = { "__proto__": staticBase, z: 1 }
 root = Card([

@@ -124,6 +124,48 @@ unterminated strings) fail loudly with a clear message, and that the real
   2-space indent, trailing newline) — the same bytes as `*.expected.json`
   fixtures and the Swift `TreeSerializer`.
 
+## `verify-collation.mjs` — the CLDR-root ASCII table vs V8
+
+Both ports' READMEs used to assert "235,233 ordered pairs vs V8
+`localeCompare` — zero mismatches" from a sweep that existed in no committed
+file. This is that sweep, committed:
+
+```sh
+node probes/verify-collation.mjs --emit    # (re)write collation-corpus.json
+node probes/verify-collation.mjs --check   # V8 drift gate only (fast)
+node probes/verify-collation.mjs           # full: V8 + BOTH ports
+```
+
+`collation-corpus.json` is a deterministic 700-string corpus over the full
+0x00–0x7F alphabet (mulberry32, fixed seed; a pinned adversarial set —
+hyphen/space adjacency, case pairs, digits, leading and trailing whitespace,
+the strings `java.text.Collator` used to get wrong — plus random strings of
+length 1–8) together with `Math.sign(a.localeCompare(b))` for all
+**244,650** pairs, encoded one character per pair.
+
+Both ports assert against that one file
+(`AsciiCollationTest.kt`, `ASCIICollationTests.swift`), which makes it a
+cross-port equality gate as well as a V8 conformance gate; the script's default
+mode runs V8 and then both suites and exits non-zero on any mismatch. Scope is
+ASCII only, deliberately: everything above U+007F is deviation #1.
+
+## `gen-js-intrinsics.mjs` — the intrinsic prototype tables vs V8
+
+`JsObject.kt` / `JSObject.swift` carry ~500 lines of hand-transcribed
+`Object.getOwnPropertyNames(X.prototype)` tables each, and nothing proved they
+agreed with V8 or with each other.
+
+```sh
+node probes/gen-js-intrinsics.mjs --out probes/js-intrinsics.json   # regenerate
+node probes/gen-js-intrinsics.mjs --check probes/js-intrinsics.json # drift gate
+```
+
+The committed dump records each own property's kind (`function` / `data` /
+`accessor`), function name and arity, in V8's own enumeration order, and
+asserts that none of them is enumerable — which is exactly what makes
+`Object.keys(Array.prototype)` `[]`. `JsObjectModelTest.kt` and
+`JSObjectModelTests.swift` assert their tables against that same file.
+
 ---
 
 # Differential fuzzing (CI gate)
@@ -170,11 +212,46 @@ node probes/gen-fuzz-corpus.mjs --campaign pinned --with-expected \
 
 | campaign | sessions | steps | what it reaches |
 | --- | ---: | ---: | --- |
-| `prefix` | 101 | 26,021 | EXHAUSTIVE PREFIX: every UTF-16 code-unit prefix of every corpus entry (surrogate-pair-safe cuts), fed **cumulatively** to ONE streaming parser per entry — the Renderer's store-flush contract (spec §10) |
+| `prefix` | 118 | 34,661 | EXHAUSTIVE PREFIX: every UTF-16 code-unit prefix of every corpus entry (surrogate-pair-safe cuts), fed **cumulatively** to ONE streaming parser per entry — the Renderer's store-flush contract (spec §10) |
 | `nonmonotonic` | 48 | 566 | seeded shrink / cross-fixture switch / reset-to-empty sequences — `StreamCore`'s cache-**reset** branch, which prefix fuzzing can never reach because prefixes only grow |
-| `mutation` | 2,424 | 2,424 | seeded single-code-point insert/delete/replace using a hazard alphabet (`"` `'` `` ` `` brackets, backslash, CR, LF, CRLF, NBSP, U+FEFF, combining acute, `@`, `$`, `#`, `//`, `:`, `,`, `.`), one fresh parser per mutant |
-| `all` | 2,573 | 29,011 | the three above |
-| `pinned` | 39 | 313 | small committed cross-section **with oracle expectations inlined** (`fuzz-campaign-pinned.json`, ~310 KB) |
+| `mutation` | 2,832 | 2,832 | seeded single-code-point insert/delete/replace using a hazard alphabet (`"` `'` `` ` `` brackets, backslash, CR, LF, CRLF, NBSP, U+FEFF, combining acute, `@`, `$`, `#`, `//`, `:`, `,`, `.`), one fresh parser per mutant |
+| `synthesis` | 1,200 | 2,400 | programs SYNTHESIZED from the serializer's duck-typing key alphabet — **the only campaign that does not derive from the corpus** (see below) |
+| `all` | 4,198 | 40,459 | the four above |
+| `pinned` | 49 | 389 | small committed cross-section **with oracle expectations inlined** (`fuzz-campaign-pinned.json`, ~400 KB) |
+
+### `synthesis` — why a campaign that ignores the corpus
+
+`prefix`, `nonmonotonic` and `mutation` all start from the committed fixtures.
+That is why **31,269 steps of them found none of the three serializer
+duck-typing divergences a reviewer found by hand in 61 steps**: no fixture
+contained a `{steps: […]}` row, a hand-written `valueAST`, or an object
+spelling out `type`/`typeName`, and no single-code-point mutation can invent
+one. Mutation fuzzing explores a ball of radius 1 around a corpus that never
+enters the neighbourhood.
+
+`buildSynthesisSessions` writes object literals directly from the keys the
+serializer branches on — `steps`, `type`, `typeName`, `valueAST`, `props`,
+`partial`, `hasDynamicProps`, `statementId`, `k`, `v`, `__proto__` — chains
+about half of them onto an earlier statement with `"__proto__"`, and makes the
+entry statement a duck-typed element one time in five.
+
+Measured: against the ports as they stood at `3141d3a` (before the
+`serializeStep` / `valueAST` / element-identity fixes) this campaign alone
+produces **1,208 divergences**; against the current ports, **0**. It also found
+a divergence the hand-written fixtures did not — `statementId` is copied
+VERBATIM into the tree, so its object keys come out in `JSON.stringify`
+insertion order while every other object in the document is sorted.
+
+Two shapes are deliberately NOT generated, and both are documented deviations
+rather than hidden ones:
+
+- `{steps: [null]}` and an element-shaped object with no `props` make the
+  REFERENCE throw, so no expected tree exists (deviation #7 in both ports'
+  READMEs). The generator maintains the two invariants that avoid them.
+- AST discriminants (`"Str"`, `"Num"`, …) are excluded from the `k` alphabet:
+  a literal `{k: "Str", v: -1}` is runtime-EVALUATED by JS and kept as data by
+  the typed ports (deviation #5). The first run of this campaign found exactly
+  that, in 3 of 400 programs, which is the evidence the campaign works.
 
 ### Campaign file shape
 
@@ -239,6 +316,22 @@ campaign carrying `expected` (the pinned one) is compared as a fourth program,
 which also regression-gates the JS oracle itself. Exit codes: `0` agree,
 `1` divergence, `2` usage/toolchain error.
 
+**Steps where the REFERENCE throws.** `lib/serialize.mjs` raises
+`TypeError: Cannot convert undefined or null to object` for a `null` action
+step and for an element-shaped object with no `props` (deviation #7 in both
+ports' READMEs), so those steps have no expected tree. Rather than crash the
+run or drop them silently, the runner records the throw, prints
+
+```
+oracle threw  : 2 step(s) — no expected tree exists (serialize.mjs Object.keys
+                on a nullish value); ports cross-compared instead
+                === adhoc/thr1 step 0 ===
+```
+
+in the summary, and holds the two PORTS to each other on that step. A prefix or
+mutation campaign over the element-shaped fixtures (094–097) can construct both
+shapes, which is why the mechanism exists.
+
 Failure output names the failing program, the step, the first differing byte
 offset and both trees around it:
 
@@ -253,14 +346,14 @@ DIVERGENCE (tree) in swift
 ## Runtime
 
 Measured on this repo (Swift 6.1 / JDK 21 / node 22), campaign `all`
-(2,573 sessions, 29,011 steps, ~21 MB per stream):
+(4,198 sessions, 40,459 steps):
 
 | program | wall |
 | --- | ---: |
-| JS oracle (in-process) | ~2.0 s |
-| Swift driver (release, excludes build) | ~3.4 s |
-| Kotlin driver | ~2.7 s (≈4 s including Gradle start-up) |
-| **whole `--campaign all` run** | **~10 s** |
+| JS oracle (in-process) | ~2.5 s |
+| Swift driver (release, excludes build) | ~5.0 s |
+| Kotlin driver | ~3.3 s (≈4.6 s including Gradle start-up) |
+| **whole `--campaign all` run** | **~13 s** |
 
 Cold toolchain setup dominates CI: `swift build -c release` ≈ 1–2 min from
 scratch, Gradle ≈ 1 min. Both CI jobs stay well under the 5-minute target.
@@ -275,7 +368,7 @@ cd spec/fixtures/generator
 npm ci                                   # once
 
 # Same campaign CI runs, keeping the streams:
-node probes/run-differential.mjs --campaign prefix,nonmonotonic,mutation \
+node probes/run-differential.mjs --campaign prefix,nonmonotonic,mutation,synthesis \
   --out-dir /tmp/difffuzz --keep
 
 # Byte-compare by hand / bisect the first differing record:
@@ -313,6 +406,7 @@ verify the gate is not vacuous:
 | --- | --- |
 | Swift `jsMathRound` → `floor(x + 0.5)` | **0 divergences** over fixtures alone; **2 divergences** with `fuzz-seeds/` in the corpus, at `prefix/seed/001-round-ties` step 393 (`@Round(0.49999999999999994)`: oracle `0`, Swift `1`) |
 | Kotlin serializer: `JS_OWN_KEY_ORDER` → flat `sorted()` | **2 divergences** at `prefix/075-object-key-index-order` steps 680–681 (integer-index keys not hoisted ahead of `"-dash"`) |
+| Replay the whole gate against the ports at `3141d3a` (a real, historical pre-fix state, via `git worktree add --detach`) | `synthesis` alone: **1,208 divergences**; the seven new duck-typing fixtures (091–097): **14 divergences**, i.e. every one of them fails in BOTH ports before the fix and passes after |
 
 Re-run either experiment before trusting a green result after a large refactor.
 

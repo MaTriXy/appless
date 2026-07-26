@@ -195,7 +195,7 @@ final class Evaluator {
             {
                 return value
             }
-            // KNOWN-DEVIATION (README.md #6): a LITERAL object whose OWN `k` is
+            // KNOWN-DEVIATION #5 (both READMEs, same number): a LITERAL object whose OWN `k` is
             // a real AST kind string ({k: "Str", v: "x"}) is indistinguishable
             // from an AST node in JS and would be evaluated here; the typed
             // port keeps it as plain data.

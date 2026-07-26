@@ -3,7 +3,7 @@
 Kotlin port of the `@openuidev/lang-core` openui-lang parser + runtime
 evaluator, oracle-verified byte-for-byte against the JS reference
 implementation over the golden fixture corpus in `spec/fixtures/`
-(105 fixtures) plus differential probe sweeps.
+(114 fixtures) plus differential probe sweeps.
 
 - Normative spec: `spec/openui-lang.md`
 - JS reference: `spec/fixtures/generator/node_modules/@openuidev/lang-core/dist`
@@ -98,7 +98,11 @@ canonical equivalence. What did NOT come for free:
 
 The port aims for byte parity with the JS oracle. The following deviations are
 known and deliberate — but "not in the corpus" is not "not reachable", so each
-entry says how far it reaches.
+entry says how far it reaches, with a command that reproduces it.
+
+**The numbering is IDENTICAL in `ios/Packages/OpenUILang/README.md`.** A code
+comment saying "KNOWN-DEVIATION #5" means the same entry in both ports; the two
+lists are maintained as one.
 
 1. **Collation outside ASCII** (`Evaluator.sortCompare`,
    `StringJs.jsAsciiLocaleCompare`). `@Sort`'s string comparator in JS is
@@ -123,10 +127,23 @@ entry says how far it reaches.
    pins exactly those inputs (`"a-b"`/`"ab"`, `" s"`, `"a b c"`, `"a.b"`,
    `"[object Object]"`, leading-space strings).
 
-   Verified: 235,233 ordered pairs drawn from the full 0x00–0x7F alphabet
-   (random strings up to length 8 plus a pinned adversarial set) compared
-   against V8 — **zero mismatches**; and a 40-program × ~80-string `@Sort`
-   sweep is byte-identical across the oracle, this port and the Swift port.
+   **Verified, reproducibly** — this used to be an uncommitted claim about
+   "235,233 ordered pairs"; it is now a committed probe:
+
+   ```sh
+   cd spec/fixtures/generator && node probes/verify-collation.mjs
+   # [collation] corpus 700 strings, 244650 pairs (V8 v22.22.2, seed 0xc011a7e)
+   # [collation] ok: committed corpus matches V8 v22.22.2 on all pairs
+   # [collation] ok: swift ASCIICollationTests
+   # [collation] ok: kotlin AsciiCollationTest
+   # [collation] PASS - V8 and both ports agree on all 244650 ASCII pairs.
+   ```
+
+   `probes/collation-corpus.json` records V8's answer for every pair of a
+   deterministic 700-string corpus over the FULL 0x00–0x7F alphabet
+   (`--emit` regenerates it); `AsciiCollationTest` and the Swift
+   `ASCIICollationTests` assert against that one file, which makes it a
+   cross-port gate as well as a V8 conformance gate.
 
    What remains a deviation: a string containing any code unit **above
    U+007F** falls back to `java.text.Collator.getInstance(Locale.US)` (Swift
@@ -138,12 +155,42 @@ entry says how far it reaches.
 
    Still deliberately NOT `String.compareTo`, which is raw code-unit order and
    would sort `"a" > "B"`.
-2. **Object-identity loose equality is always false**
+
+2. **Lone surrogates — a CROSS-PORT difference, and this port is the one that
+   matches the oracle** (`Lexer.parseJsonStringLiteral`, `TreeSerializer.quote`;
+   Swift `Lexer.parseJSONStringLiteral`).
+
+   Kotlin `String` is a UTF-16 code-unit sequence and CAN hold an unpaired
+   surrogate, so this port keeps it and the serializer re-escapes it as
+   `\udXXX` (well-formed `JSON.stringify`, ES2019) — byte-identical to the
+   oracle. Swift `String` cannot represent one and substitutes U+FFFD, so the
+   Swift port diverges from the oracle here and from this port.
+
+   **Scope correction.** Both READMEs used to scope this to "programs
+   containing an unpaired surrogate escape in a double-quoted string". That is
+   wrong: no escape is needed. A WELL-FORMED astral character plus an ordinary
+   index reaches it, because indexing is UTF-16 in JS and in both ports:
+
+   ```sh
+   # spec/fixtures/generator
+   printf 's = "a\360\237\230\200b"\nroot = Card([TextContent("u1=" + s[1])])\n' > /tmp/astral.oui
+   node probes/expected-tree.mjs /tmp/astral.oui   # "text": "u1=\ud83d"
+   ```
+
+   oracle `\ud83d`, Kotlin `\ud83d`, Swift U+FFFD. Any astral character in an
+   indexed or `@Sort`ed label lands here. Pinned from both sides —
+   `LoneSurrogateTest.kt` asserts the oracle-matching bytes, the Swift
+   `LoneSurrogateTests.swift` asserts the U+FFFD bytes — so the difference is
+   recorded, not rediscovered. It is deliberately NOT a corpus fixture: the
+   Swift `FixtureOracleTests` gate compares against the oracle and would fail.
+
+3. **Object-identity loose equality is always false**
    (`RuntimeValue.jsLooseEquals`). JS `==` between two objects compares
    references; this port has value semantics and no stable identities. The
    materializer never routes the same JS object instance to both sides, so the
    oracle produces `false` too.
-3. **Only `TypeError`s from `ToPrimitive` reach `runtimeErrors`**
+
+4. **Only `TypeError`s from `ToPrimitive` reach `runtimeErrors`**
    (`Evaluator.evaluateElementProps`, `RuntimeValue.JsTypeError`). This
    REPLACES the former "`runtimeErrors` is always empty" deviation, which was
    wrong: `evaluate-tree.js` wraps every prop in try/catch, and JS
@@ -165,13 +212,15 @@ entry says how far it reaches.
    `084-reserved-call-expression-throws`), and V8's `'caller', 'callee', and
    'arguments' ...` poison-pill message when `Function.prototype.arguments` /
    `.caller` is read off an inherited native function
-   (`$obj.toString.arguments`). What is still NOT modelled is any other JS
-   runtime throw inside prop evaluation — there is no other reachable one in
-   this value model (there are no *callable* values, `toNumber` never throws,
-   and lang-core's own pushes into `errors` come from QueryManager /
-   tool-provider paths AppLess never reaches). A future contract that adds
-   throwing paths must extend the catch.
-4. **Synthetic AST-shaped objects are not runtime-evaluated**
+   (`$obj.toString.arguments`; fixture `098-function-poison-pill`, plus
+   `JsObjectModelTest.poisonPillsThrowV8sMessage`). What is still NOT modelled
+   is any other JS runtime throw inside prop evaluation — there is no other
+   reachable one in this value model (there are no *callable* values,
+   `toNumber` never throws, and lang-core's own pushes into `errors` come from
+   QueryManager / tool-provider paths AppLess never reaches). A future
+   contract that adds throwing paths must extend the catch.
+
+5. **Synthetic AST-shaped objects are not runtime-evaluated**
    (`Evaluator.evaluatePropValue`, `JsObjects.astNodeView`). JS AST nodes are
    plain objects, so the runtime duck-types any object whose `k` is in
    `AST_KINDS` as an AST node. The port's typed values only recognise a real
@@ -183,11 +232,30 @@ entry says how far it reaches.
    whose OWN keys SHADOW an inherited AST field (`{"__proto__": $x, n: "$y"}`
    reads `n` off the prototype here, off the own key in JS).
 
+   Why it is not closed: the port's `AstNode` is a typed sealed hierarchy and
+   an object literal is not. `{k: "Str", v: -1}` evaluates to the NUMBER `-1`
+   in JS (`evaluate` returns `node.v` verbatim), and `AstNode.Str.v` is a
+   `String`. Closing it means re-implementing `evaluate` over untyped objects.
+
+   Reproduction (the first run of the `synthesis` fuzz campaign found exactly
+   this, in 3 of 400 programs):
+
+   ```sh
+   printf 'row = { k: "Str", v: -1 }\nroot = Card([KVList([row])])\n' > /tmp/ast.oui
+   node probes/expected-tree.mjs /tmp/ast.oui     # "rows": [ -1 ]
+   # both ports:                                  # "rows": [ {"$ast": {"k":"Str","v":-1}} ]
+   ```
+
+   AST discriminants are therefore excluded from the `synthesis` campaign's
+   `k` alphabet (`probes/gen-fuzz-corpus.mjs`, `SYNTH_K_VALUES`), which says so
+   and points here.
+
    The *serializer-level* duck-typing (any object with a string `k` —
    inherited or own — serializes as `{"$ast": …}`, regardless of whether `k` is
    a real kind — fixtures `070-kvlist-k-key-astnode`, `085-proto-object-valued`)
    IS replicated in `Pipeline.convertValue`.
-5. **`@Sort` on an array that mixes numeric-parsable and non-numeric strings**
+
+6. **`@Sort` on an array that mixes numeric-parsable and non-numeric strings**
    (`Evaluator.callDataBuiltin`). lang-core's comparator switches to a NUMERIC
    comparison when *both* operands parse as numbers and to collation otherwise,
    which is not a strict weak ordering: `" "` (→ 0) beats `"-0"` numerically
@@ -196,20 +264,40 @@ entry says how far it reaches.
    TimSort, Kotlin's `sortedWith` and Swift's `sorted(by:)` visit different
    pairs. Both ports agree with the oracle and with each other on any array
    where the comparator IS consistent (all-numeric or all-non-numeric), which
-   is every corpus fixture; a mixed array of ~80 strings diverges in roughly
-   5% of programs. Closing it means porting V8's TimSort verbatim.
+   is every corpus fixture.
 
-### Deliberate improvement over the Swift port
+   **How often it bites is corpus-dependent, so no bare rate is quoted here.**
+   The rate tracks how many of the strings `Number()` happens to parse: an
+   earlier sweep of 40 programs × ~80 strings drawn from a label-like alphabet
+   measured ~5%, and an independent random-ASCII corpus of 60 programs measured
+   13% (8/60). Neither number generalises; the honest statement is that any
+   `@Sort` input mixing numeric-parsable and non-numeric strings is at risk.
+   Closing it means porting V8's TimSort verbatim.
 
-**Lone surrogates are preserved** (`Lexer.parseJsonStringLiteral`,
-`TreeSerializer.quote`). `JSON.parse` keeps an unpaired `\uD800`–`\uDFFF`
-escape as a lone UTF-16 surrogate inside the JS string; Swift `String` cannot
-represent one and the Swift port substitutes U+FFFD (its KNOWN-DEVIATION #2).
-Kotlin `String` CAN hold a lone surrogate, so the escape's code unit is
-appended verbatim and the serializer re-escapes lone surrogates as `\udXXX`
-(matching well-formed `JSON.stringify`, ES2019) rather than letting the UTF-8
-encoder replace them with `?`. Verified against the JS oracle with a
-`"lone:\ud800 pair:😀 hi:\udc00"` probe: byte-identical.
+7. **Serializer-level `TypeError`: shapes for which NO expected tree exists.**
+   Two shapes make `lib/serialize.mjs` itself throw
+   `TypeError: Cannot convert undefined or null to object`, taking the fixture
+   generator down with it, so the reference has no answer to port:
+
+   | shape | site |
+   | --- | --- |
+   | a `null`/`undefined` ACTION STEP — `{steps: [null]}` | `Object.keys(step)`, serialize.mjs:51 |
+   | an object that duck-types as an element with no `props` — `{type: "element", typeName: "X"}` | `Object.keys(el.props)`, serialize.mjs:84 |
+
+   ```sh
+   printf 'root = Card([KVList([{ steps: [null] }])])\n' > /tmp/thr.oui
+   node probes/expected-tree.mjs /tmp/thr.oui
+   # [expected-tree] FAILED: TypeError: Cannot convert undefined or null to object
+   #     at serializeStep (…/lib/serialize.mjs:51:28)
+   ```
+
+   Both ports emit `{}` for the step and an element with empty props
+   respectively (`JsObjects.objectKeys` answers `null` and the caller treats it
+   as "no keys"), and the two ports agree with each other. Because there is
+   nothing to compare against, `probes/run-differential.mjs` detects an oracle
+   throw, reports it in the summary (`oracle threw : N step(s)`) and
+   cross-compares the two PORTS on that step instead of failing the run. No
+   fixture can pin these shapes for the same reason.
 
 ### Implemented quirk parity (not deviations)
 

@@ -2,5 +2,5 @@
 # null` — a duck-type test, not a type check — and then ASSIGNS
 # `root.statementId = entryId`. A hand-written object literal that spells the
 # element fields out is therefore a perfectly good root.
-row = { type: "element", typeName: "TextContent", props: { text: "row" }, partial: false, hasDynamicProps: false }
-root = { type: "element", typeName: "Card", props: { children: [row] }, partial: false, hasDynamicProps: false }
+row = { type: "element", props: { text: "row" }, partial: false, hasDynamicProps: false, typeName: "TextContent" }
+root = { type: "element", props: { children: [row] }, partial: false, hasDynamicProps: false, typeName: "Card" }

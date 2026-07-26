@@ -195,7 +195,7 @@ internal class Evaluator(store: Map<String, RtValue>) {
                 JsObjects.getMember(value, "steps") is RtValue.Arr -> value
                 JsObjects.hasProperty(value, "type") &&
                     JsObjects.hasProperty(value, "valueAST") -> value
-                // KNOWN-DEVIATION (mirrors Swift #6): a LITERAL object whose
+                // KNOWN-DEVIATION #5 (both READMEs, same number): a LITERAL object whose
                 // OWN `k` is a real AST kind ({k: "Str", v: "x"}) is
                 // indistinguishable from an AST node in JS and would be
                 // evaluated here; the typed port keeps it as plain data.

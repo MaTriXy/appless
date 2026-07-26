@@ -3,7 +3,7 @@
 # row that merely INHERITS those fields from a `{"__proto__": …}` entry
 # serializes as the inherited element, and `statementId` is the own key
 # materialize.js stamped onto the row itself.
-elBase = { type: "element", typeName: "TextContent", props: { text: "inherited" }, partial: false, hasDynamicProps: false }
+elBase = { type: "element", props: { text: "inherited" }, partial: false, hasDynamicProps: false, typeName: "TextContent" }
 inhEl = { "__proto__": elBase, z: 1 }
 twoDeep = { "__proto__": inhEl, y: 2 }
 root = Card([
