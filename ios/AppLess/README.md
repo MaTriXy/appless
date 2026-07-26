@@ -24,15 +24,25 @@ Sources/
     ContractSchema.swift    GENERATED from spec/contract/genos.schema.json
     RendererRegistry.swift  RenderableComponent, registry, conformanceReport()
     PropDecoding.swift      PropValue/ElementNode readers, placeholder decoders
+    JSValue.swift           ECMAScript Number::toString, Math.round, and what
+                            React paints for a prop (`jsText` vs `String(v)`)
     RendererProps.swift     prop shapes + the rules the renderers branch on
+    RendererPresentation.swift  the per-renderer decisions a `body` used to make:
+                            Select/Tabs/Chips/Slider/Buttons/Toggle/Bubbles,
+                            flex-wrap rows, field seeding
     FormState.swift         form-state model, {value, componentType} payload
     Actions.swift           ActionPlan → ActionEvent (spec §9.3-9.4)
     ChartData.swift         domain rounding, ticks, stacking, pie geometry
+    ChartLayout.swift       CartesianChartInput (decode + point flattening),
+                            axis-label slots, pie disc geometry, bridge numbers
     MapGeometry.swift       contract zoom levels → MKCoordinateSpan deltas
     SemanticImage.swift     /api/img resolution policy over GenOSCore.Images
     CommandRouter.swift     routeCommand / handleAction as pure decisions
     ShellState.swift        sessions, activeApp, recents, minimized set, @OS
     ShellChrome.swift       every shell number/color/string/curve + key gate rules
+    ShellPresentation.swift screen-host state, switcher preview gating, layer
+                            guards, back-swipe thresholds, home typing frames,
+                            parsed-tree cache, active-screen reporting
     HomeTiles.swift         home tile icon + one-word label choice
     SuggestionRotation.swift the 4s three-slot suggestion rotation
     VectorPath.swift        SVG path-data reader (M/L/H/V/C/Z, abs + rel)
@@ -147,11 +157,16 @@ action-less `ListItem` stays inert.
 ```sh
 export PATH=/opt/swift/usr/bin:$PATH   # Swift 6.1
 cd ios/AppLess
-swift build
+swift build --build-tests              # sources AND tests, so a test-only
+                                       # warning cannot hide
 swift test
+python3 Scripts/parse-swiftui.py       # the SwiftUI syntax gate
 ```
 
-Both are green on Linux with no Xcode and no SwiftUI SDK.
+All three are green on Linux with no Xcode and no SwiftUI SDK. That means
+`AppLessCore` is compiled, executed and asserted; `AppLessUI` is parsed and
+text-inspected, and **not** type-checked — see
+[the Linux gate](#the-linux-gate-over-applessui--and-its-limits).
 
 ## The Linux/macOS split
 
@@ -230,12 +245,49 @@ compiles the SwiftUI for iOS with
 `xcodebuild -scheme AppLessUI -destination 'generic/platform=iOS'`. If a view
 does not build, that job is red.
 
-Linux still gets a real check on the wiring: `RendererWiringTests` reads
-`Sources/AppLessUI/Renderers.swift` as TEXT and fails if any
-`RenderableComponent` case has no `registry.register(.Foo)` line, if there are
-more or fewer than 30 registrations, or if any `AppLessUI` file is missing its
-`#if canImport(SwiftUI)` guard. A component left unwired therefore goes red on
-the cheap tier, before macOS CI ever runs.
+### The Linux gate over `AppLessUI` — and its limits
+
+`AppLessUI` **cannot be type-checked on Linux.** `canImport(SwiftUI)` is false,
+every file compiles to nothing, and `swift build` proving green says nothing at
+all about the views. Two cheap-tier gates cover what text can cover; neither is
+a type check, and neither should ever be described as one.
+
+**1. `Scripts/parse-swiftui.py`** — copies each file with the outer guard
+FORCED ON and runs `swiftc -parse` over the copies. That is a SYNTAX check: it
+catches malformed expressions and unbalanced braces, including inside inactive
+`#if` branches (Swift requires those to parse), and nothing else. It also
+verifies the guard shape it depends on — the guard must be the first
+non-comment line, `#endif` the last, and no code may escape the outer pair —
+and fails on any diagnostic. `--check-only` runs the structural half with no
+toolchain.
+
+**2. `RendererSourceGateTests`** — reads `Sources/AppLessUI/*.swift` as TEXT
+and fails on:
+
+| Failure it catches | How |
+|---|---|
+| a component never registered | the parsed registration table vs `RenderableComponent.allCases` |
+| a component registered TWICE | per-component counts, not a total (a total cannot tell 30 distinct from 29 + 1 duplicate) |
+| a renderer wired under the WRONG contract name | `FooView` must render `Foo`, with the two chart pairs and `MapViewRenderer` as declared exceptions |
+| a chart pair whose two registrations do not disagree | the `horizontal:` / `area:` literal must differ |
+| a renderer struct that exists and is never wired (and the reverse) | `(node:, ctx:)` declarations vs the registration table |
+| a `body` reading a prop the contract does not declare | every `p.text("x")`-style literal vs `ContractSchema.paramOrder[component]` |
+| an icon name with no SF Symbol | every literal passed to `LucideIcon` / `IconBadge` / `PhosphorIcon`, plus every name the Core tables can produce |
+| a number formatted inside a view | no `String(format:` in `AppLessUI` |
+| code escaping the SwiftUI guard | first/last directive + nesting depth |
+
+Each of those nine was verified by mutating the source and watching the named
+test go red. What the gate still cannot see: type errors, wrong modifier order,
+and any view that compiles and draws the wrong thing. Only the macOS job
+(`xcodebuild -scheme AppLessUI -destination 'generic/platform=iOS'`) covers
+those, and it has never run.
+
+The rule that keeps the gate meaningful is the one in the section above: **a
+value is never decided inside `AppLessUI`.** All 30 renderers read their props
+exclusively through `AppLessCore.PropReader` / `GenosProps` / `StructuralProps`
+— there is no `node.props` access anywhere in `AppLessUI` — and 23 of the 30
+additionally delegate a named branching or geometry decision to a Core type
+with its own Linux test.
 
 > The scaffolding brief said 29 renderable components; 33 − 3 is 30, and the
 > contract's own renderer interface declares 30. The count in the code is
@@ -389,6 +441,38 @@ contract, the prop shapes and the action semantics are identical.
     are applied through a `#if os(iOS)` modifier so the same views still
     compile for macOS, which is what `swift test` builds in CI.
 
+### Text fitting
+
+27. **The 56pt hero numbers shrink instead of wrapping.** RN puts no
+    `numberOfLines` on `HeroStat.value`, so a long value wraps onto a second
+    56pt line. `HeroStatView` uses `lineLimit(1)` + `minimumScaleFactor(0.5)`
+    instead, because a SwiftUI text that wraps inside a fixed-height hero
+    block pushes the rest of the card off screen. `StatTiles.value` is the
+    same trade at `0.6`, on top of RN's own `numberOfLines={1}` — RN
+    ellipsizes where the port shrinks. `ListItem.trailing` is NOT in this
+    group: RN leaves it unlimited and so does the port.
+
+## RN-parity corrections
+
+Six places where the Swift port and `src/genos/` disagreed and the port was
+wrong. Each is now pinned by a Linux test that also exercises the branch the
+old code took.
+
+| # | What the port did | What RN does | Where the fix lives |
+|---|---|---|---|
+| 1 | Slider read-out via `String(format: "%g")`, which cuts to 6 significant digits: `123456.7` printed `123457`, `1234567.89` printed `1.23457e+06` | interpolates a JS number into a `<Text>` | `JSNumber.string` (pinned against a node v22 table), `SliderPresentation.readoutText` |
+| 2 | `Math.round` via Swift's `rounded()`, which rounds a half AWAY from zero | JS rounds a half toward +∞: `Math.round(-2.505*100)/100` is `-2.5`, not `-2.51` | `JSNumber.round`, used by `GenosProps.sliderReadout` |
+| 3 | dropped non-string entries from `labels` / `rows` / `items` / `messages`, shortening the array | keeps the slot; React paints numbers. An all-numeric chart `labels` emptied the array, `hasCartesianData` went false and the **whole chart disappeared** | `PropValue.jsText`, `ChartData.axisLabels`, `GenosProps.{kvRows,statTiles,chipLabels,bubbleMessages}` |
+| 4 | `p.string("value") ?? ""` everywhere a prop is painted, so `HeroStat(1234)` rendered an empty hero | `<Text>{props.value}</Text>` renders numbers (and skips booleans) | `PropReader.text(_:)`, now used by every renderer |
+| 5 | `Tabs` fell back to `"Tab n"` for an EMPTY label and highlighted the CLAMPED index | `??` fires on `undefined` only; the highlight tests the RAW `active`, so a shrunken list highlights nothing | `TabsPresentation`, `StructuralProps.TabItem.label: String?` |
+| 6 | `Select`'s closed control printed the item's raw value for a label-less item | `selected?.label ?? props.placeholder ?? "Select…"` — the placeholder, not the value; only the OPEN list falls back to the value | `SelectPresentation`, `StructuralProps.SelectItem.label: String?` |
+
+Two smaller ones, same treatment: array-typed element props
+(`ListBlock.items`, `Tabs.items`, `Select.items`, `Buttons.buttons`,
+`Form.fields`, chart `series`) now reject a lone element, matching every RN
+reader's `Array.isArray(x) ? x : []`; and `ListItem.trailing` lost its
+`lineLimit(1)`, which RN does not have.
+
 ## Sources of truth
 
 | Ported artifact | Source |
@@ -398,7 +482,10 @@ contract, the prop shapes and the action semantics are identical.
 | `IconMap`, `iconTint`, dot fallback | `spec/icon-map.md`, `src/genos/ui/icons.tsx` |
 | `ContractSchema`, `RenderableComponent` | `spec/contract/genos.schema.json`, `src/genos/ui/contract.tsx` |
 | `RendererProps`, the renderer views | `src/genos/ui/cupertino/components.tsx`, `forms.tsx` |
-| `ChartData` | `src/genos/ui/shared/charts.tsx` |
+| `ChartData`, `ChartLayout` | `src/genos/ui/shared/charts.tsx` |
+| `JSValue` (`Number::toString`, `Math.round`, React text children) | ECMA-262 §6.1.6.1, pinned against node v22 |
+| `RendererPresentation` | `src/genos/ui/cupertino/{components,forms}.tsx` |
+| `ShellPresentation` | `src/genos/GenOS.tsx`, `shell/{HomeScreen,Switcher}.tsx` |
 | `FormState`, `Actions` | `src/genos/ui/shared/{forms.ts,actions.ts}`, `spec/openui-lang.md` §9.3-9.4 |
 | `MapGeometry` | `src/genos/ui/shared/map.tsx`, `contract.tsx` MapView |
 | `SemanticImage` | `src/genos/tools/images.ts`, `GenOSCore.Images` |
