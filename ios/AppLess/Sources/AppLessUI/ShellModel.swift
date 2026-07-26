@@ -409,20 +409,23 @@ public final class GenOSShellModel: ObservableObject {
         // `cleanLang` strips the model's code fences before parsing, exactly
         // as the RN `<Renderer response={cleanLang(top.content)} />` does.
         let text = Lang.cleanLang(screen.content)
-        guard parsedText[id] != text else { return }
-        parsedText[id] = text
-        guard !text.isEmpty else {
-            trees[id] = nil
+        switch ScreenTreeCache.refresh(cleanedText: text, lastParsed: parsedText[id]) {
+        case .unchanged:
             return
+        case .clear:
+            parsedText[id] = text
+            trees[id] = nil
+        case .parse(let text):
+            parsedText[id] = text
+            let parser: StreamingParser
+            if let existing = parsers[id] {
+                parser = existing
+            } else {
+                parser = StreamingParser(schema: schema)
+                parsers[id] = parser
+            }
+            trees[id] = parser.set(text)
         }
-        let parser: StreamingParser
-        if let existing = parsers[id] {
-            parser = existing
-        } else {
-            parser = StreamingParser(schema: schema)
-            parsers[id] = parser
-        }
-        trees[id] = parser.set(text)
     }
 }
 

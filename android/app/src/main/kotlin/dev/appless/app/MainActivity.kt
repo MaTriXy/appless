@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.remember
 import dev.appless.app.shell.GenOSShell
+import dev.appless.app.shell.shellHost
 import dev.appless.app.theme.AppLessTheme
 import dev.appless.openuilang.LibrarySchema
 import java.io.IOException
@@ -29,8 +30,11 @@ public class MainActivity : ComponentActivity() {
             // contract for EVERY parse pass, including the ~20/second during a
             // stream, so re-reading the asset per screen would be absurd.
             val schema = remember { loadContractSchema() }
+            // One host instance for the composition: a fresh one per frame would
+            // make `GenOSShell`'s parameter unstable and defeat skipping.
+            val host = remember(app) { app.shellHost }
             AppLessTheme {
-                GenOSShell(app = app, schema = schema)
+                GenOSShell(app = host, schema = schema)
             }
         }
     }

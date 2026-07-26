@@ -52,15 +52,39 @@ import dev.appless.app.theme.toColor
 import dev.appless.genoscore.AppDef
 import dev.appless.genoscore.Apps
 import dev.appless.genoscore.GenOSConstants
+import dev.appless.genoscore.GenOSController
 import dev.appless.genoscore.KeyStatus
+import dev.appless.genoscore.KeyStore
 import dev.appless.genoscore.Lang
 import dev.appless.genoscore.OSCommandKind
 import dev.appless.genoscore.Screen
+import dev.appless.genoscore.ScreenStore
 import dev.appless.genoscore.ScreenStatus
 import dev.appless.openuilang.LibrarySchema
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+
+/**
+ * The three `genos-core` singletons the shell reads — the whole of its contact
+ * with the object graph.
+ *
+ * [GenOSShell] used to take the [AppLessApplication] itself, which meant the
+ * only way to compose it was to also stand up OkHttp, the Keystore and a live
+ * Cerebras stream. Naming the seam instead lets `ShellCompositionTest` drive
+ * the REAL shell off a fake [dev.appless.genoscore.ScreenStreaming] — no
+ * network, no device — while production still passes the one built in
+ * `AppLessApplication`.
+ */
+internal class ShellHost(
+    val screenStore: ScreenStore,
+    val keyStore: KeyStore,
+    val controller: GenOSController,
+)
+
+/** The production graph, as a [ShellHost]. */
+internal val AppLessApplication.shellHost: ShellHost
+    get() = ShellHost(screenStore = screenStore, keyStore = keyStore, controller = controller)
 
 /**
  * The OS shell — `src/genos/GenOS.tsx`.
@@ -71,7 +95,7 @@ import kotlinx.coroutines.launch
  * where they are unit-tested. What is left here is the wiring and the pixels.
  */
 @Composable
-internal fun GenOSShell(app: AppLessApplication, schema: LibrarySchema) {
+internal fun GenOSShell(app: ShellHost, schema: LibrarySchema) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val shellTheme = LocalShellTheme.current

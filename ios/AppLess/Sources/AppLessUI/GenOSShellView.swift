@@ -55,18 +55,22 @@ public struct GenOSShellView: View {
 
                 screenLayer(size: size, insets: insets)
 
-                if model.activeApp != nil && !model.switcherOpen {
+                if ShellLayers.showsChrome(
+                    hasActiveApp: model.activeApp != nil, switcherOpen: model.switcherOpen)
+                {
                     chromeLayer(insets: insets)
                     hintLayer(insets: insets)
                 }
 
-                if model.activeApp != nil && model.isGenerating {
+                if ShellLayers.showsGeneratingPill(
+                    hasActiveApp: model.activeApp != nil, generating: model.isGenerating)
+                {
                     pillLayer(insets: insets)
                 }
 
                 toastLayer(insets: insets, width: size.width)
 
-                if model.switcherOpen {
+                if ShellLayers.showsSwitcher(switcherOpen: model.switcherOpen) {
                     SwitcherView(
                         apps: model.runningApps,
                         theme: theme,
@@ -167,9 +171,16 @@ public struct GenOSShellView: View {
         .padding(.top, insets.top + CGFloat(ShellChrome.Chrome.insetTop))
     }
 
+    /// The hint sits inside the chrome layer, so `showsChrome` is already
+    /// true here; `showsGestureHint` re-states the full guard so the rule is
+    /// pinned in one place.
     @ViewBuilder
     private func hintLayer(insets: EdgeInsets) -> some View {
-        if model.showsGestureHint {
+        if ShellLayers.showsGestureHint(
+            hasActiveApp: model.activeApp != nil,
+            switcherOpen: model.switcherOpen,
+            hintArmed: model.showsGestureHint)
+        {
             GestureHintView(onDismiss: { model.dismissGestureHint() })
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                 .padding(.bottom, insets.bottom + CGFloat(ShellChrome.Hint.bottomInset))

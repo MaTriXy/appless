@@ -130,10 +130,9 @@ public struct HomeScreenView: View {
                         app: app,
                         editing: editingId == app.id,
                         onPress: {
-                            if editingId != nil {
-                                editingId = nil
-                            } else {
-                                onResume(app.id)
+                            switch HomePresentation.tileTap(isEditing: editingId != nil) {
+                            case .dismissEditing: editingId = nil
+                            case .resume: onResume(app.id)
                             }
                         },
                         onLongPress: { editingId = app.id },
@@ -299,12 +298,10 @@ struct SuggestionRowView: View {
     /// at 45ms per character.
     @MainActor
     private func swap(to label: String) async {
-        if !mounted {
-            mounted = true
-            shown = label
-            return
-        }
-        if covered {
+        let isFirstAppearance = !mounted
+        mounted = true
+        guard HomePresentation.animatesSwap(covered: covered, isFirstAppearance: isFirstAppearance)
+        else {
             shown = label
             return
         }
@@ -313,10 +310,10 @@ struct SuggestionRowView: View {
         if Task.isCancelled { return }
         shown = ""
         fade = 1
-        for index in 1...max(1, label.count) {
+        for frame in HomePresentation.typingFrames(for: label) {
             try? await Task.sleep(nanoseconds: nanoseconds(ShellChrome.Home.suggestionTypeSeconds))
             if Task.isCancelled { return }
-            shown = String(label.prefix(index))
+            shown = frame
         }
     }
 }

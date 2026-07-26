@@ -105,6 +105,71 @@ import Testing
         #expect(ShellActivity.leadingIntent(stackDepth: 2) == .back)
     }
 
+    // MARK: - Layers
+
+    /// The four guards look interchangeable and are not. Each test below picks
+    /// the state where two of them disagree.
+    @Test func layerGuardsAreNotTheSameCondition() {
+        // Chrome and hint hide behind the switcher; the pill does not.
+        #expect(!ShellLayers.showsChrome(hasActiveApp: true, switcherOpen: true))
+        #expect(
+            !ShellLayers.showsGestureHint(
+                hasActiveApp: true, switcherOpen: true, hintArmed: true))
+        #expect(
+            ShellLayers.showsGeneratingPill(hasActiveApp: true, generating: true),
+            "the pill keeps reporting while the switcher is open")
+
+        // The switcher ignores activeApp entirely - it opens from the home
+        // screen with nothing running.
+        #expect(ShellLayers.showsSwitcher(switcherOpen: true))
+
+        // Nothing open: only the home screen.
+        #expect(!ShellLayers.showsChrome(hasActiveApp: false, switcherOpen: false))
+        #expect(!ShellLayers.showsGeneratingPill(hasActiveApp: false, generating: true))
+        #expect(!ShellLayers.showsSwitcher(switcherOpen: false))
+
+        // The hint is strictly narrower than the chrome it sits inside.
+        #expect(ShellLayers.showsChrome(hasActiveApp: true, switcherOpen: false))
+        #expect(
+            !ShellLayers.showsGestureHint(
+                hasActiveApp: true, switcherOpen: false, hintArmed: false))
+        #expect(
+            ShellLayers.showsGestureHint(
+                hasActiveApp: true, switcherOpen: false, hintArmed: true))
+    }
+
+    // MARK: - Home screen
+
+    @Test func aHomeTileTapDismissesEditModeBeforeItResumes() {
+        #expect(HomePresentation.tileTap(isEditing: true) == .dismissEditing)
+        #expect(HomePresentation.tileTap(isEditing: false) == .resume)
+    }
+
+    /// First mount shows the label immediately (RN seeds `useState(s.label)`);
+    /// so does every swap while an app screen covers the home screen.
+    @Test func suggestionSwapAnimatesOnlyWhenVisibleAndAlreadyMounted() {
+        #expect(HomePresentation.animatesSwap(covered: false, isFirstAppearance: false))
+        #expect(!HomePresentation.animatesSwap(covered: false, isFirstAppearance: true))
+        #expect(!HomePresentation.animatesSwap(covered: true, isFirstAppearance: false))
+        #expect(!HomePresentation.animatesSwap(covered: true, isFirstAppearance: true))
+    }
+
+    /// `label.slice(0, i)` for `i = 1…length`, and the row must always end on
+    /// the whole label.
+    @Test func typingFramesBuildTheLabelOneCharacterAtATime() {
+        #expect(HomePresentation.typingFrames(for: "Plan") == ["P", "Pl", "Pla", "Plan"])
+        #expect(HomePresentation.typingFrames(for: "P") == ["P"])
+        // The branch a naive `1...label.count` crashes on: RN's interval still
+        // fires once for an empty label, so the list is never empty.
+        #expect(HomePresentation.typingFrames(for: "") == [""])
+        // Grapheme clusters are typed whole - a flag or an emoji must never
+        // appear as half a scalar.
+        #expect(HomePresentation.typingFrames(for: "a\u{1F1EE}\u{1F1F3}") == ["a", "a🇮🇳"])
+        for label in ["Plan a trip", "", "x"] {
+            #expect(HomePresentation.typingFrames(for: label).last == label || label.isEmpty)
+        }
+    }
+
     // MARK: - Tree cache
 
     @Test func treeCacheWantsTheTopScreenAndEverySessionsTop() {
