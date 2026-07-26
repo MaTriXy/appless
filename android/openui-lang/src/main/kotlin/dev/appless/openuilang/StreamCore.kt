@@ -33,7 +33,13 @@ internal class OrderedMap<V> {
  * query/mutation statement lists, which are always empty for AppLess).
  */
 internal class InternalResult(
-    val root: RtElement? = null,
+    /**
+     * `parser.js`: `const root = isElementNode(materialized) ? materialized :
+     * null` — a duck-type test, not a type check, so the entry statement may
+     * be any object that ANSWERS the test. Kept as a raw [RtValue] for that
+     * reason; [JsObjects.runtimeElementRef] reads its fields.
+     */
+    val root: RtValue? = null,
     val incomplete: Boolean = true,
     val unresolved: List<String> = emptyList(),
     val errors: List<ParseError> = emptyList(),
@@ -126,8 +132,20 @@ internal fun buildResult(
         currentStatementId = entryId,
     )
     val materialized = materializeValue(syms.getValue(entryId), ctx)
-    // If the entry materializes to a non-element, `root` is null (spec §8.1).
-    val root = (materialized as? RtValue.Element)?.element?.withStatementId(entryId)
+    // `const root = isElementNode(materialized) ? materialized : null;`
+    // `if (root) root.statementId = entryId;` — a chain-aware duck-type test
+    // followed by an ordinary ASSIGNMENT, so an object that only INHERITS its
+    // element identity is a valid root and gets an OWN `statementId` key
+    // (fixture `094-duck-element-root`). A non-element entry gives `null`
+    // (spec §8.1, fixture `015-root-non-element`).
+    val root: RtValue? = JsObjects.runtimeElementRef(materialized)?.let { ref ->
+        if (ref.element != null) {
+            RtValue.Element(ref.element.withStatementId(entryId))
+        } else {
+            (materialized as RtValue.Obj).obj.assign("statementId", RtValue.Str(entryId))
+            materialized
+        }
+    }
     val stateDeclarations = extractStatements(typedStmts, ctx)
     return InternalResult(
         root = root,

@@ -25,11 +25,9 @@
 #     device and simulator SDKs is the whole point of `ios-app.yml` and costs a
 #     macOS runner; duplicating it here would double that cost for every push.
 #   * It does NOT run the Android SDK tier (`:app:assembleDebug`,
-#     `:app:testDebugUnitTest`). That needs an SDK install on the runner, and
-#     the `:app` module is still mid-write (see docs/MIGRATION_STATUS.md). Its
-#     gate belongs in a dedicated `android-app.yml` owned by whoever finishes
-#     the module — that workflow does not exist yet, and its absence is
-#     currently the largest hole in this repo's CI coverage.
+#     `:app:testDebugUnitTest`). That needs an SDK install on the runner, so it
+#     lives in its own `android-app.yml`, which DOES now exist and gates the
+#     real Compose compile, the APK and its staged spec assets.
 #   * It does NOT run the differential-fuzz campaigns. Those are minutes-long
 #     and already gated by `differential-fuzz.yml` on the paths that matter.
 #

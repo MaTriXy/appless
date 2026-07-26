@@ -66,9 +66,15 @@ private fun resolveRefValue(name: String, ctx: MaterializeContext): RtValue {
     ctx.currentStatementId = name
     try {
         val result = materializeValue(target, ctx)
-        return if (result is RtValue.Element) {
-            RtValue.Element(result.element.withStatementId(name))
+        // `if (mode === "value" && isElementNode(result)) result.statementId = name;`
+        // — a CHAIN-AWARE duck-type test followed by an ordinary assignment, so
+        // an object that merely inherits (or literally spells out) the element
+        // fields is tagged too, with an OWN `statementId` key.
+        val ref = JsObjects.runtimeElementRef(result) ?: return result
+        return if (ref.element != null) {
+            RtValue.Element(ref.element.withStatementId(name))
         } else {
+            (result as RtValue.Obj).obj.assign("statementId", RtValue.Str(name))
             result
         }
     } finally {
@@ -219,9 +225,11 @@ internal fun containsDynamicValue(v: RtValue): Boolean = when (v) {
     is RtValue.Obj -> when {
         JsObjects.astNodeView(v) != null -> true
         else -> {
-            val el = JsObjects.elementView(v)
-            if (el != null) {
-                el.props.values.any { containsDynamicValue(it) }
+            val ref = JsObjects.runtimeElementRef(v)
+            if (ref != null) {
+                // `Object.values(v.props)` — the props value read THROUGH the
+                // chain, then its own enumerable values.
+                JsObjects.objectValues(ref.props).any { containsDynamicValue(it) }
             } else {
                 v.obj.values.any { containsDynamicValue(it) }
             }

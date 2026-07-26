@@ -110,7 +110,9 @@ public object TreeSerializer {
         lines.add(pad(inner) + "\"code\": " + quote(error.code))
         lines.add(pad(inner) + "\"message\": " + quote(error.message))
         error.component?.let { lines.add(pad(inner) + "\"component\": " + quote(it)) }
-        error.statementId?.let { lines.add(pad(inner) + "\"statementId\": " + quote(it)) }
+        error.statementId?.let {
+            lines.add(pad(inner) + "\"statementId\": " + serializeValue(it, inner))
+        }
         return "{\n" + lines.joinToString(",\n") + "\n" + pad(indent) + "}"
     }
 
@@ -119,7 +121,9 @@ public object TreeSerializer {
         val inner = indent + 1
         val lines = ArrayList<String>(4)
         lines.add(pad(inner) + "\"component\": " + quote(element.component))
-        element.statementId?.let { lines.add(pad(inner) + "\"statementId\": " + quote(it)) }
+        element.statementId?.let {
+            lines.add(pad(inner) + "\"statementId\": " + serializeValue(it, inner))
+        }
         lines.add(pad(inner) + "\"props\": " + serializeStringKeyedObject(element.props, inner))
         element.children?.let {
             lines.add(pad(inner) + "\"children\": " + serializeValue(it, inner))

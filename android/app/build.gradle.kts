@@ -6,6 +6,8 @@
 // independent renderer logic). Everything that needs a device — Compose UI,
 // Keystore-backed key storage, OkHttp networking, WebView maps, Coil images —
 // lives here and NOWHERE else.
+import java.time.Duration
+
 plugins {
     // Versions are pinned in the ROOT build file (see the comment there) so AGP
     // and the Kotlin plugin share one classloader.

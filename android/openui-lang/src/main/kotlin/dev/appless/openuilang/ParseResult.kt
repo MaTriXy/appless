@@ -99,8 +99,19 @@ public class PropObject() {
 public data class ElementNode(
     /** Component type name, e.g. `"CardHeader"`. */
     val component: String,
-    /** Present iff the element came from a named statement. */
-    val statementId: String? = null,
+    /**
+     * Present iff the element carries a `statementId` field — normally the
+     * name of the statement it came from, hence normally a [PropValue.Str]
+     * (use [statementIdText]).
+     *
+     * It is a [PropValue] and not a `String?` because lang-core's ElementNode
+     * is a plain JS object and the reference serializer copies the field
+     * VERBATIM (`out.statementId = el.statementId`). An object that merely
+     * duck-types as an element can therefore carry any value there — see
+     * `spec/fixtures/095-duck-element-fields.oui`, where a row with an own
+     * `statementId: 42` serializes as `"statementId": 42`.
+     */
+    val statementId: PropValue? = null,
     /**
      * Named props (positional args already mapped via the contract's property
      * order), EXCLUDING `children`. Props that evaluated to `undefined` are
@@ -110,7 +121,10 @@ public data class ElementNode(
     val props: Map<String, PropValue> = emptyMap(),
     /** Present iff the element has a `children` prop (Card, TabItem). */
     val children: PropValue? = null,
-)
+) {
+    /** [statementId] when it is a string, which is every ordinary element. */
+    public val statementIdText: String? get() = (statementId as? PropValue.Str)?.value
+}
 
 /**
  * A deferred action: `{steps: [...]}`. Each step is a plain-object value
@@ -143,7 +157,12 @@ public data class ParseError(
 public data class RuntimeError(
     val message: String,
     val component: String? = null,
-    val statementId: String? = null,
+    /**
+     * `evaluate-tree.js` copies the failing element's `statementId` field into
+     * the error VERBATIM, so this has the same shape as
+     * [ElementNode.statementId] and for the same reason.
+     */
+    val statementId: PropValue? = null,
     val source: String = "runtime",
     val code: String = "runtime-error",
 )
