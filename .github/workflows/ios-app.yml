@@ -1,0 +1,148 @@
+# iOS app gate — the tier that Linux cannot provide.
+#
+# `swift build` / `swift test` on Linux compile every `#if canImport(SwiftUI)`
+# file to NOTHING, so the whole SwiftUI half (30 renderers + the OS shell) is
+# unverified there. This workflow exists to actually COMPILE it for iOS, on a
+# real Xcode toolchain, and to fail loudly when it does not.
+#
+# Gates:
+#   1. Toolchain: an explicitly selected Xcode whose Swift is >= 6.1
+#      (ios/AppLess/Package.swift is swift-tools-version 6.1).
+#   2. `swift test` for the three packages: OpenUILang (parser), GenOSCore
+#      (store/controller/stream) and AppLess (AppLessCore + the macOS-only
+#      live conformance suite).
+#   3. The conformance gate line `renderers registered: 30/30` — on macOS this
+#      is the LIVE count, i.e. `registerCupertinoRenderers()` really wired all
+#      30 contract components.
+#   4. THE POINT: `xcodebuild -scheme AppLessUI -destination generic/platform=iOS`
+#      compiles the SwiftUI for the device SDK. If a view does not build, this
+#      job is red.
+name: ios-app
+
+on:
+  push:
+    paths:
+      - "ios/**"
+      - "spec/**"
+      - ".github/workflows/ios-app.yml"
+  pull_request:
+    paths:
+      - "ios/**"
+      - "spec/**"
+      - ".github/workflows/ios-app.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ios-app-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ios-app:
+    # macOS 14+ is required: the packages need Swift 6.1, which ships with
+    # Xcode 16.3 and later.
+    runs-on: macos-15
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode (explicit, newest first)
+        run: |
+          set -euo pipefail
+          chosen=""
+          for candidate in \
+            /Applications/Xcode_26*.app \
+            /Applications/Xcode_16.4.app \
+            /Applications/Xcode_16.3.app \
+            /Applications/Xcode_16*.app \
+            /Applications/Xcode.app
+          do
+            if [ -d "$candidate" ]; then chosen="$candidate"; break; fi
+          done
+          if [ -z "$chosen" ]; then
+            echo "no Xcode found in /Applications"; ls /Applications; exit 1
+          fi
+          echo "selected $chosen"
+          sudo xcode-select -switch "$chosen/Contents/Developer"
+          echo "DEVELOPER_DIR=$chosen/Contents/Developer" >> "$GITHUB_ENV"
+
+      - name: Toolchain must be Swift 6.1 or newer
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          swift --version
+          version="$(swift --version 2>&1 | sed -n 's/.*Swift version \([0-9][0-9.]*\).*/\1/p' | head -1)"
+          echo "swift version: $version"
+          if [ "$(printf '%s\n6.1\n' "$version" | sort -V | head -1)" != "6.1" ]; then
+            echo "Package.swift declares swift-tools-version 6.1; toolchain is $version"
+            exit 1
+          fi
+
+      # ----------------------------------------------------------------- tests
+
+      - name: OpenUILang — swift test
+        working-directory: ios/Packages/OpenUILang
+        run: swift test
+
+      - name: GenOSCore — swift test
+        working-directory: ios/Packages/GenOSCore
+        run: swift test
+
+      - name: AppLess — swift test (AppLessCore + live conformance)
+        working-directory: ios/AppLess
+        run: |
+          set -euo pipefail
+          swift test 2>&1 | tee "$RUNNER_TEMP/appless-tests.log"
+
+      - name: "Conformance gate — renderers registered: 30/30"
+        run: |
+          set -euo pipefail
+          if ! grep -q "renderers registered: 30/30" "$RUNNER_TEMP/appless-tests.log"; then
+            echo "conformance gate line missing — a contract component is unwired"
+            grep -n "renderers registered" "$RUNNER_TEMP/appless-tests.log" || true
+            exit 1
+          fi
+          echo "renderers registered: 30/30"
+
+      # ------------------------------------------------------- SwiftUI compile
+
+      - name: SwiftUI — syntax check with the canImport guards forced on
+        run: python3 ios/AppLess/Scripts/parse-swiftui.py
+
+      - name: List package schemes
+        working-directory: ios/AppLess
+        run: xcodebuild -list
+
+      # THE gate this workflow exists for. `swift build` on Linux compiles the
+      # SwiftUI to nothing; here it is compiled for the iOS device SDK, so a
+      # broken view fails the run.
+      - name: AppLessUI — compile for iOS (generic device)
+        working-directory: ios/AppLess
+        run: |
+          set -euo pipefail
+          xcodebuild build \
+            -scheme AppLessUI \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            -skipPackagePluginValidation \
+            CODE_SIGNING_ALLOWED=NO \
+            ONLY_ACTIVE_ARCH=NO
+
+      - name: AppLessUI — compile for the iOS Simulator SDK
+        working-directory: ios/AppLess
+        run: |
+          set -euo pipefail
+          xcodebuild build \
+            -scheme AppLessUI \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            -skipPackagePluginValidation \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Upload test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: appless-test-log
+          path: ${{ runner.temp }}/appless-tests.log
+          if-no-files-found: ignore

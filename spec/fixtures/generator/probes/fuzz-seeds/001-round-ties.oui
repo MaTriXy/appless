@@ -1,0 +1,21 @@
+root = Card([
+  CardHeader("Round ties"),
+  KVList([
+    {label: "half", value: @Round(0.5)},
+    {label: "neg-half", value: @Round(-0.5)},
+    {label: "one-half", value: @Round(1.5)},
+    {label: "neg-one-half", value: @Round(-1.5)},
+    {label: "two-half", value: @Round(2.5)},
+    {label: "neg-two-half", value: @Round(-2.5)},
+    {label: "eps-below-half", value: @Round(0.49999999999999994)},
+    {label: "neg-third", value: @Round(-0.3)},
+    {label: "neg-two-thirds", value: @Round(-0.7)},
+    {label: "pow2-half", value: @Round(4503599627370496.5)},
+    {label: "d2-tie", value: @Round(1.005, 2)},
+    {label: "d2-neg-tie", value: @Round(-1.005, 2)},
+    {label: "d1-tie", value: @Round(0.05, 1)},
+    {label: "d1-neg-tie", value: @Round(-0.15, 1)},
+    {label: "d-neg", value: @Round(1234.5678, -2)},
+    {label: "str", value: "" + @Round(-0.5)}
+  ], "ROUND")
+])

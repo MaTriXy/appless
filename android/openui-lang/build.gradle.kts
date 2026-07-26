@@ -35,3 +35,26 @@ tasks.test {
     // Never let Gradle's up-to-date check hide the oracle output.
     outputs.upToDateWhen { false }
 }
+
+// Differential-fuzz driver (build-only tooling, not part of `test`).
+// Replays a campaign from spec/fixtures/generator/probes/gen-fuzz-corpus.mjs:
+//   ./gradlew :openui-lang:fuzzDriver -PfuzzCampaign=<file> [-PfuzzOut=<file>]
+// See spec/fixtures/generator/probes/README.md.
+tasks.register<JavaExec>("fuzzDriver") {
+    group = "verification"
+    description = "Replays a differential-fuzz campaign through the Kotlin port."
+    mainClass.set("dev.appless.openuilang.fuzz.FuzzDriverKt")
+    classpath = sourceSets["main"].runtimeClasspath
+    // Deeply nested fuzz inputs recurse in the expression parser.
+    jvmArgs("-Dfile.encoding=UTF-8", "-Xss16m")
+    workingDir = rootProject.projectDir.parentFile ?: projectDir
+    argumentProviders.add {
+        val campaign = providers.gradleProperty("fuzzCampaign").orNull
+            ?: throw GradleException("fuzzDriver requires -PfuzzCampaign=<campaign.json>")
+        buildList {
+            add(campaign)
+            providers.gradleProperty("fuzzOut").orNull?.let { add("--out"); add(it) }
+            providers.gradleProperty("fuzzSchema").orNull?.let { add("--schema"); add(it) }
+        }
+    }
+}

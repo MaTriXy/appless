@@ -27,18 +27,66 @@ public struct AppLessApp: App {
     }
 }
 
-/// Root of the shell. The Cupertino renderers are wired, so this reports
-/// `renderers registered: 30/30`; it stays in place until the GenOS shell
-/// (home screen, screen stack, ask bar) lands and starts rendering real
-/// screens through ``GenosScreenView``.
+/// Boots the runtime, then hands over to ``GenOSShellView``.
+///
+/// The contract schema and the generated system prompt are bundle resources of
+/// the HOST app target (they are never copied into this package - see
+/// `AppLessConfiguration.load`). Until they are there, the shell cannot parse a
+/// screen, so the diagnostics view explains exactly that instead of showing an
+/// empty home screen that can never generate anything.
 public struct RootView: View {
+
+    private enum Boot {
+        case loading
+        case ready(GenOSShellModel)
+        case failed(String)
+    }
+
+    @State private var boot: Boot = .loading
     @Environment(\.colorScheme) private var colorScheme
 
     public init() {}
 
+    public var body: some View {
+        Group {
+            switch boot {
+            case .loading:
+                Color(CdsTheme.resolve(isDark: colorScheme == .dark).bg)
+                    .ignoresSafeArea()
+            case .ready(let model):
+                GenOSShellView(model: model)
+            case .failed(let message):
+                SetupDiagnosticsView(message: message)
+            }
+        }
+        .onAppear { start() }
+    }
+
+    @MainActor
+    private func start() {
+        guard case .loading = boot else { return }
+        // Renderers register once; the App's init already did it, but a
+        // preview or a host app that instantiates RootView directly has not.
+        registerCupertinoRenderers()
+        do {
+            let configuration = try AppLessConfiguration.load()
+            boot = .ready(AppLessRuntime.makeModel(configuration: configuration))
+        } catch {
+            boot = .failed(String(describing: error))
+        }
+    }
+}
+
+/// Why the shell could not boot, plus the renderer conformance report - the
+/// same gate line CI greps (`renderers registered: 30/30`).
+struct SetupDiagnosticsView: View {
+    let message: String
+
+    @Environment(\.colorScheme) private var colorScheme
+
     private var theme: CdsTheme { CdsTheme.resolve(isDark: colorScheme == .dark) }
 
-    public var body: some View {
+    var body: some View {
         let report = RendererRegistry.shared.conformanceReport()
         ScrollView {
             VStack(alignment: .leading, spacing: CdsMetrics.Spacing.cardGap) {
@@ -46,28 +94,33 @@ public struct RootView: View {
                     Text("APPLESS")
                         .cdsTextStyle(CdsMetrics.Typography.headerSubtitle)
                         .foregroundStyle(Color(theme.ink2))
-                    Text("Renderers")
+                    Text("Setup")
                         .cdsTextStyle(CdsMetrics.Typography.headerTitle)
                         .foregroundStyle(Color(theme.ink))
                 }
                 .padding(.top, CdsMetrics.Spacing.headerPaddingTop)
                 .padding(.bottom, CdsMetrics.Spacing.headerPaddingBottom)
 
-                Text(report.formatted())
-                    .cdsTextStyle(CdsMetrics.Typography.rowSubtitle)
-                    .foregroundStyle(Color(theme.ink2))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(CdsMetrics.Spacing.calloutPaddingHorizontal)
-                    .background(
-                        RoundedRectangle(cornerRadius: CdsMetrics.Radius.group, style: .continuous)
-                            .fill(Color(theme.group))
-                    )
+                callout(message)
+                callout(report.formatted())
             }
             .padding(.horizontal, CdsMetrics.Spacing.cardGap)
             .padding(.bottom, CdsMetrics.Spacing.cardPaddingBottom)
         }
         .background(Color(theme.bg).ignoresSafeArea())
         .cdsTheme(colorScheme: colorScheme)
+    }
+
+    private func callout(_ text: String) -> some View {
+        Text(text)
+            .cdsTextStyle(CdsMetrics.Typography.rowSubtitle)
+            .foregroundStyle(Color(theme.ink2))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(CdsMetrics.Spacing.calloutPaddingHorizontal)
+            .background(
+                RoundedRectangle(cornerRadius: CdsMetrics.Radius.group, style: .continuous)
+                    .fill(Color(theme.group))
+            )
     }
 }
 

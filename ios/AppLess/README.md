@@ -5,9 +5,11 @@ The iOS shell for the GenOS runtime: it consumes the verified Swift packages
 `../Packages/GenOSCore` (screen store, controller, streaming, app catalog), and
 renders the resolved element tree with SwiftUI.
 
-**Status: renderers complete.** Tokens, the icon map, the contract tables, the
-prop decoders and the conformance registry are done and tested, and all **30**
-Cupertino renderers are implemented and wired by `registerCupertinoRenderers()`.
+**Status: renderers + shell complete.** Tokens, the icon map, the contract
+tables, the prop decoders and the conformance registry are done and tested, all
+**30** Cupertino renderers are implemented and wired by
+`registerCupertinoRenderers()`, and the OS shell (home screen, screen stack,
+switcher, chrome, key gate) is ported from `src/genos/GenOS.tsx`.
 See [Known differences](#known-differences-vs-the-react-native-renderers) for
 every place SwiftUI cannot reproduce the RN behavior exactly.
 
@@ -28,8 +30,24 @@ Sources/
     ChartData.swift         domain rounding, ticks, stacking, pie geometry
     MapGeometry.swift       contract zoom levels → MKCoordinateSpan deltas
     SemanticImage.swift     /api/img resolution policy over GenOSCore.Images
+    CommandRouter.swift     routeCommand / handleAction as pure decisions
+    ShellState.swift        sessions, activeApp, recents, minimized set, @OS
+    ShellChrome.swift       every shell number/color/string/curve + key gate rules
+    HomeTiles.swift         home tile icon + one-word label choice
+    SuggestionRotation.swift the 4s three-slot suggestion rotation
+    VectorPath.swift        SVG path-data reader (M/L/H/V/C/Z, abs + rel)
+    Wordmark.swift          the AppLess wordmark path, verbatim from the asset
   AppLessUI/              SwiftUI only — every file is `#if canImport(SwiftUI)`
-    AppLessApp.swift        @main App struct + RootView
+    AppLessApp.swift        @main App struct + RootView + setup diagnostics
+    GenOSShellView.swift    the shell: layers, chrome, minimize, overlays
+    ShellModel.swift        the observable object driving ShellState/GenOSCore
+    ShellRuntime.swift      clock / Keychain / URLSession seams + the factory
+    HomeScreenView.swift    wordmark, tiles, rotating suggestions, ask bar
+    ScreenHostView.swift    skeleton → streamed render → error+retry, transitions
+    SwitcherView.swift      switcher cards with live miniature previews
+    KeyGateView.swift       BYOK first-launch / rejected-key gate
+    ShellChromeViews.swift  chrome buttons, hint, generating pill, toast, glass
+    WordmarkView.swift      the wordmark path as a SwiftUI Shape
     Theme+SwiftUI.swift     CdsColor → Color, TextStyle → Font, \.cds environment
     IconView.swift          LucideIcon, IconBadge
     Renderers.swift         RenderContext, form store, dispatcher, all 30 registrations
@@ -44,7 +62,56 @@ Sources/
                             DatePicker, Slider, Buttons, Button
 Tests/
   AppLessCoreTests/       Linux-runnable
+  AppLessUITests/         guarded — empty on Linux, live conformance on macOS
+Scripts/
+  parse-swiftui.py        `swiftc -parse` with the canImport guards forced on
 ```
+
+## The shell
+
+`GenOSShellView` is the SwiftUI port of `src/genos/GenOS.tsx`. Its layers,
+bottom to top: the home screen (always mounted), the active app's top screen,
+the chrome (back/home top-left, switcher top-right), the one-time gesture hint,
+the generating pill, the toast, the switcher, and the BYOK key gate.
+
+Nothing about the shell is *decided* in a view:
+
+| RN | Swift |
+|---|---|
+| `sessions` / `activeApp` / `recentOrder` / `appMeta` / `minimizedIds` | `AppLessCore.ShellState` |
+| `routeCommand` (ask bar, chips) | `ShellRouter.route(_:activeApp:topScreenId:apps:)` |
+| `handleAction` (taps inside a screen) | `ShellRouter.decide(event:…)` |
+| chrome copy, curves, paddings, gate rules | `ShellChrome` |
+| `TILE_ICONS` / `KEYWORD_ICONS` / `oneWordName` | `HomeTiles` |
+| the 4s suggestion rotation | `SuggestionRotation` |
+| `APPLESS_LOGO_XML` | `AppLessWordmark` + `VectorPath` |
+| screens, caching, prefetch, `@OS`, cancellation | `GenOSCore.GenOSController` |
+
+`GenOSShellModel` (in `AppLessUI`, because it is `ObservableObject`) holds only
+what React kept *outside* state: the store subscription, the minimize
+animation and its re-entrancy guard, the toast and hint timers, the one-shot
+`@OS` execution pass, and one `StreamingParser` per visible screen.
+
+Transitions come from `ShellChrome.transition(_:)` — launch zooms up over
+380ms, push slides in from the right over 300ms, pop settles back from the left
+over 260ms, Home shrinks the screen toward the icon grid over 360ms, all on
+RN's `Easing.bezier(0.22, 1, 0.32, 1)`.
+
+### Running it
+
+The shell needs two files at runtime that this package deliberately does NOT
+copy (a copy goes stale silently):
+
+- `spec/contract/genos.schema.json` → bundled as `genos.schema.json`
+- `spec/prompt/system-prompt.generated.txt` → bundled as
+  `system-prompt.generated.txt`
+
+Add both to the host app target's resources. `AppLessConfiguration.load()`
+reads them from `Bundle.main`, along with an optional
+`AppLessCerebrasAPIKey` / `AppLessExaAPIKey` (Info.plist or the
+`EXPO_PUBLIC_*` environment variables). Without the contract, `RootView` shows
+a diagnostics screen saying exactly that instead of a home screen that could
+never generate anything.
 
 ## How a screen renders
 
@@ -155,6 +222,13 @@ live line reads `renderers registered: 0/30`.
 `registerCupertinoRenderers()` in `Renderers.swift` now wires all 30, so on
 macOS CI `report.gateLine == report.declaredGateLine` — i.e. `isComplete` is
 true and that is what CI should assert.
+
+`.github/workflows/ios-app.yml` is that macOS tier: it runs `swift test` for
+all three packages (which on macOS includes `AppLessUITests`, the LIVE
+conformance suite), greps the gate line, and — the reason the workflow exists —
+compiles the SwiftUI for iOS with
+`xcodebuild -scheme AppLessUI -destination 'generic/platform=iOS'`. If a view
+does not build, that job is red.
 
 Linux still gets a real check on the wiring: `RendererWiringTests` reads
 `Sources/AppLessUI/Renderers.swift` as TEXT and fails if any
@@ -286,6 +360,35 @@ contract, the prop shapes and the action semantics are identical.
     mid-stream can reset to the model's value where React would have kept the
     override.
 
+### The shell
+
+21. **The wordmark is drawn, not decoded.** RN hands `APPLESS_LOGO_XML` to
+    `react-native-svg`; SwiftUI has no SVG reader, so the asset's single
+    `<path d="…">` lives in `AppLessCore.AppLessWordmark` and is parsed by
+    `VectorPath` into a SwiftUI `Shape`. A Linux test re-reads
+    `src/genos/shell/applessLogo.ts` and fails if the two ever diverge.
+22. **The home wallpaper is a gradient.** `assets/home-bg.jpg` belongs to the
+    Expo app, and this package ships no bitmaps, so the backdrop is
+    `ShellChrome.Home.backdropStops` under the same 22% scrim. Drop the image
+    into the host app and swap the `backdrop` view to match RN exactly.
+23. **The minimize completion is time-based.** RN gets a `finished` flag from
+    `Animated.timing(...).start(cb)`. SwiftUI's `withAnimation` has no
+    completion on iOS 16, so the model waits the animation's own 360ms and
+    commits under a token: a newer minimize supersedes an older one, and
+    `ShellState.commitMinimize` still refuses to dismiss an app the user
+    resumed mid-flight — the same two guards RN has.
+24. **Back is a button, not a hardware key.** iOS has no hardware back, so RN's
+    `BackHandler` table is exposed as `GenOSShellModel.handleBackGesture()`
+    (backed by `ShellState.hardwareBackIntent(minimizing:)`) for the shell to
+    bind to an edge-swipe; the top-left chrome button drives the same
+    back/home decision.
+25. **The switcher's miniatures re-render, they do not snapshot.** Like RN,
+    each card renders the real element tree at full phone size and scales it
+    by 0.5 — so a streaming screen keeps painting inside its card.
+26. **Keyboard traits are iOS-only.** `submitLabel` / `textInputAutocapitalization`
+    are applied through a `#if os(iOS)` modifier so the same views still
+    compile for macOS, which is what `swift test` builds in CI.
+
 ## Sources of truth
 
 | Ported artifact | Source |
@@ -299,6 +402,10 @@ contract, the prop shapes and the action semantics are identical.
 | `FormState`, `Actions` | `src/genos/ui/shared/{forms.ts,actions.ts}`, `spec/openui-lang.md` §9.3-9.4 |
 | `MapGeometry` | `src/genos/ui/shared/map.tsx`, `contract.tsx` MapView |
 | `SemanticImage` | `src/genos/tools/images.ts`, `GenOSCore.Images` |
+| `ShellState`, `ShellRouter` | `src/genos/GenOS.tsx` |
+| `ShellChrome` | `src/genos/GenOS.tsx`, `shell/{HomeScreen,Switcher,KeyGate}.tsx` |
+| `HomeTiles`, `SuggestionRotation` | `src/genos/shell/HomeScreen.tsx`, `apps.ts` |
+| `AppLessWordmark` | `src/genos/shell/applessLogo.ts` |
 
 Regenerate `ContractSchema.swift` whenever the contract changes; the tests fail
 loudly if it drifts.

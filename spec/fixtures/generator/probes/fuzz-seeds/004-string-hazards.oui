@@ -1,0 +1,20 @@
+$name = " padded "
+root = Card([
+  CardHeader("String hazards", "sub\ttab"),
+  KVList([
+    {label: "escapes", value: "q\"b\\s\nn\rr\ttAuA"},
+    {label: "nbsp", value: "a b"},
+    {label: "bom", value: "﻿head"},
+    {label: "combining", value: "é"},
+    {label: "astral", value: "🎉🚀"},
+    {label: "u2028", value: "a b"},
+    {label: "u0085", value: "ab"},
+    {label: "bad-escape", value: "keep \q and \x41 literal"},
+    {label: "concat", value: "n=" + 1 + 2},
+    {label: "coerce-nbsp", value: " 12.5 " * 1},
+    {label: "coerce-u2028", value: " 1e3 " * 1},
+    {label: "coerce-empty", value: "" * 1},
+    {label: "trimmed", value: $name},
+    {label: "ternary", value: $name ? "yes" : "no"}
+  ], "STRINGS")
+])

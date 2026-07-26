@@ -1,0 +1,161 @@
+# Differential fuzzing of the two openui-lang ports against the JS oracle.
+#
+# The Swift (`ios/Packages/OpenUILang`) and Kotlin (`android/openui-lang`) ports
+# must serialize BYTE-IDENTICALLY to the reference implementation for every
+# input, not just for the 97 committed fixtures. Every real divergence found in
+# review so far was found by ad-hoc differential fuzzing; this workflow promotes
+# that technique into a permanent gate.
+#
+# Campaigns (spec/fixtures/generator/probes/gen-fuzz-corpus.mjs, fixed seed):
+#   prefix        every UTF-16 code-unit prefix of every fixture, fed
+#                 cumulatively to ONE streaming parser per fixture
+#                 (~23k steps — the streaming/incremental path)
+#   nonmonotonic  seeded shrink / cross-fixture switch sequences — the
+#                 cache-reset path prefix fuzzing can never reach
+#   mutation      seeded single-code-point insert/delete/replace over every
+#                 fixture using a hazard alphabet (quotes, brackets, backslash,
+#                 CR, LF, NBSP, U+FEFF, combining acute, @, $, #, //)
+#
+# Topology: two jobs, each a two-way byte comparison against the SAME JS oracle
+# (node+Kotlin on plain ubuntu, node+Swift in the official Swift container).
+# Agreement with a common oracle is agreement with each other, so this is a
+# full three-way gate without paying for a macOS runner. Locally,
+# `node probes/run-differential.mjs` does the real three-way in one process.
+#
+# Any divergence fails the job and prints the failing program, the step name and
+# both trees around the first differing byte.
+name: differential-fuzz
+
+on:
+  push:
+    paths:
+      - "ios/Packages/OpenUILang/**"
+      - "android/openui-lang/**"
+      - "spec/**"
+      - ".github/workflows/differential-fuzz.yml"
+  pull_request:
+    paths:
+      - "ios/Packages/OpenUILang/**"
+      - "android/openui-lang/**"
+      - "spec/**"
+      - ".github/workflows/differential-fuzz.yml"
+
+concurrency:
+  group: differential-fuzz-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── JS oracle vs the Kotlin port ────────────────────────────────────────────
+  node-kotlin:
+    name: oracle vs Kotlin
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: spec/fixtures/generator/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Oracle — install (applies + verifies the react-lang patch)
+        working-directory: spec/fixtures/generator
+        run: npm ci
+
+      - name: Kotlin driver — build
+        working-directory: android
+        run: ./gradlew :openui-lang:classes --console=plain
+
+      - name: Pinned campaign — committed oracle expectations still hold
+        working-directory: spec/fixtures/generator
+        run: |
+          node probes/run-differential.mjs \
+            --campaign-file probes/fuzz-campaign-pinned.json \
+            --skip-swift
+
+      - name: Pinned campaign — regenerates byte-identically (determinism gate)
+        working-directory: spec/fixtures/generator
+        run: |
+          node probes/gen-fuzz-corpus.mjs --campaign pinned --with-expected \
+            --out probes/fuzz-campaign-pinned.json
+          git diff --exit-code probes/fuzz-campaign-pinned.json
+
+      - name: Exhaustive-prefix + non-monotonic + mutation campaigns
+        working-directory: spec/fixtures/generator
+        run: |
+          node probes/run-differential.mjs \
+            --campaign prefix,nonmonotonic,mutation \
+            --out-dir "$RUNNER_TEMP/difffuzz" \
+            --max-divergences 5 \
+            --skip-swift
+
+      - name: Upload diverging streams
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: differential-streams-kotlin
+          path: ${{ runner.temp }}/difffuzz
+          retention-days: 7
+          if-no-files-found: ignore
+
+  # ── JS oracle vs the Swift port ─────────────────────────────────────────────
+  node-swift:
+    name: oracle vs Swift
+    runs-on: ubuntu-latest
+    # Official Swift image — same 6.1 toolchain the package declares, and far
+    # cheaper than a macOS runner. Swap to `runs-on: macos-14` if an
+    # Apple-platform-specific divergence is ever suspected.
+    container: swift:6.1-jammy
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: spec/fixtures/generator/package-lock.json
+
+      - name: Swift toolchain
+        run: swift --version
+
+      - name: Oracle — install (applies + verifies the react-lang patch)
+        working-directory: spec/fixtures/generator
+        run: npm ci
+
+      - name: Swift driver — build
+        working-directory: ios/Packages/OpenUILang
+        run: swift build -c release --product openui-fuzz-driver
+
+      - name: Pinned campaign — committed oracle expectations still hold
+        working-directory: spec/fixtures/generator
+        run: |
+          node probes/run-differential.mjs \
+            --campaign-file probes/fuzz-campaign-pinned.json \
+            --skip-kotlin
+
+      - name: Exhaustive-prefix + non-monotonic + mutation campaigns
+        working-directory: spec/fixtures/generator
+        run: |
+          node probes/run-differential.mjs \
+            --campaign prefix,nonmonotonic,mutation \
+            --out-dir "$RUNNER_TEMP/difffuzz" \
+            --max-divergences 5 \
+            --skip-kotlin
+
+      - name: Upload diverging streams
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: differential-streams-swift
+          path: ${{ runner.temp }}/difffuzz
+          retention-days: 7
+          if-no-files-found: ignore

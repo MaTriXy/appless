@@ -48,5 +48,13 @@ let package = Package(
             name: "AppLessCoreTests",
             dependencies: ["AppLessCore"]
         ),
+        // The live conformance gate. Every file in it is wrapped in
+        // `#if canImport(SwiftUI)`, so on Linux it is an empty test target and
+        // on macOS it asserts that `registerCupertinoRenderers()` really did
+        // register all 30 renderers (Linux can only check the DECLARED count).
+        .testTarget(
+            name: "AppLessUITests",
+            dependencies: ["AppLessCore", "AppLessUI"]
+        ),
     ]
 )

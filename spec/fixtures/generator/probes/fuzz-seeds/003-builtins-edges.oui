@@ -1,0 +1,19 @@
+mixed = [3, -1.5, "2", "10", -0.5, 0]
+root = Card([
+  CardHeader("Builtin edges"),
+  KVList([
+    {label: "floor-neg", value: @Floor(-2.5)},
+    {label: "ceil-neg", value: @Ceil(-2.5)},
+    {label: "abs-negzero", value: @Abs(0 - 0)},
+    {label: "sum", value: @Sum(mixed)},
+    {label: "avg", value: @Avg(mixed)},
+    {label: "min", value: @Min(mixed)},
+    {label: "max", value: @Max(mixed)},
+    {label: "count", value: @Count(mixed)},
+    {label: "first", value: @First(mixed)},
+    {label: "sorted", value: "" + @Sort(mixed)},
+    {label: "empty-sum", value: @Sum([])},
+    {label: "empty-avg", value: @Avg([])},
+    {label: "empty-min", value: @Min([])}
+  ], "BUILTINS")
+])

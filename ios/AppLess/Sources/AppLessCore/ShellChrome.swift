@@ -393,6 +393,8 @@ public enum ShellChrome {
         public static let tileSize: Double = 54
         public static let tileRadius: Double = 13
         public static let tileGlyphSize: Double = 26
+        /// `<TileIcon color="#fff" weight="fill" />`.
+        public static let tileGlyphInk = CdsColor("#ffffff")
         public static let tilePressedScale: Double = 0.92
         public static let tileLabelTopMargin: Double = 5
         public static let tileLabelMaxWidth: Double = 62
