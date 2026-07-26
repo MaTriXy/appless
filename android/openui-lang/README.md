@@ -30,7 +30,7 @@ Dependency order, mirroring the Swift port file-for-file:
 |---|---|
 | `JsonValue.kt` | hand-rolled JSON reader for the contract schema only |
 | `LibrarySchema.kt` | `spec/contract/genos.schema.json` → root, components, `paramOrder`, per-param `default` |
-| `StringJs.kt` | JS string-semantics wrappers + the JVM-vs-JS trap list |
+| `StringJs.kt` | the JVM-vs-JS trap list, `jsStringSplit`, and the `JSON.stringify` own-key order (`JS_OWN_KEY_ORDER`, incl. canonical-array-index hoisting) |
 | `Ast.kt` | `AstNode` sealed hierarchy, `walkAst`, `collectStateRefs` |
 | `Lexer.kt` | `tokenize`, double-quoted strings via strict JSON parsing with whole-string raw fallback, single-quoted escapes, numbers, `&`→`&&` / `|`→`||` |
 | `Preprocess.kt` | exact ECMAScript whitespace set, `jsTrim`/`jsTrimEnd`, `stripFences` (string-aware), `stripComments` |
@@ -67,8 +67,22 @@ canonical equivalence. What did NOT come for free:
   accepts `"1f"`, `"1d"`, `"0x1p3"` and `Character.isWhitespace` padding (JS
   → NaN) while rejecting `"0x10"`, `"0b101"` and `"Infinity"` (JS → 16, 5, ∞).
   `RuntimeValue.jsStringToNumber` implements the ECMAScript grammar directly.
-- **`Math.round`.** JS is `floor(x + 0.5)`; Kotlin's `Math.round`/`roundToInt`
-  is half-away-from-zero and disagrees on `-0.5`, `-2.5`, …
+- **`Math.round`.** JS is "the integral Number closest to x, ties toward
+  **+∞**" (ES 21.3.2.28) — NOT Kotlin's `Math.round`/`roundToInt`, which is
+  half-**away-from-zero** and disagrees on every negative tie (`-0.5`, `-1.5`,
+  `-2.5`, …), and NOT the `floor(x + 0.5)` shorthand either. `floor(x + 0.5)`
+  is wrong twice: the addition can round UP before the floor sees it
+  (`Math.round(0.49999999999999994)` is `0` in JS, but
+  `0.49999999999999994 + 0.5` is exactly `1.0` in binary64, so the shorthand
+  answers `1`), and it loses the negative zero (JS `Math.round(-0.5)` is `-0`).
+  `@Round(x, d)` scales first (`round(x * 10^d) / 10^d`), so the same
+  counterexample is reachable from an ordinary decimal:
+  `@Round(0.049999999999999994, 1)` is `0` in JS and `0.1` under the shorthand.
+  `Evaluator.jsMathRound` implements the spec rule with an exact tie test
+  (`x >= floor(x) + 0.5`; a non-integral double always has |x| < 2^52, so
+  `floor(x) + 0.5` is representable and the comparison cannot round —
+  unlike `x - floor(x) >= 0.5`, where the subtraction itself can).
+  Pinned against node by `MathRoundSemanticsTest`.
 - **`split`.** `java.lang.String.split` drops trailing empty segments; JS does
   not. `jsSplitLines` / `jsStringSplit` keep them.
 - **Number formatting.** `Double.toString` always emits a decimal point,
@@ -82,17 +96,50 @@ canonical equivalence. What did NOT come for free:
 ## KNOWN-DEVIATIONS
 
 The port aims for byte parity with the JS oracle. The following deviations are
-known and deliberate; none is observable in the current fixture corpus.
+known and deliberate, and none is observable in the current fixture corpus —
+but "not in the corpus" is not "not reachable": #1 in particular diverges on
+ordinary hyphenated ASCII input and is a live correctness risk for
+model-generated programs.
 
-1. **`localeCompare` approximation** (`Evaluator.sortCompare`). `@Sort`'s
-   string comparator in JS is `String.prototype.localeCompare` (V8 ICU
-   collation, host default locale). The port uses
-   `java.text.Collator.getInstance(Locale.US)`. Verified equal to the oracle on
-   a mixed case/diacritic/underscore/digit probe
-   (`"" < "_zed" < "10" < "apple" < "Apple" < "Ápple" < "banana" < "cherry"`),
-   but locale tailorings and non-Latin scripts may differ from V8's ICU tables.
-   Deliberately NOT `String.compareTo`, which is raw code-unit order and would
-   sort `"a" > "B"`.
+1. **`localeCompare` approximation** (`Evaluator.sortCompare`) — the widest
+   deviation on this list, and it bites **plain ASCII data**. `@Sort`'s string
+   comparator in JS is `String.prototype.localeCompare` (V8 ICU collation, host
+   default locale, ICU's `alternate = non-ignorable` default). The port uses
+   `java.text.Collator.getInstance(Locale.US)`, whose legacy en_US rules differ
+   in ways that have nothing to do with exotic locales:
+
+   - **Hyphen and space are IGNORABLE at primary strength** in
+     `java.text.Collator`, but are ordinary characters (sorting *before*
+     letters) in V8. So `"a-b" > "ab"` on the JVM and `"a-b" < "ab"` in V8;
+     likewise `"co-op"` vs `"coop"`, `"e-mail"` vs `"email"`, `"a b"` vs
+     `"ab"`. Any hyphenated or multi-word label — the common case for @Sort
+     input — can land on the wrong side.
+   - **Other ASCII punctuation is ordered differently** even where both treat
+     it as significant: `"a/b"` vs `"a*b"` and `"a.b"` vs `"a/b"` invert
+     between the two.
+   - **Compatibility ligatures are not decomposed.** `java.text.Collator`'s
+     rules are canonical (NFD)-based, so U+FB01 `ﬁ`, U+FB00 `ﬀ` and U+01C6 `ǆ`
+     sort as opaque units after every Latin letter, while V8 gives them the
+     primary weights of `f`+`i`, `f`+`f`, `d`+`z`. `"ﬁx" > "st"` on the JVM,
+     `"ﬁx" < "st"` in V8. (Canonical/singleton cases such as `æ`, `œ` and `ß`
+     DO agree — this is specifically the compatibility set.)
+
+   Measured: a 47-word probe of ASCII-punctuation, ligature and hyphenated
+   strings run through both engines diverges on **172 of 2209 ordered pairs**
+   (86 distinct unordered pairs). The earlier
+   `"" < "_zed" < "10" < "apple" < "Apple" < "Ápple" < "banana" < "cherry"`
+   probe still agrees, but it happens to contain none of the affected
+   characters and should not be read as evidence of parity.
+
+   Not observable in the current fixture corpus (fixtures 030, 032 and 064 are
+   the only `@Sort` users and none sorts hyphenated, space-containing or
+   ligature-bearing strings) — but it is a live correctness risk for real
+   model-generated programs, not a theoretical one. Closing it means either
+   pulling in ICU4J and configuring `alternate = non-ignorable`, or
+   hand-porting the DUCET weights.
+
+   Still deliberately NOT `String.compareTo`, which is raw code-unit order and
+   would sort `"a" > "B"` — a much larger and more visible error.
 2. **Object-identity loose equality is always false**
    (`RuntimeValue.jsLooseEquals`). JS `==` between two objects compares
    references; this port has value semantics and no stable identities. The
@@ -143,6 +190,14 @@ encoder replace them with `?`. Verified against the JS oracle with a
 - **Serializer duck-typing**: any object with a `steps` array serializes as
   `{"$action": …}`; any plain object with a string-valued `k` serializes as
   `{"$ast": …}` (mirrors `spec/fixtures/generator/lib/serialize.mjs`).
+- **Serializer key ORDER is `JSON.stringify`'s, not `Array.prototype.sort`'s**
+  (`StringJs.JS_OWN_KEY_ORDER`). The reference serializer sorts keys and
+  re-inserts them into a fresh object, but the bytes come from
+  `JSON.stringify`, which re-derives the order from `OrdinaryOwnPropertyKeys`:
+  canonical array indices (`"0"`–`"4294967294"`, `ToString(ToUint32(k)) === k`)
+  come FIRST in ascending numeric order, then everything else in code-unit
+  order. So `"10"` follows `"2"`, and `"4294967295"` is demoted to the string
+  group (fixture `075-object-key-index-order`).
 - **Schema `default` application** (`Materialize.materializeComp`): a
   missing/null REQUIRED prop takes the JSON Schema property's `default` before
   `missing-required` / `null-required` is reported. The shipped GenOS contract

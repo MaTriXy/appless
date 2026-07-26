@@ -90,10 +90,17 @@ template) — and verifies both directions:
 Any drift is listed and the process exits non-zero. The generator's
 `npm test` runs this check (script `check:streaming`), and the `spec-gates`
 CI workflow runs `npm test`, with `ios/Packages/OpenUILang/Tests/**` in its
-path filters — so editing either side without the other fails CI. The Swift
-file must keep the machine-readable shape the parser understands (plain
-literals in `steps: [ (text, expected), ... ]`, shared trees only via
+path filters — so editing either side without the other fails CI.
+
+The Swift file must keep the machine-readable shape the parser understands
+(plain literals in `steps: [ (text, expected), ... ]`, shared trees only via
 `rootWithText`); the parser fails loudly on anything it cannot extract.
+
+The Kotlin port carries the same seven scenarios in
+`android/openui-lang/src/test/kotlin/dev/appless/openuilang/StreamingSemanticsTest.kt`.
+That file is NOT parsed by `--check` (the scanner understands Swift literals
+only); it is kept in sync by hand against the `SCENARIOS` table, and its
+expectations are regenerable with `expected-tree.mjs --steps`.
 
 ## `scanner-tests.mjs` — SwiftScanner unit tests
 

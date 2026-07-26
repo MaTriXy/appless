@@ -434,11 +434,17 @@ internal class Evaluator(store: Map<String, RtValue>) {
      * `Sort`'s numeric-aware comparator. The numeric branch is exact; the
      * string branch approximates JS `String.prototype.localeCompare`.
      *
-     * KNOWN-DEVIATION (mirrors Swift #1): JS `localeCompare` is V8's ICU
-     * collation for the host default locale. `java.text.Collator` for
-     * `Locale.US` agrees for ASCII data; locale tailorings and non-Latin
-     * scripts may differ. Deliberately NOT `String.compareTo`, which is raw
-     * code-unit order and would sort `"a" > "B"`.
+     * KNOWN-DEVIATION #1 (see README) — and NOT limited to exotic locales.
+     * JS `localeCompare` is V8's ICU collation (default
+     * `alternate = non-ignorable`); `java.text.Collator.getInstance(Locale.US)`
+     * uses legacy en_US rules that treat **hyphen and space as ignorable at
+     * primary strength** and do not decompose **compatibility ligatures**
+     * (U+FB01 `ﬁ`, U+FB00 `ﬀ`, U+01C6 `ǆ`). So plain ASCII input diverges:
+     * `"a-b" > "ab"` and `"co-op" > "coop"` here, `<` in V8. A 47-word
+     * punctuation/ligature probe diverges on 172 of 2209 ordered pairs.
+     *
+     * Still deliberately NOT `String.compareTo`, which is raw code-unit order
+     * and would sort `"a" > "B"`.
      */
     private fun sortCompare(av: RtValue, bv: RtValue): Int {
         fun isNumeric(v: RtValue): Boolean = when (v) {

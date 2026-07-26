@@ -142,6 +142,21 @@ current fixture corpus; each is listed with the condition under which it
   `steps` array serializes as `{"$action": ...}`, and any plain object
   with a string-valued `k` serializes as `{"$ast": ...}` — both mirror
   `spec/fixtures/generator/lib/serialize.mjs`.
+- **Serializer key ORDER is `JSON.stringify`'s, not
+  `Array.prototype.sort`'s** (`StringJS.jsOwnKeyLess`). The reference
+  serializer sorts keys and re-inserts them into a fresh object, but the
+  bytes come from `JSON.stringify`, which re-derives the order from
+  `OrdinaryOwnPropertyKeys`: canonical array indices (`"0"`–
+  `"4294967294"`, `ToString(ToUint32(k)) === k`) come FIRST in ascending
+  numeric order, then everything else in UTF-16 code-unit order. So
+  `"10"` follows `"2"`, and `"4294967295"` is demoted to the string group
+  (fixture `075-object-key-index-order`).
+- **ECMAScript `Math.round`** (`Evaluator.jsMathRound`): "closest integral
+  Number, ties toward +∞" — not Swift's half-away-from-zero `rounded()`
+  and not `floor(x + 0.5)`, whose addition can round up first
+  (`Math.round(0.49999999999999994)` is `0` in JS, the shorthand says `1`)
+  and which loses `-0`. Reachable through `@Round`'s scaling as
+  `@Round(0.049999999999999994, 1)`; pinned by `MathRoundSemanticsTests`.
 - **ECMAScript `Number::toString`** (`TreeSerializer.formatNumber`):
   shortest-round-trip digits, positional for decimal exponents in
   (-7, 21) — including integer-valued doubles beyond Int64

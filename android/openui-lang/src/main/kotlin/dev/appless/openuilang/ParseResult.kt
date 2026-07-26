@@ -48,6 +48,12 @@ public sealed interface PropValue {
  * and `String.hashCode` are code-unit based, so a `LinkedHashMap` already
  * keeps precomposed and decomposed keys distinct (fixture 072). The wrapper
  * exists so the two ports have the same shape and so ordering stays explicit.
+ *
+ * Deliberately NO structural `equals`/`hashCode`: nothing in the port or its
+ * tests compares prop objects by value — trees are compared as canonical JSON
+ * bytes via [TreeSerializer] — and a value-equality override here would have
+ * to answer whether key ORDER counts, which is a question only the serializer
+ * gets to answer (see [TreeSerializer]'s `JS_OWN_KEY_ORDER`).
  */
 public class PropObject() {
     private val map = LinkedHashMap<String, PropValue>()
@@ -70,16 +76,7 @@ public class PropObject() {
 
     public operator fun set(key: String, value: PropValue?): Unit = put(key, value)
 
-    override fun equals(other: Any?): Boolean =
-        other is PropObject && other.map == map && other.map.keys.toList() == map.keys.toList()
-
-    override fun hashCode(): Int = map.hashCode()
-
     override fun toString(): String = map.toString()
-
-    public companion object {
-        public fun of(vararg pairs: Pair<String, PropValue>): PropObject = PropObject(pairs.toList())
-    }
 }
 
 /** An element in the resolved tree. */

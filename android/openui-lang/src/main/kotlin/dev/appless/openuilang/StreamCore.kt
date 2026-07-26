@@ -26,8 +26,6 @@ internal class OrderedMap<V> {
     }
 
     fun has(key: String): Boolean = map.containsKey(key)
-
-    fun clear() = map.clear()
 }
 
 /**
@@ -168,14 +166,32 @@ internal class StreamCore(schema: LibrarySchema) {
      * scratch (spec §10.2).
      */
     fun set(fullText: String): InternalResult {
-        val current = buf.toString()
-        if (fullText.length < current.length || !fullText.startsWith(current)) {
-            reset()
-        }
+        if (!bufferIsPrefixOf(fullText)) reset()
         if (fullText.length > buf.length) {
             buf.append(fullText, buf.length, fullText.length)
         }
         return currentResult()
+    }
+
+    /**
+     * `fullText.startsWith(buf)` — the §10.2 prefix-extension test — WITHOUT
+     * materializing the buffer.
+     *
+     * `buf.toString()` copies the entire accumulated program on every flush,
+     * and the Renderer calls [set] once per streamed token, so that is a
+     * quadratic amount of copying over a response purely to answer a question
+     * that a code-unit walk answers in place (and usually bails out of on the
+     * first mismatch). Semantics are unchanged: `String.startsWith` on the JVM
+     * is a UTF-16 code-unit prefix test, which is exactly this loop, and a
+     * shorter text still fails the length guard as before.
+     */
+    private fun bufferIsPrefixOf(fullText: String): Boolean {
+        val n = buf.length
+        if (fullText.length < n) return false
+        for (i in 0 until n) {
+            if (fullText[i] != buf[i]) return false
+        }
+        return true
     }
 
     private fun reset() {
