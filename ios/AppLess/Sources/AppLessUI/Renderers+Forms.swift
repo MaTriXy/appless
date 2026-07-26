@@ -353,7 +353,7 @@ struct SliderView: View {
             }
             HStack(spacing: CdsMetrics.Spacing.sliderRowGap) {
                 Group {
-                    if step > 0 {
+                    if SliderPresentation.isDiscrete(step: step) {
                         Slider(value: $value, in: minimum...upper, step: step)
                     } else {
                         Slider(value: $value, in: minimum...upper)
@@ -386,7 +386,7 @@ struct SliderView: View {
             let stored = ctx.forms.value(form: ctx.formName, name: name)?.numbersValue
             value = GenosProps.sliderValue(
                 fieldValue: stored,
-                defaultValue: p.value("defaultValue").map { $0.arrayValue.compactMap(\.finiteNumberValue) },
+                defaultValue: SliderPresentation.defaultValues(p.value("defaultValue")),
                 min: minimum)
         }
         .onChange(of: value) { newValue in

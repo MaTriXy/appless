@@ -32,7 +32,7 @@ struct ChartAxisTitle: View {
     let alignment: Alignment
 
     var body: some View {
-        if let text, !text.isEmpty {
+        if ChartData.showsAxisTitle(text), let text {
             Text(text)
                 .font(.system(size: ChartData.axisFontSize))
                 .foregroundStyle(Color(theme.ink2))
@@ -220,7 +220,7 @@ struct CartesianLineChartView: View {
     @ViewBuilder
     private func plot(_ input: CartesianChartInput, domainMax: Double) -> some View {
         #if canImport(Charts)
-        let showsPoints = input.labels.count <= ChartData.maxPointsWithMarkers
+        let showsPoints = ChartData.showsPointMarkers(labelCount: input.labels.count)
         Chart(input.points) { point in
             if area {
                 AreaMark(
@@ -313,7 +313,7 @@ struct PieChartView: View {
         let innerFactor = ChartData.innerRadiusFactor(variant: p.string("variant"))
         let slices = ChartData.pieSlices(values: values, semiCircular: semiCircular)
         let boxHeight = ChartData.pieChartHeight(semiCircular: semiCircular)
-        if !slices.isEmpty {
+        if ChartData.rendersPie(values: values) {
             VStack(spacing: 0) {
                 ZStack {
                     ForEach(slices, id: \.index) { slice in
@@ -363,7 +363,7 @@ struct PieSliceShape: Shape {
         let end = Angle(radians: slice.drawnEndAngle)
 
         var path = Path()
-        if inner <= 0 {
+        if !disc.isDonut {
             path.move(to: center)
             path.addArc(
                 center: center, radius: radius,

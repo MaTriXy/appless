@@ -302,4 +302,44 @@ import Testing
             #expect(source.contains(pattern), "GenOS.tsx no longer contains \(pattern)")
         }
     }
+
+    // MARK: - @OS(open, …)
+
+    /// `APPS.find(a => a.id === target || a.name.toLowerCase() === target)`
+    /// (`GenOS.tsx` L412-414), falling back to a summoned app.
+    ///
+    /// The name match is case-insensitive and the id match is EXACT - both
+    /// halves matter, and the fallback must not quietly resolve to some
+    /// unrelated catalog entry.
+    @Test func osOpenResolvesByIdOrLowercasedName() {
+        let catalog = [
+            AppDef(
+                id: "mail", name: "Mail", emoji: "M", tileStart: "#000", tileEnd: "#111",
+                request: "open mail"),
+            AppDef(
+                id: "photos", name: "Photo Library", emoji: "P", tileStart: "#000",
+                tileEnd: "#111", request: "open photos"),
+        ]
+        #expect(ShellRouter.osOpenTarget(argument: "mail", apps: catalog).id == "mail")
+        #expect(ShellRouter.osOpenTarget(argument: "MAIL", apps: catalog).id == "mail")
+        #expect(
+            ShellRouter.osOpenTarget(argument: "Photo Library", apps: catalog).id == "photos")
+        #expect(
+            ShellRouter.osOpenTarget(argument: "photo library", apps: catalog).id == "photos")
+
+        // A PARTIAL name is not a match - unlike `routeCommand`, which does a
+        // substring test. Confusing the two would make @OS(open, "photo")
+        // resume the wrong app instead of summoning a new one.
+        let partial = ShellRouter.osOpenTarget(argument: "photo", apps: catalog)
+        #expect(partial.id != "photos")
+        #expect(partial.name == "photo")
+
+        // Unknown argument summons; the summoned app is never a catalog one.
+        let summoned = ShellRouter.osOpenTarget(argument: "Weekly Budget", apps: catalog)
+        #expect(!catalog.map(\.id).contains(summoned.id))
+        #expect(summoned.name == "Weekly Budget")
+
+        // An empty catalog cannot crash - it always summons.
+        #expect(ShellRouter.osOpenTarget(argument: "mail", apps: []).name == "mail")
+    }
 }

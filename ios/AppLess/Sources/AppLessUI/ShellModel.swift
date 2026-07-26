@@ -354,9 +354,7 @@ public final class GenOSShellModel: ObservableObject {
         case .home:
             goHome()
         case .open(let argument):
-            let target = argument.lowercased()
-            let known = apps.first { $0.id == target || $0.name.lowercased() == target }
-            launch(known ?? Apps.summonApp(argument))
+            launch(ShellRouter.osOpenTarget(argument: argument, apps: apps))
         }
     }
 

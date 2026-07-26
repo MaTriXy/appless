@@ -431,6 +431,13 @@ public enum CdsMetrics {
         /// `large-heavy` also carries `marginBottom: -6`. components.tsx L103.
         public static let largeHeavyMarginBottom: Double = -6
 
+        /// `large-heavy` is the only `TextContent` style that pulls the next
+        /// block up (`marginBottom: -6`, components.tsx L103); every other
+        /// style, including an unknown one, adds nothing.
+        public static func textContentBottomInset(_ style: String?) -> Double {
+            style == "large-heavy" ? largeHeavyMarginBottom : 0
+        }
+
         /// Unknown/missing `style` falls back to `default`. components.tsx L108.
         public static func textContentStyle(_ name: String?) -> TextStyle {
             textContent[name ?? "default"] ?? textContent["default"]!

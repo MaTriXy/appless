@@ -228,6 +228,78 @@ import Testing
         #expect(FieldSeeding.sliderSeed(value: .array([]), defaultValue: nil, min: 1) == .array([]))
     }
 
+    /// `props.variant === "discrete" ? (props.step ?? 1) : 0`, then
+    /// `step > 0` picks the stepped SwiftUI initializer.
+    @Test func onlyADiscreteSliderHasASteppedTrack() {
+        #expect(SliderPresentation.isDiscrete(step: GenosProps.sliderStep(variant: "discrete", step: nil)))
+        #expect(SliderPresentation.isDiscrete(step: GenosProps.sliderStep(variant: "discrete", step: 5)))
+        #expect(!SliderPresentation.isDiscrete(step: GenosProps.sliderStep(variant: nil, step: 5)))
+        #expect(!SliderPresentation.isDiscrete(step: 0))
+        // A negative step is not "discrete either way" - it must not reach a
+        // SwiftUI `Slider(step:)`, which traps on a non-positive stride.
+        #expect(!SliderPresentation.isDiscrete(step: -1))
+    }
+
+    /// `props.defaultValue?.[0]` - optional chaining on a non-array yields
+    /// undefined, so the value chain falls through to `min`.
+    @Test func sliderDefaultValuesRejectNonArrays() {
+        #expect(SliderPresentation.defaultValues(.array([.number(3), .number(9)])) == [3, 9])
+        #expect(SliderPresentation.defaultValues(.array([])) == [])
+        #expect(SliderPresentation.defaultValues(nil) == nil)
+        #expect(SliderPresentation.defaultValues(.number(3)) == nil)
+        #expect(SliderPresentation.defaultValues(.null) == nil)
+        // Non-finite entries are dropped, not turned into NaN bounds.
+        #expect(SliderPresentation.defaultValues(.array([.number(.nan), .number(2)])) == [2])
+        #expect(
+            GenosProps.sliderValue(
+                fieldValue: nil,
+                defaultValue: SliderPresentation.defaultValues(.number(3)),
+                min: 7) == 7)
+    }
+
+    // MARK: - Toggle
+
+    /// `override ?? !!props.on` - two different tests, and the pair below is
+    /// where collapsing them into one would show: `override == false` must
+    /// win over `on: true`.
+    @Test func toggleOverrideBeatsAFreshOnProp() {
+        #expect(TogglePresentation.isOn(override: nil, onProp: .bool(true)))
+        #expect(!TogglePresentation.isOn(override: nil, onProp: .bool(false)))
+        #expect(!TogglePresentation.isOn(override: nil, onProp: nil))
+        #expect(!TogglePresentation.isOn(override: false, onProp: .bool(true)))
+        #expect(TogglePresentation.isOn(override: true, onProp: .bool(false)))
+        // `!!props.on` is truthiness, not a Bool cast: a non-empty string is on.
+        #expect(TogglePresentation.isOn(override: nil, onProp: .string("yes")))
+        #expect(!TogglePresentation.isOn(override: nil, onProp: .string("")))
+        #expect(!TogglePresentation.isOn(override: nil, onProp: .number(0)))
+        #expect(TogglePresentation.isOn(override: nil, onProp: .number(1)))
+        #expect(!TogglePresentation.isOn(override: nil, onProp: .null))
+    }
+
+    // MARK: - Chips (appearance)
+
+    @Test func chipActiveStateDrivesFillInkAndBorderTogether() {
+        #expect(ChipsPresentation.isActive(index: 2, active: 2))
+        #expect(!ChipsPresentation.isActive(index: 1, active: 2))
+        // The tap gate is the complement of the appearance test, so an active
+        // chip can never both re-dispatch and look active.
+        for index in 0...3 {
+            #expect(
+                ChipsPresentation.isActive(index: index, active: 2)
+                    != ChipsPresentation.shouldDispatch(tapped: index, active: 2))
+        }
+    }
+
+    // MARK: - TextContent
+
+    @Test func onlyLargeHeavyPullsTheNextBlockUp() {
+        #expect(CdsMetrics.Typography.textContentBottomInset("large-heavy") == -6)
+        #expect(CdsMetrics.Typography.textContentBottomInset("large") == 0)
+        #expect(CdsMetrics.Typography.textContentBottomInset("small-heavy") == 0)
+        #expect(CdsMetrics.Typography.textContentBottomInset(nil) == 0)
+        #expect(CdsMetrics.Typography.textContentBottomInset("bogus") == 0)
+    }
+
     // MARK: - Buttons
 
     @Test func buttonsAreARowUnlessTheDirectionSaysColumn() {

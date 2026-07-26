@@ -154,7 +154,9 @@ struct SkeletonView: View {
                     RoundedRectangle(cornerRadius: block.radius, style: .continuous)
                         .fill(Color(ShellChrome.Skeleton.fill))
                         .frame(
-                            width: width > 0 ? width * CGFloat(block.widthFraction) : nil,
+                            width: ShellChrome.Skeleton.blockWidth(
+                                available: Double(width), fraction: block.widthFraction
+                            ).map { CGFloat($0) },
                             height: block.height)
                 }
             }

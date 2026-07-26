@@ -194,6 +194,7 @@ struct ChipsView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: CdsMetrics.Spacing.chipGap) {
                 ForEach(labels.indices, id: \.self) { index in
+                    let isActive = ChipsPresentation.isActive(index: index, active: active)
                     Button {
                         // Re-tapping the active chip is a no-op (it would ask
                         // the model to re-render the screen it is already on).
@@ -205,17 +206,14 @@ struct ChipsView: View {
                     } label: {
                         Text(labels[index])
                             .cdsTextStyle(CdsMetrics.Typography.chip)
-                            .foregroundStyle(
-                                Color(index == active ? ctx.theme.bg : ctx.theme.ink)
-                            )
+                            .foregroundStyle(Color(isActive ? ctx.theme.bg : ctx.theme.ink))
                             .padding(.vertical, CdsMetrics.Spacing.chipPaddingVertical)
                             .padding(.horizontal, CdsMetrics.Spacing.chipPaddingHorizontal)
                             .background(
-                                Capsule().fill(
-                                    Color(index == active ? ctx.theme.ink : ctx.theme.group))
+                                Capsule().fill(Color(isActive ? ctx.theme.ink : ctx.theme.group))
                             )
                             .overlay {
-                                if index != active {
+                                if !isActive {
                                     Capsule()
                                         .stroke(
                                             Color(ctx.theme.sep),

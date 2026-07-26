@@ -343,6 +343,13 @@ public enum ShellChrome {
             public let radius: Double
         }
 
+        /// A block's width, or `nil` before the container has been measured -
+        /// the placeholder then takes its natural width instead of collapsing
+        /// to zero.
+        public static func blockWidth(available: Double, fraction: Double) -> Double? {
+            available > 0 ? available * fraction : nil
+        }
+
         public static let blocks: [Block] = [
             Block(height: 30, widthFraction: 0.55, radius: 12),
             Block(height: 150, widthFraction: 1.0, radius: 16),

@@ -207,4 +207,28 @@ extension ChartData {
     /// Legend entries per line. RN uses `flexWrap`; the port chunks, which is
     /// identical for the six-color palette at phone widths.
     public static let legendEntriesPerRow = 3
+
+    /// `if (!xLabel) return null` / `if (!yLabel) return null` (L104, L114) -
+    /// a JS truthiness test, so an EMPTY axis title reserves no space either.
+    public static func showsAxisTitle(_ text: String?) -> Bool {
+        !(text ?? "").isEmpty
+    }
+
+    /// `pts.length <= 16` - point markers are dropped once the series is long
+    /// enough for them to read as noise (L400).
+    public static func showsPointMarkers(labelCount: Int) -> Bool {
+        labelCount <= maxPointsWithMarkers
+    }
+
+    /// `if (!total) return null` (L464) - a pie with nothing positive in it
+    /// renders no chart at all, not an empty disc with a legend.
+    public static func rendersPie(values: [Double]) -> Bool {
+        !pieSlices(values: values, semiCircular: false).isEmpty
+    }
+}
+
+extension ChartData.PieDisc {
+    /// `arcPath`'s two branches: `inner <= 0` draws a filled wedge from the
+    /// centre, otherwise the wedge is an annulus (L429-437).
+    public var isDonut: Bool { innerRadius > 0 }
 }

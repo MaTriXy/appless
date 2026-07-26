@@ -135,6 +135,18 @@ public enum ShellRouter {
         return .summon(app)
     }
 
+    /// `@OS(open, "<arg>")`: `APPS.find(a => a.id === target || a.name.toLowerCase()
+    /// === target)`, falling back to a summoned app (`GenOS.tsx` L411-414).
+    ///
+    /// The comparison lowercases the ARGUMENT and the catalog NAME, but not
+    /// the catalog id - ids are already lowercase, and matching them
+    /// case-insensitively would be a change, not a port.
+    public static func osOpenTarget(argument: String, apps: [AppDef] = Apps.all) -> AppDef {
+        let target = argument.lowercased()
+        let known = apps.first { $0.id == target || $0.name.lowercased() == target }
+        return known ?? Apps.summonApp(argument)
+    }
+
     // MARK: handleAction
 
     /// RN's navigation-shaped-request guard: "show me all my apps" must reach

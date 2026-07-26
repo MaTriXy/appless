@@ -82,7 +82,9 @@ struct StatTilesView: View {
     private func tile(_ item: StatTile) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: CdsMetrics.Spacing.tileLabelGap) {
-                if let icon = item.icon, !icon.isEmpty {
+                // `!!it.icon` is already applied by `GenosProps.statTiles`, so
+                // a present icon is a truthy one.
+                if let icon = item.icon {
                     LucideIcon(
                         icon,
                         size: CdsMetrics.Size.tileGlyph,
@@ -99,7 +101,7 @@ struct StatTilesView: View {
                     .monospacedDigit()
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
-                if let delta = item.delta, !delta.isEmpty {
+                if let delta = item.delta {
                     Text(delta)
                         .cdsTextStyle(CdsMetrics.Typography.tileDelta)
                         .foregroundStyle(Color(item.deltaSign.color(ctx.theme)))

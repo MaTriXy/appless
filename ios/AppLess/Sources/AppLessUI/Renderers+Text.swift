@@ -80,9 +80,7 @@ struct TextContentView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, CdsMetrics.Spacing.headerPaddingHorizontal)
             // `large-heavy` pulls the next block up. components.tsx L103.
-            .padding(
-                .bottom,
-                key == "large-heavy" ? CdsMetrics.Typography.largeHeavyMarginBottom : 0)
+            .padding(.bottom, CdsMetrics.Typography.textContentBottomInset(key))
     }
 }
 

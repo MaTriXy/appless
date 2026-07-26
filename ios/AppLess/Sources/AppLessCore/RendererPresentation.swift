@@ -136,6 +136,10 @@ public enum ChipsPresentation {
         tapped != active
     }
 
+    /// `i === active` - drives the fill, the ink AND the border (an active
+    /// chip has `borderWidth: 0`), so all three read one predicate.
+    public static func isActive(index: Int, active: Int) -> Bool { index == active }
+
     /// `triggerAction(msg, undefined, undefined)` (L593-597) - no form name,
     /// no plan.
     public static let dispatchesWithFormName: String? = nil
@@ -187,6 +191,19 @@ public enum SliderPresentation {
         return (lower, declared > lower ? declared : lower + 1)
     }
 
+    /// A step of 0 means "continuous" - RN passes it straight to the RN
+    /// slider, SwiftUI needs a different initializer, so the branch is named
+    /// here rather than spelled `step > 0` inside a view.
+    public static func isDiscrete(step: Double) -> Bool { step > 0 }
+
+    /// `props.defaultValue?.[0]` decoded to the numbers the value chain needs.
+    /// A non-array (or an array with no finite numbers) yields `nil` / `[]`,
+    /// so the chain falls through to `props.min` exactly as `?.[0]` does.
+    public static func defaultValues(_ prop: PropValue?) -> [Double]? {
+        guard let prop, case .array(let items) = prop else { return nil }
+        return items.compactMap(\.finiteNumberValue)
+    }
+
     /// `{Math.round(current * 100) / 100}` interpolated into a `<Text>`
     /// (L208) - so the string is JS's, not `%g`'s.
     ///
@@ -195,6 +212,21 @@ public enum SliderPresentation {
     /// `1234567.89` printed `1.23457e+06`.
     public static func readoutText(_ value: Double) -> String {
         JSNumber.string(GenosProps.sliderReadout(value))
+    }
+}
+
+// MARK: - Toggle
+
+/// `Toggle`'s local flip. `components.tsx` L227-281.
+public enum TogglePresentation {
+
+    /// `override ?? !!props.on` (L230).
+    ///
+    /// `override` is `useState<boolean | null>(null)`: until the user touches
+    /// the switch it is nil and a freshly streamed `on` prop wins, which is
+    /// why the two tests are `??` (nullish) and `!!` (truthy) rather than one.
+    public static func isOn(override: Bool?, onProp: PropValue?) -> Bool {
+        override ?? (onProp?.isJSTruthy ?? false)
     }
 }
 

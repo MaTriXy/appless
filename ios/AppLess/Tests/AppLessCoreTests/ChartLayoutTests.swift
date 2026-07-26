@@ -184,6 +184,49 @@ import Testing
         #expect(!tiny.isDrawable)
     }
 
+    /// `if (!xLabel) return null` is a truthiness test, so an empty axis
+    /// title reserves no vertical space.
+    @Test func axisTitlesAreHiddenWhenAbsentOrEmpty() {
+        #expect(ChartData.showsAxisTitle("Day"))
+        #expect(!ChartData.showsAxisTitle(""))
+        #expect(!ChartData.showsAxisTitle(nil))
+        #expect(ChartData.showsAxisTitle(" "))  // whitespace is truthy in JS
+    }
+
+    /// Markers are dropped once the series gets long enough to look noisy;
+    /// the boundary is inclusive (`<= 16`).
+    @Test func pointMarkersStopJustPastSixteen() {
+        #expect(ChartData.showsPointMarkers(labelCount: 1))
+        #expect(ChartData.showsPointMarkers(labelCount: 16))
+        #expect(!ChartData.showsPointMarkers(labelCount: 17))
+        #expect(ChartData.showsPointMarkers(labelCount: 0))
+    }
+
+    /// `if (!total) return null` - the legend must not survive an all-zero
+    /// pie, which is what a `!labels.isEmpty` test would have allowed.
+    @Test func aPieWithNoPositiveValueRendersNothing() {
+        #expect(ChartData.rendersPie(values: [1, 2]))
+        #expect(!ChartData.rendersPie(values: [0, 0]))
+        #expect(!ChartData.rendersPie(values: []))
+        #expect(!ChartData.rendersPie(values: [-3]))  // negatives clamp to 0
+        #expect(ChartData.rendersPie(values: [0, 0, 0.5]))
+    }
+
+    /// `arcPath`'s two branches.
+    @Test func onlyADonutHasAHole() {
+        let pie = ChartData.pieDisc(
+            width: 300, height: 170, semiCircular: false, innerRadiusFactor: 0)
+        let donut = ChartData.pieDisc(
+            width: 300, height: 170, semiCircular: false, innerRadiusFactor: 0.6)
+        #expect(!pie.isDonut)
+        #expect(donut.isDonut)
+        // A donut in a box too small for a positive radius is neither.
+        let tiny = ChartData.pieDisc(
+            width: 10, height: 10, semiCircular: false, innerRadiusFactor: 0.6)
+        #expect(!tiny.isDrawable)
+        #expect(!tiny.isDonut)
+    }
+
     @Test func pieChartHeightSwitchesOnAppearance() {
         #expect(ChartData.pieChartHeight(semiCircular: true) == 110)
         #expect(ChartData.pieChartHeight(semiCircular: false) == 170)

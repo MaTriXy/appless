@@ -117,7 +117,7 @@ struct ToggleView: View {
 
     var body: some View {
         let p = PropReader(node)
-        let isOn = override ?? (p.value("on")?.isJSTruthy ?? false)
+        let isOn = TogglePresentation.isOn(override: override, onProp: p.value("on"))
         Button {
             override = !isOn
         } label: {

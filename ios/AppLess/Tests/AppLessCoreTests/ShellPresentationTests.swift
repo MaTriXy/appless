@@ -248,6 +248,17 @@ import Testing
         #expect([wentHome, stayedHome, cameBack] == [true, false, true])
     }
 
+    // MARK: - Skeleton
+
+    /// A placeholder block sized before its container has been measured must
+    /// take its natural width, not collapse to zero.
+    @Test func skeletonBlocksWaitForAMeasuredWidth() {
+        #expect(ShellChrome.Skeleton.blockWidth(available: 320, fraction: 0.55) == 176)
+        #expect(ShellChrome.Skeleton.blockWidth(available: 320, fraction: 1) == 320)
+        #expect(ShellChrome.Skeleton.blockWidth(available: 0, fraction: 0.55) == nil)
+        #expect(ShellChrome.Skeleton.blockWidth(available: -1, fraction: 0.55) == nil)
+    }
+
     // MARK: - Wordmark
 
     /// SVG `preserveAspectRatio="xMidYMid meet"`: uniform scale, centered
