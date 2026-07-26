@@ -70,6 +70,11 @@ android {
 
     testOptions {
         unitTests.isReturnDefaultValues = true
+        // Robolectric needs the MERGED resources, assets and AndroidManifest to
+        // stand up a real `Application`/`Activity` off-device. Without this the
+        // Compose tier below cannot inflate a theme and every
+        // `createComposeRule()` test dies in `ActivityScenario.launch`.
+        unitTests.isIncludeAndroidResources = true
     }
 }
 
@@ -135,11 +140,46 @@ dependencies {
     testImplementation(kotlin("test"))
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+
+    // ------------------------------------------------------- Compose UI tier
+    //
+    // The five original suites are plain JVM tests over routing/state/registry
+    // logic — not one `@Composable` ever ran. Everything below exists so the 30
+    // Material renderers and the shell can be COMPOSED and asserted against, on
+    // Linux, with no emulator and no device:
+    //
+    //   Robolectric  — a real (sandboxed) Android runtime on the JVM, so
+    //                  `Activity`, `Looper`, resources, `Canvas` and
+    //                  `TextMeasurer` all exist inside `testDebugUnitTest`.
+    //   ui-test-junit4 — `createComposeRule()` / `createAndroidComposeRule()`
+    //                  plus the semantics matchers (`onNodeWithText`, …).
+    //                  Compose has supported this rule under Robolectric since
+    //                  1.5; the `androidTest` variant of the same API is what
+    //                  would need a device.
+    //   ui-test-manifest — supplies the `ComponentActivity` entry that
+    //                  `createComposeRule()` launches into. It is a DEBUG
+    //                  manifest overlay, which is why it is `debugImplementation`
+    //                  and not `testImplementation`.
+    //
+    // Robolectric's runner is JUnit 4 and this build is on the JUnit Platform,
+    // so the vintage engine runs it alongside the Jupiter suites in ONE task.
+    testImplementation("org.robolectric:robolectric:4.14.1")
+    testImplementation("androidx.test:core-ktx:1.6.1")
+    testImplementation(platform("androidx.compose:compose-bom:2024.12.01"))
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
+    testImplementation("junit:junit:4.13.2")
+    testRuntimeOnly("org.junit.vintage:junit-vintage-engine:5.11.4")
 }
 
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
     systemProperty("file.encoding", "UTF-8")
+    // Robolectric resolves `android-all-instrumented` from Maven Central on
+    // first use and caches it under ~/.m2; pinning the repo keeps a CI runner
+    // from depending on whatever `mavenLocal` happens to hold.
+    systemProperty("robolectric.offline", "false")
+    systemProperty("robolectric.logging.enabled", "true")
     testLogging {
         showStandardStreams = true
         events("passed", "skipped", "failed")

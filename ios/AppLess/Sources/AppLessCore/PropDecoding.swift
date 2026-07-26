@@ -153,10 +153,33 @@ public struct PropReader {
 
     /// Child elements of an array-of-elements prop, optionally filtered to one
     /// component type (`items` for Tabs/Select, `series` for the charts).
+    ///
+    /// - Important: this flattens a LONE element into a one-item list, which is
+    ///   what `renderNode(props.input)` needs. The array-typed list props go
+    ///   through ``elementList(_:component:)`` instead, because every RN reader
+    ///   for those is guarded by `Array.isArray(...) ? ... : []`.
     public func elements(_ key: String, component: String? = nil) -> [ElementNode] {
         let all = (value(key)?.childElements ?? [])
         guard let component else { return all }
         return all.filter { $0.component == component }
+    }
+
+    /// Child elements of a prop the contract declares as an ARRAY of elements
+    /// (`ListBlock.items`, `Tabs.items`, `Select.items`, `Buttons.buttons`,
+    /// `Form.fields`, chart `series`).
+    ///
+    /// A non-array value yields `[]`, never a one-item list. RN spells this
+    /// guard out for the props whose renderer survives it -
+    /// `Array.isArray(props.items) ? props.items : []` (`components.tsx` L310,
+    /// L626; `shared/forms.ts` L62) - and for the rest
+    /// (`(props.fields ?? []).filter(Boolean)`) a non-array is a `TypeError`
+    /// that takes the whole screen down, so an empty list is the graceful
+    /// reading of the same intent rather than a behavior change.
+    public func elementList(_ key: String, component: String? = nil) -> [ElementNode] {
+        guard case .array(let items)? = value(key) else { return [] }
+        let elements = items.compactMap(\.elementValue)
+        guard let component else { return elements }
+        return elements.filter { $0.component == component }
     }
 
     /// The `children` slot (Card, TabItem), flattened to elements.
@@ -183,22 +206,37 @@ public enum StructuralProps {
     }
 
     /// `SelectItem(value, label)` - consumed by `Select`.
+    ///
+    /// `label` stays OPTIONAL because `forms.tsx` reads it through two
+    /// different fallbacks: the option row prints `it.label ?? it.value`
+    /// (L157) while the closed control prints
+    /// `selected?.label ?? props.placeholder ?? "Select…"` (L124) - which is
+    /// the placeholder, NOT the value, for a label-less item. Collapsing the
+    /// two at decode time makes the control print the raw value instead.
+    /// See ``SelectPresentation``.
     public struct SelectItem: Sendable, Equatable {
         public let value: String
-        public let label: String
+        public let label: String?
 
-        public init(value: String, label: String) {
+        public init(value: String, label: String?) {
             self.value = value
             self.label = label
         }
+
+        /// `it.label ?? it.value` - what one row of the open list prints.
+        public var optionLabel: String { label ?? value }
     }
 
     /// `TabItem(label, children)` - consumed by `Tabs`.
+    ///
+    /// `label` stays OPTIONAL because `components.tsx` L666 falls back with
+    /// `??`, which fires on `undefined` only: an explicitly EMPTY label
+    /// renders an empty segment in RN, not `"Tab 1"`.
     public struct TabItem: Sendable, Equatable {
-        public let label: String
+        public let label: String?
         public let children: [ElementNode]
 
-        public init(label: String, children: [ElementNode]) {
+        public init(label: String?, children: [ElementNode]) {
             self.label = label
             self.children = children
         }
@@ -206,30 +244,30 @@ public enum StructuralProps {
 
     /// Decode the `series` prop of any cartesian/pie chart.
     public static func series(of node: ElementNode) -> [Series] {
-        PropReader(node).elements("series", component: "Series").map { element in
+        PropReader(node).elementList("series", component: "Series").map { element in
             let p = PropReader(element)
             return Series(
-                category: p.string("category") ?? "",
+                // `String(p.category ?? "")` - an explicit coercion, so a
+                // number or boolean category keeps its text.
+                category: p.value("category").map(\.jsStringCoerced) ?? "",
                 values: p.numbers("values").map(clampChartValue)
             )
         }
     }
 
-    /// Decode the `items` prop of `Select`. `label` falls back to `value`,
-    /// matching `forms.tsx` L157 (`it.label ?? it.value`).
+    /// Decode the `items` prop of `Select`.
     public static func selectItems(of node: ElementNode) -> [SelectItem] {
-        PropReader(node).elements("items", component: "SelectItem").map { element in
+        PropReader(node).elementList("items", component: "SelectItem").map { element in
             let p = PropReader(element)
-            let value = p.string("value") ?? ""
-            return SelectItem(value: value, label: p.string("label") ?? value)
+            return SelectItem(value: p.text("value") ?? "", label: p.text("label"))
         }
     }
 
     /// Decode the `items` prop of `Tabs`.
     public static func tabItems(of node: ElementNode) -> [TabItem] {
-        PropReader(node).elements("items", component: "TabItem").map { element in
+        PropReader(node).elementList("items", component: "TabItem").map { element in
             let p = PropReader(element)
-            return TabItem(label: p.string("label") ?? "", children: p.children)
+            return TabItem(label: p.text("label"), children: p.children)
         }
     }
 
