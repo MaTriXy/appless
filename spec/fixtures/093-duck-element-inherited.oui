@@ -1,0 +1,13 @@
+# The serializer's isElementNode is `v.type === "element" && typeof v.typeName
+# === "string"` — ordinary GETs, so both read THROUGH the prototype chain. A
+# row that merely INHERITS those fields from a `{"__proto__": …}` entry
+# serializes as the inherited element, and `statementId` is the own key
+# materialize.js stamped onto the row itself.
+elBase = { type: "element", typeName: "TextContent", props: { text: "inherited" }, partial: false, hasDynamicProps: false }
+inhEl = { "__proto__": elBase, z: 1 }
+twoDeep = { "__proto__": inhEl, y: 2 }
+root = Card([
+  CardHeader("Inherited element identity"),
+  KVList([inhEl]),
+  KVList([twoDeep])
+])

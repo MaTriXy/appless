@@ -121,6 +121,20 @@ public data class ElementNode(
     val props: Map<String, PropValue> = emptyMap(),
     /** Present iff the element has a `children` prop (Card, TabItem). */
     val children: PropValue? = null,
+    /**
+     * `false` in exactly one degenerate case, where the emitted JSON has NO
+     * `component` key at all and [component] is `""`.
+     *
+     * `serializeExpected` runs `serializeElement` on the evaluated ROOT
+     * unconditionally (`evaluatedRoot ? serializeElement(evaluatedRoot) :
+     * null`), and evaluation returns `{ ...el, props }` — a fresh object
+     * literal that keeps only the element's OWN keys. A root whose element
+     * identity was INHERITED (`root = {"__proto__": <element>, …}`) therefore
+     * arrives there without a `typeName`, `{ component: undefined }` has its
+     * key dropped by `JSON.stringify`, and the tree begins at `statementId`.
+     * Fixture `096-duck-element-proto-spread`.
+     */
+    val componentPresent: Boolean = true,
 ) {
     /** [statementId] when it is a string, which is every ordinary element. */
     public val statementIdText: String? get() = (statementId as? PropValue.Str)?.value

@@ -76,12 +76,19 @@ private func resolveRefValue(_ name: String, _ ctx: MaterializeContext) -> RTVal
         ctx.currentStatementId = prev
         ctx.visited.remove(name)
     }
-    var result = materializeValue(target, ctx)
-    if case .element(var el) = result {
+    let result = materializeValue(target, ctx)
+    // `if (mode === "value" && isElementNode(result)) result.statementId = name;`
+    // — a CHAIN-AWARE duck-type test followed by an ordinary assignment, so an
+    // object that merely inherits (or literally spells out) the element fields
+    // is tagged too, with an OWN `statementId` key.
+    guard let ref = JSObjects.runtimeElementRef(result) else { return result }
+    if var el = ref.element {
         el.statementId = name
-        result = .element(el)
+        return .element(el)
     }
-    return result
+    guard case .object(var o) = result else { return result }
+    o.assign("statementId", .string(name))
+    return .object(o)
 }
 
 /// Resolve a Ref in expression mode.
@@ -221,8 +228,10 @@ func containsDynamicValue(_ v: RTValue) -> Bool {
         return el.props.values.contains(where: containsDynamicValue)
     case .object(let o):
         if JSObjects.astNodeView(v) != nil { return true }
-        if let el = JSObjects.elementView(v) {
-            return el.props.values.contains(where: containsDynamicValue)
+        if let ref = JSObjects.runtimeElementRef(v) {
+            // `Object.values(v.props)` — the props value read THROUGH the
+            // chain, then its own enumerable values.
+            return JSObjects.objectValues(ref.props).contains(where: containsDynamicValue)
         }
         return o.values.contains(where: containsDynamicValue)
     // The intrinsic prototypes have no ENUMERABLE own properties.

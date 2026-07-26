@@ -1,0 +1,13 @@
+# serialize.mjs `serializeStep` runs `Object.keys(step).sort()` on WHATEVER the
+# step is — it never type-switches. Every non-plain-object step is therefore
+# BOXED and comes out as an object: a number or boolean has no own enumerable
+# keys ({}), a string and an array spread to their index keys.
+nums = { steps: [1, 2] }
+bools = { steps: [true, false] }
+strs = { steps: ["ab", ""] }
+arrs = { steps: [[1, 2], []] }
+mixed = { steps: [{ type: "set", target: "$x" }, 7, "hi"] }
+root = Card([
+  CardHeader("Non-object action steps"),
+  KVList([nums, bools, strs, arrs, mixed])
+])

@@ -1,0 +1,16 @@
+# `evaluateElementProps` returns `{ ...el, props: evaluated }` — a FRESH object
+# literal that keeps only the element's OWN enumerable keys. A row whose
+# element identity was INHERITED loses it the moment its props are evaluated
+# (`hasDynamicProps` is not `=== false`), so it serializes as a plain object of
+# `props` + its own keys. The sibling row pins the `=== false` short-circuit
+# that keeps the identity.
+$n = 5
+dynBase = { type: "element", typeName: "TextContent", props: { text: $n }, partial: false }
+staticBase = { type: "element", typeName: "TextContent", props: { text: $n }, partial: false, hasDynamicProps: false }
+spreads = { "__proto__": dynBase, z: 1 }
+keeps = { "__proto__": staticBase, z: 1 }
+root = Card([
+  CardHeader("Spread drops inherited element fields"),
+  KVList([spreads]),
+  KVList([keeps])
+])

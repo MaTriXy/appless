@@ -1,0 +1,57 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "Spread drops inherited element fields"
+        }
+      },
+      {
+        "component": "KVList",
+        "props": {
+          "rows": [
+            {
+              "props": {
+                "text": 5
+              },
+              "statementId": "spreads",
+              "z": 1
+            }
+          ]
+        }
+      },
+      {
+        "component": "KVList",
+        "props": {
+          "rows": [
+            {
+              "component": "TextContent",
+              "statementId": "keeps",
+              "props": {
+                "text": {
+                  "$ast": {
+                    "k": "StateRef",
+                    "n": "$n"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {
+    "$n": 5
+  },
+  "runtimeErrors": []
+}

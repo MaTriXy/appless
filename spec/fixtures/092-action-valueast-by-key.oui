@@ -1,0 +1,16 @@
+# `serializeStep` wraps by KEY NAME, not by value type:
+#   out[key] = key === "valueAST" ? { $ast: serializeAst(v) } : serializeValue(v)
+# so a NUMBER under `valueAST` becomes {"$ast": 1}, while an AST-shaped value
+# under any other key goes through serializeValue's own duck-typing instead.
+bareStep = { type: "set", valueAST: 1, extra: 2 }
+strAst = { steps: [{ type: "set", valueAST: "hi" }] }
+arrAst = { steps: [{ type: "set", valueAST: [1, { k: "Num", v: 2 }] }] }
+nullAst = { steps: [{ type: "set", valueAST: null }] }
+otherKey = { steps: [{ type: "set", target: { k: "Num", v: 3 } }] }
+$count = 0
+real = Action([@Set($count, $count + 1)])
+root = Card([
+  CardHeader("valueAST is wrapped by key name"),
+  KVList([bareStep, strAst, arrAst, nullAst, otherKey]),
+  Button("Real @Set for contrast", real)
+])

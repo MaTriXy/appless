@@ -67,49 +67,79 @@ final class Evaluator {
     /// `evaluate-tree.js` `evaluateElementProps` — the entry point, and the
     /// ONLY one that catches. Each prop is evaluated inside a do/catch; on a
     /// throw the RAW prop value is kept and a `runtimeErrors` entry recorded.
-    func evaluateElementProps(_ el: RTElement) -> RTElement {
-        if el.hasDynamicProps == false { return el }
-        var out = el
+    func evaluateElementProps(_ root: RTValue) -> RTValue {
+        guard let ref = JSObjects.runtimeElementRef(root) else { return root }
+        // `inline: false` never rethrows — every prop is caught individually.
+        return (try? recurseElement(ref, inline: false)) ?? root
+    }
+
+    /// `evaluate-tree.js` `evaluateElementProps` (`inline: false`) and
+    /// `evaluator.js` `evaluateElementInline` (`inline: true`) — the SAME prop
+    /// loop, differing only in the catch. The inline one deliberately does NOT
+    /// catch: a throw in there propagates out of `evaluate()` and is caught by
+    /// the OUTER tree-level call, so the recorded error names the outer element
+    /// and the outer prop key (fixture `082-runtime-error-outer-prop`).
+    ///
+    /// Everything the loop touches is an ordinary property GET on the receiver,
+    /// so a duck-typed element works exactly like a typed one — with ONE
+    /// consequence the typed path hides: the reference returns
+    /// `{ ...el, props: evaluated }`, a FRESH object literal whose own
+    /// enumerable keys are copied by DEFINE. An element identity that was only
+    /// INHERITED (`{"__proto__": <element>}`) is therefore lost right here,
+    /// because `type`/`typeName` were never own keys (fixture
+    /// `096-duck-element-proto-spread`).
+    private func recurseElement(_ ref: JSElementRef, inline: Bool) throws -> RTValue {
+        // `if (el.hasDynamicProps === false) return el;` — a strict `=== false`,
+        // so a MISSING `hasDynamicProps` (undefined) does not short-circuit.
+        if case .bool(false) = ref.hasDynamicProps { return ref.receiver }
         var props = RTObject()
-        for (key, value) in el.props.entries {
-            do {
-                props[key] = try evaluatePropValue(value, inline: false)
-            } catch let error as JSTypeError {
-                runtimeErrors.append(
-                    RuntimeError(
-                        message:
-                            "Evaluating prop \"\(key)\" on \(el.typeName) failed: \(error.message)",
-                        component: el.typeName,
-                        statementId: el.statementId
+        // `Object.entries(el.props)` — own enumerable entries of whatever
+        // `el.props` resolved to through the chain.
+        for key in JSObjects.objectKeys(ref.props) ?? [] {
+            let value = (try? JSObjects.getMember(ref.props, key)) ?? .undefined
+            var evaluated: RTValue
+            if inline {
+                evaluated = try evaluatePropValue(value, inline: true)
+            } else {
+                do {
+                    evaluated = try evaluatePropValue(value, inline: false)
+                } catch let error as JSTypeError {
+                    runtimeErrors.append(
+                        RuntimeError(
+                            message:
+                                "Evaluating prop \"\(key)\" on \(ref.typeName) failed: "
+                                + error.message,
+                            component: ref.typeName,
+                            statementId: Pipeline.rawJSON(ref.statementId)
+                        )
                     )
-                )
-                props[key] = value
-            } catch {
-                props[key] = value
+                    evaluated = value
+                } catch {
+                    evaluated = value
+                }
             }
+            // `evaluated[key] = …` — ASSIGNMENT, so a `__proto__` key re-points
+            // the rebuilt props object rather than becoming an own key.
+            props.assign(key, evaluated)
         }
-        out.props = props
-        return out
+        if var el = ref.element {
+            el.props = props
+            return .element(el)
+        }
+        var out = RTObject()
+        for key in JSObjects.objectKeys(ref.receiver) ?? [] {
+            // Object spread is CreateDataProperty, not assignment: an own
+            // `__proto__` key survives as ordinary data.
+            out[key] = (try? JSObjects.getMember(ref.receiver, key)) ?? .undefined
+        }
+        out["props"] = .object(props)
+        return .object(out)
     }
 
-    /// `evaluator.js` `evaluateElementInline` — the schema-aware re-evaluation
-    /// `evaluate()` performs on nested ElementNodes (sites 89/421). Same prop
-    /// loop, but deliberately WITHOUT the catch: a throw in here propagates out
-    /// of `evaluate()` and is caught by the OUTER `evaluateElementProps`, so
-    /// the recorded error names the outer element and the outer prop key.
-    private func evaluateElementInline(_ el: RTElement) throws -> RTElement {
-        if el.hasDynamicProps == false { return el }
-        var out = el
-        var props = RTObject()
-        for (key, value) in el.props.entries {
-            props[key] = try evaluatePropValue(value, inline: true)
-        }
-        out.props = props
-        return out
-    }
-
-    private func recurseElement(_ el: RTElement, inline: Bool) throws -> RTElement {
-        inline ? try evaluateElementInline(el) : evaluateElementProps(el)
+    /// `isElementNode(v) ? callbacks.recurseElement(v) : v`, chain-aware.
+    private func recurseIfElement(_ v: RTValue, inline: Bool) throws -> RTValue {
+        guard let ref = JSObjects.runtimeElementRef(v) else { return v }
+        return try recurseElement(ref, inline: inline)
     }
 
     /// `evaluate-prop.js` `evaluatePropCore`. `inline` selects the recursion
@@ -126,17 +156,13 @@ final class Evaluator {
             // The schema context IS present on every evaluate-prop entry
             // (evaluate-tree.js builds `{ library: evalCtx.library }`).
             let result = try evaluate(node, ctx, SchemaCtx.present)
-            if case .element(let el) = result {
-                return .element(try recurseElement(el, inline: inline))
+            // `isElementNode(result)` / `result.map(item => isElementNode(item) ? …)`
+            // — both chain-aware duck-type tests, not type checks.
+            if JSObjects.runtimeElementRef(result) != nil {
+                return try recurseIfElement(result, inline: inline)
             }
             if case .array(let items) = result {
-                return .array(
-                    try items.map { item in
-                        if case .element(let el) = item {
-                            return .element(try recurseElement(el, inline: inline))
-                        }
-                        return item
-                    })
+                return .array(try items.map { try recurseIfElement($0, inline: inline) })
             }
             // Strip ReactiveAssign in a non-reactive context.
             if isReactiveAssign(result),
@@ -148,8 +174,8 @@ final class Evaluator {
             return result
         case .array(let items):
             return .array(try items.map { try evaluatePropValue($0, inline: inline) })
-        case .element(let el):
-            return .element(try recurseElement(el, inline: inline))
+        case .element:
+            return try recurseIfElement(value, inline: inline)
         case .object, .proto:
             // evaluate-prop.js runs its duck-typing in this exact order, and
             // EVERY test is a prototype-chain-aware read, so an object that
@@ -159,8 +185,8 @@ final class Evaluator {
             if let astView = JSObjects.astNodeView(value) {
                 return try evaluatePropValue(.ast(astView), inline: inline)
             }
-            if let elementView = JSObjects.elementView(value) {
-                return .element(try recurseElement(elementView, inline: inline))
+            if let elementRef = JSObjects.runtimeElementRef(value) {
+                return try recurseElement(elementRef, inline: inline)
             }
             // ActionPlan / ActionStep — preserve as-is (deferred evaluation)
             if case .array = try JSObjects.getMember(value, "steps") { return value }
@@ -278,16 +304,12 @@ final class Evaluator {
                 // re-evaluated inline ONLY when the schema context is present.
                 if schemaCtx != nil {
                     for (key, v) in el.props.entries {
-                        if case .element(let sub) = v {
-                            el.props[key] = .element(try evaluateElementInline(sub))
+                        // `isElementNode(val)` / per-item — chain-aware tests.
+                        if JSObjects.runtimeElementRef(v) != nil {
+                            el.props[key] = try recurseIfElement(v, inline: true)
                         } else if case .array(let items) = v {
                             el.props[key] = .array(
-                                try items.map { item in
-                                    if case .element(let sub) = item {
-                                        return .element(try evaluateElementInline(sub))
-                                    }
-                                    return item
-                                })
+                                try items.map { try recurseIfElement($0, inline: true) })
                         }
                     }
                 }
@@ -706,9 +728,7 @@ final class Evaluator {
             // evaluator.js:421 — the element re-evaluation is gated on the
             // schema context, so inside an Action the per-item element keeps
             // whatever raw ASTs site 75 preserved.
-            if schemaCtx != nil, case .element(let el) = result {
-                return .element(try evaluateElementInline(el))
-            }
+            if schemaCtx != nil { return try recurseIfElement(result, inline: true) }
             return result
         }
         return .array(results)

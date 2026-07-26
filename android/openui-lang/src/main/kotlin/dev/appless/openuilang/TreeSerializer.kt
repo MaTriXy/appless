@@ -120,7 +120,11 @@ public object TreeSerializer {
         // Fixed key order: component, statementId?, props, children?.
         val inner = indent + 1
         val lines = ArrayList<String>(4)
-        lines.add(pad(inner) + "\"component\": " + quote(element.component))
+        // `{ component: el.typeName }` with an UNDEFINED typeName is an object
+        // with an undefined-valued key, which JSON.stringify omits.
+        if (element.componentPresent) {
+            lines.add(pad(inner) + "\"component\": " + quote(element.component))
+        }
         element.statementId?.let {
             lines.add(pad(inner) + "\"statementId\": " + serializeValue(it, inner))
         }

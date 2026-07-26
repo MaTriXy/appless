@@ -329,6 +329,56 @@ enum JSObjects {
         }
     }
 
+    /// `Object.keys(v)` — the own ENUMERABLE string keys of `ToObject(v)`, in
+    /// `OrdinaryOwnPropertyKeys` order.
+    ///
+    /// The BOXING is the whole point: `Object.keys` accepts every value except
+    /// `undefined`/`null`, and each primitive wrapper has different own keys.
+    /// Measured on node v22:
+    ///
+    /// ```
+    /// Object.keys(1) -> []             Object.keys(true) -> []
+    /// Object.keys("ab") -> ["0","1"]   Object.keys([1,2]) -> ["0","1"]
+    /// Object.keys(Array.prototype) -> []  Object.keys(function f(){}) -> []
+    /// ```
+    ///
+    /// `length` is NON-enumerable on arrays and String wrappers, `name`/
+    /// `length` are non-enumerable on functions, and every own property of
+    /// every intrinsic prototype is non-enumerable too.
+    ///
+    /// `nil` means `undefined`/`null`, where JS throws
+    /// `TypeError: Cannot convert undefined or null to object`.
+    static func objectKeys(_ v: RTValue) -> [String]? {
+        switch v {
+        case .undefined, .null: return nil
+        case .number, .bool, .function, .proto: return []
+        case .string(let s): return (0..<s.utf16.count).map { String($0) }
+        case .array(let items): return items.indices.map { String($0) }
+        case .object(let o): return o.keys
+        case .element(let el): return elementFieldNames.filter { elementOwn(el, $0) != nil }
+        case .ast(let node): return astFieldNames.filter { astOwn(node, $0) != nil }
+        }
+    }
+
+    /// `Object.values(v)`; `[]` where `objectKeys` would throw.
+    static func objectValues(_ v: RTValue) -> [RTValue] {
+        (objectKeys(v) ?? []).map { (try? getMember(v, $0)) ?? .undefined }
+    }
+
+    /// Every field name an ElementNode object literal can carry, in the order
+    /// `materialize.js` creates them. Key ORDER is never observable in the
+    /// emitted tree — every serializer object is sorted — but the SET is.
+    private static let elementFieldNames = [
+        "type", "typeName", "props", "partial", "hasDynamicProps", "statementId",
+    ]
+
+    /// Every field name any AST node object literal can carry.
+    private static let astFieldNames = [
+        "k", "v", "n", "refType", "els", "entries", "name", "args", "mappedProps",
+        "op", "left", "right", "operand", "cond", "then", "else", "obj", "field",
+        "index", "target", "value",
+    ]
+
     /// True when the receiver still inherits `Object.prototype`'s `__proto__`
     /// SETTER — the precondition for `o["__proto__"] = v` re-pointing the
     /// prototype instead of creating an own key (an object whose chain was cut
@@ -452,21 +502,72 @@ enum JSObjects {
         }
     }
 
-    /// `parser/types.js` `isElementNode(value)`, read through the prototype
-    /// chain: `type === "element"`, string `typeName`, non-null object `props`,
-    /// boolean `partial`.
-    static func elementView(_ v: RTValue) -> RTElement? {
-        if case .element(let el) = v { return el }
-        guard case .object(let o) = v else { return nil }
-        // Own fields shadowing the inherited element identity are deviation #6.
-        if o.has("type") || o.has("typeName") { return nil }
-        var cur = prototypeOf(v)
-        while let link = cur {
-            if case .null = link { return nil }
-            if case .element(let el) = link { return el }
-            if case .object(let lo) = link, lo.has("type") || lo.has("typeName") { return nil }
-            cur = prototypeOf(link)
-        }
-        return nil
+    /// `parser/types.js` `isElementNode(value)` — read through the prototype
+    /// chain, exactly like the reference: `type === "element"`, string
+    /// `typeName`, non-null object `props`, boolean `partial`.
+    ///
+    /// `typeof props === "object"` is true for ARRAYS too (and for the
+    /// intrinsic prototypes), so `props` is deliberately kept as a raw
+    /// `RTValue` rather than an `RTObject`.
+    static func runtimeElementRef(_ v: RTValue) -> JSElementRef? {
+        guard let ref = elementRefCommon(v) else { return nil }
+        guard ref.props.isObjectLike else { return nil }
+        guard case .bool = (try? getMember(v, "partial")) ?? .undefined else { return nil }
+        return ref
     }
+
+    /// The SERIALIZER's looser `isElementNode(v)` (serialize.mjs:9-11): only
+    /// `v.type === "element"` and `typeof v.typeName === "string"`, both
+    /// ordinary GETs and therefore chain-aware. It does NOT check `props` or
+    /// `partial`, so it accepts shapes `runtimeElementRef` rejects — e.g.
+    /// `{type: "element", typeName: "X", props: 7}` serializes as an element
+    /// with empty props (`Object.keys(7)` is `[]`).
+    static func serializerElementRef(_ v: RTValue) -> JSElementRef? { elementRefCommon(v) }
+
+    /// The two checks both duck-type tests share, all chain-aware GETs.
+    private static func elementRefCommon(_ v: RTValue) -> JSElementRef? {
+        if case .element(let el) = v {
+            return JSElementRef(
+                receiver: v,
+                typeName: el.typeName,
+                props: .object(el.props),
+                statementId: el.statementId.map { RTValue.string($0) } ?? .undefined,
+                hasDynamicProps: .bool(el.hasDynamicProps),
+                element: el
+            )
+        }
+        // `!!value && typeof value === "object" && !Array.isArray(value)`.
+        // (`typeof fn` is `"function"`, so functions never get this far either.)
+        guard v.isObjectLike else { return nil }
+        if case .array = v { return nil }
+        guard case .string(let type) = (try? getMember(v, "type")) ?? .undefined,
+            jsStringEquals(type, "element"),
+            case .string(let typeName) = (try? getMember(v, "typeName")) ?? .undefined
+        else { return nil }
+        return JSElementRef(
+            receiver: v,
+            typeName: typeName,
+            props: (try? getMember(v, "props")) ?? .undefined,
+            statementId: (try? getMember(v, "statementId")) ?? .undefined,
+            hasDynamicProps: (try? getMember(v, "hasDynamicProps")) ?? .undefined,
+            element: nil
+        )
+    }
+}
+
+/// An element-like receiver plus the five fields lang-core then reads off it —
+/// every one an ordinary property GET, so every one is prototype-chain aware.
+///
+/// The reference has ONE representation for elements (a plain object literal),
+/// so `isElementNode` answering true says nothing about the field TYPES beyond
+/// what the guard itself checked. `element` is non-nil only for the ordinary
+/// case where the receiver is the port's typed `RTElement`; a duck-typed
+/// object keeps its fields raw.
+struct JSElementRef {
+    let receiver: RTValue
+    let typeName: String
+    let props: RTValue
+    let statementId: RTValue
+    let hasDynamicProps: RTValue
+    let element: RTElement?
 }

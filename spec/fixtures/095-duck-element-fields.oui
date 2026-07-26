@@ -1,0 +1,18 @@
+# The SERIALIZER's isElementNode is looser than the runtime one: it checks only
+# `type`/`typeName`, never `props` or `partial`. So `props` can be any value and
+# `Object.keys(el.props)` boxes it (a number has no keys, a string spreads to
+# its indices), and `statementId` is copied VERBATIM — no serializeValue — so a
+# numeric one is emitted as a number.
+#
+# A row written INLINE is never a named statement, so materialize.js does not
+# stamp its `statementId` — whatever the author wrote survives.
+elBase = { type: "element", typeName: "TextContent", props: { text: "inherited" }, partial: false, hasDynamicProps: false }
+numProps = { type: "element", typeName: "Weird", props: 7 }
+strProps = { type: "element", typeName: "Weird2", props: "ab" }
+arrProps = { type: "element", typeName: "Weird3", props: [10, 20] }
+root = Card([
+  CardHeader("Serializer-level element fields"),
+  KVList([{ "__proto__": elBase, statementId: 42 }]),
+  KVList([{ "__proto__": elBase, statementId: [1, "two"] }]),
+  KVList([numProps, strProps, arrProps])
+])

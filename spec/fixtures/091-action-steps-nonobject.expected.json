@@ -1,0 +1,82 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "Non-object action steps"
+        }
+      },
+      {
+        "component": "KVList",
+        "props": {
+          "rows": [
+            {
+              "$action": {
+                "steps": [
+                  {},
+                  {}
+                ]
+              }
+            },
+            {
+              "$action": {
+                "steps": [
+                  {},
+                  {}
+                ]
+              }
+            },
+            {
+              "$action": {
+                "steps": [
+                  {
+                    "0": "a",
+                    "1": "b"
+                  },
+                  {}
+                ]
+              }
+            },
+            {
+              "$action": {
+                "steps": [
+                  {
+                    "0": 1,
+                    "1": 2
+                  },
+                  {}
+                ]
+              }
+            },
+            {
+              "$action": {
+                "steps": [
+                  {
+                    "target": "$x",
+                    "type": "set"
+                  },
+                  {},
+                  {
+                    "0": "h",
+                    "1": "i"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

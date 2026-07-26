@@ -107,25 +107,54 @@ public struct PropObject: Sendable, Equatable, ExpressibleByDictionaryLiteral {
 public struct ElementNode: Sendable, Equatable {
     /// Component type name, e.g. `"CardHeader"`.
     public var component: String
-    /// Present iff the element came from a named statement.
-    public var statementId: String?
+    /// Present iff the element carries a `statementId` field — normally the
+    /// name of the statement it came from, hence normally a `.string` (use
+    /// `statementIdText`).
+    ///
+    /// It is a `PropValue` and not a `String?` because lang-core's ElementNode
+    /// is a plain JS object and the reference serializer copies the field
+    /// VERBATIM (`out.statementId = el.statementId`). An object that merely
+    /// duck-types as an element can therefore carry any value there — see
+    /// `spec/fixtures/095-duck-element-fields.oui`, where a row with an own
+    /// `statementId: 42` serializes as `"statementId": 42`.
+    public var statementId: PropValue?
     /// Named props (positional args already mapped via the contract's property
     /// order), EXCLUDING `children`. Props that evaluated to `undefined` are
     /// omitted; `null` is kept as `.null`.
     public var props: [String: PropValue]
     /// Present iff the element has a `children` prop (Card, TabItem).
     public var children: PropValue?
+    /// `false` in exactly one degenerate case, where the emitted JSON has NO
+    /// `component` key at all and `component` is `""`.
+    ///
+    /// `serializeExpected` runs `serializeElement` on the evaluated ROOT
+    /// unconditionally (`evaluatedRoot ? serializeElement(evaluatedRoot) :
+    /// null`), and evaluation returns `{ ...el, props }` — a fresh object
+    /// literal that keeps only the element's OWN keys. A root whose element
+    /// identity was INHERITED (`root = {"__proto__": <element>, …}`) therefore
+    /// arrives there without a `typeName`, `{ component: undefined }` has its
+    /// key dropped by `JSON.stringify`, and the tree begins at `statementId`.
+    /// Fixture `096-duck-element-proto-spread`.
+    public var componentPresent: Bool
+
+    /// `statementId` when it is a string, which is every ordinary element.
+    public var statementIdText: String? {
+        if case .string(let s)? = statementId { return s }
+        return nil
+    }
 
     public init(
         component: String,
-        statementId: String? = nil,
+        statementId: PropValue? = nil,
         props: [String: PropValue] = [:],
-        children: PropValue? = nil
+        children: PropValue? = nil,
+        componentPresent: Bool = true
     ) {
         self.component = component
         self.statementId = statementId
         self.props = props
         self.children = children
+        self.componentPresent = componentPresent
     }
 }
 
@@ -180,14 +209,17 @@ public struct RuntimeError: Sendable, Equatable {
     public var code: String
     public var message: String
     public var component: String?
-    public var statementId: String?
+    /// `evaluate-tree.js` copies the failing element's `statementId` field
+    /// into the error VERBATIM, so this has the same shape as
+    /// `ElementNode.statementId` and for the same reason.
+    public var statementId: PropValue?
 
     public init(
         source: String = "runtime",
         code: String = "runtime-error",
         message: String,
         component: String? = nil,
-        statementId: String? = nil
+        statementId: PropValue? = nil
     ) {
         self.source = source
         self.code = code

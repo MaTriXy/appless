@@ -1,0 +1,78 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "Serializer-level element fields"
+        }
+      },
+      {
+        "component": "KVList",
+        "props": {
+          "rows": [
+            {
+              "component": "TextContent",
+              "statementId": 42,
+              "props": {
+                "text": "inherited"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "component": "KVList",
+        "props": {
+          "rows": [
+            {
+              "component": "TextContent",
+              "statementId": [
+                1,
+                "two"
+              ],
+              "props": {
+                "text": "inherited"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "component": "KVList",
+        "props": {
+          "rows": [
+            {
+              "component": "Weird",
+              "props": {}
+            },
+            {
+              "component": "Weird2",
+              "props": {
+                "0": "a",
+                "1": "b"
+              }
+            },
+            {
+              "component": "Weird3",
+              "props": {
+                "0": 10,
+                "1": 20
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

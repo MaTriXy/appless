@@ -104,7 +104,8 @@ public enum TreeSerializer {
             lines.append(pad(inner) + "\"component\": " + quote(component))
         }
         if let statementId = error.statementId {
-            lines.append(pad(inner) + "\"statementId\": " + quote(statementId))
+            lines.append(
+                pad(inner) + "\"statementId\": " + serializeValue(statementId, indent: inner))
         }
         return "{\n" + lines.joined(separator: ",\n") + "\n" + pad(indent) + "}"
     }
@@ -113,9 +114,14 @@ public enum TreeSerializer {
         // Fixed key order: component, statementId?, props, children?.
         let inner = indent + 1
         var lines: [String] = []
-        lines.append(pad(inner) + "\"component\": " + quote(element.component))
+        // `{ component: el.typeName }` with an UNDEFINED typeName is an object
+        // with an undefined-valued key, which JSON.stringify omits.
+        if element.componentPresent {
+            lines.append(pad(inner) + "\"component\": " + quote(element.component))
+        }
         if let statementId = element.statementId {
-            lines.append(pad(inner) + "\"statementId\": " + quote(statementId))
+            lines.append(
+                pad(inner) + "\"statementId\": " + serializeValue(statementId, indent: inner))
         }
         lines.append(pad(inner) + "\"props\": " + serializeObjectBody(element.props, indent: inner))
         if let children = element.children {

@@ -29,7 +29,11 @@ struct OrderedMap<Value> {
 /// The pre-runtime-evaluation parse result (lang-core `ParseResult` minus the
 /// query/mutation statement lists, which are always empty for AppLess).
 struct InternalResult {
-    var root: RTElement?
+    /// `parser.js`: `const root = isElementNode(materialized) ? materialized :
+    /// null` — a duck-type test, not a type check, so the entry statement may
+    /// be any object that ANSWERS the test. Kept as a raw `RTValue` for that
+    /// reason; `JSObjects.runtimeElementRef` reads its fields.
+    var root: RTValue?
     var incomplete: Bool
     var unresolved: [String]
     var errors: [ParseError]
@@ -121,10 +125,21 @@ func buildResult(
     let ctx = MaterializeContext(
         syms: syms, cat: cat, partial: wasIncomplete, currentStatementId: entryId)
     let materialized = materializeValue(syms[entryId]!, ctx)
-    var root: RTElement? = nil
-    if case .element(var el) = materialized {
-        el.statementId = entryId
-        root = el
+    // `const root = isElementNode(materialized) ? materialized : null;`
+    // `if (root) root.statementId = entryId;` — a chain-aware duck-type test
+    // followed by an ordinary ASSIGNMENT, so an object that only INHERITS its
+    // element identity is a valid root and gets an OWN `statementId` key
+    // (fixture `094-duck-element-root`). A non-element entry gives `nil`
+    // (spec §8.1, fixture `015-root-non-element`).
+    var root: RTValue? = nil
+    if let ref = JSObjects.runtimeElementRef(materialized) {
+        if var el = ref.element {
+            el.statementId = entryId
+            root = .element(el)
+        } else if case .object(var o) = materialized {
+            o.assign("statementId", .string(entryId))
+            root = .object(o)
+        }
     }
     let stateDeclarations = extractStatements(typedStmts, ctx)
     return InternalResult(

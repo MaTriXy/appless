@@ -16,15 +16,20 @@ internal object Pipeline {
             store[key] = internalResult.stateDeclarations[key]!!
         }
         val evaluator = Evaluator(store)
-        val evaluatedRoot = internalResult.root?.let { evaluator.evaluateElementProps(it) }
+        val evaluatedRoot: RtValue? = internalResult.root?.let { evaluator.evaluateElementProps(it) }
 
         val state = LinkedHashMap<String, PropValue>()
         for (key in internalResult.stateDeclarations.keys) {
             state[key] = convertValue(internalResult.stateDeclarations[key]!!)
         }
 
+        // `serializeExpected`: `evaluatedRoot ? serializeElement(evaluatedRoot) : null`.
+        // The evaluated root can have LOST its element identity (the
+        // `{ ...el, props }` spread drops inherited fields), in which case the
+        // reference calls `serializeElement` on a non-element anyway and
+        // `el.typeName` comes out `undefined` — see [convertRootLike].
         return ParseResult(
-            root = evaluatedRoot?.let { convertElement(it) },
+            root = evaluatedRoot?.let { convertRootLike(it) },
             meta = ParseMeta(
                 incomplete = internalResult.incomplete,
                 unresolved = internalResult.unresolved,
@@ -40,19 +45,104 @@ internal object Pipeline {
 
     // ── RtValue → PropValue conversion (mirrors generator/lib/serialize.mjs) ──
 
-    fun convertElement(el: RtElement): ElementNode {
-        val props = LinkedHashMap<String, PropValue>()
+    fun convertElement(el: RtElement): ElementNode = convertElementFields(
+        typeName = RtValue.Str(el.typeName),
+        statementId = el.statementId?.let { RtValue.Str(it) } ?: RtValue.Undefined,
+        props = RtValue.Obj(el.props),
+    )
+
+    private fun convertElementRef(ref: JsElementRef): ElementNode =
+        convertElementFields(RtValue.Str(ref.typeName), ref.statementId, ref.props)
+
+    /**
+     * serialize.mjs `serializeElement`. Every field is read off the receiver
+     * through the prototype chain by the caller; `props` is then enumerated by
+     * `Object.keys(el.props)` — an OWN-key enumeration of whatever that GET
+     * produced, so a non-object `props` is not an error (`Object.keys(7)` is
+     * `[]`, `Object.keys("ab")` is `["0","1"]`).
+     *
+     * `statementId` is copied VERBATIM (`out.statementId = el.statementId`) —
+     * no `serializeValue`, hence no `$ast`/`$action`/`$number` treatment; see
+     * [rawJson].
+     */
+    private fun convertElementFields(
+        typeName: RtValue,
+        statementId: RtValue,
+        props: RtValue,
+    ): ElementNode {
+        val out = LinkedHashMap<String, PropValue>()
         var children: PropValue? = null
-        for ((key, value) in el.props.entries) {
+        for (key in JsObjects.objectKeys(props) ?: emptyList()) {
+            // `props[key] = …` / `children = …` — plain assignment again.
+            if (key == RtObject.PROTO_KEY) continue
+            val value = JsObjects.getMember(props, key)
             if (value.isDroppedByJsonStringify) continue
-            if (key == "children") children = convertValue(value) else props[key] = convertValue(value)
+            if (key == "children") children = convertValue(value) else out[key] = convertValue(value)
         }
+        // `out.component = el.typeName`. Only the root slot can reach this with
+        // a non-string `typeName`, and there it is always `undefined`: every
+        // other caller went through a duck-type test that already required a
+        // STRING `typeName`, and the one that did not (`serializeExpected`'s
+        // root) sees a `{...el}` spread, which either kept the own — hence
+        // string-checked — `typeName` or dropped it entirely.
         return ElementNode(
-            component = el.typeName,
-            statementId = el.statementId,
-            props = props,
+            component = (typeName as? RtValue.Str)?.value ?: "",
+            statementId = rawJson(statementId),
+            props = out,
             children = children,
+            componentPresent = typeName is RtValue.Str,
         )
+    }
+
+    /**
+     * `serializeExpected`'s root slot: `evaluatedRoot ?
+     * serializeElement(evaluatedRoot) : null`. The call is UNCONDITIONAL, so a
+     * root that lost its element identity during evaluation (the
+     * `{ ...el, props }` spread drops fields that were only INHERITED) is still
+     * run through `serializeElement` — `el.typeName` then reads `undefined` and
+     * `JSON.stringify` omits the `component` key entirely (fixture
+     * `096-duck-element-proto-spread`).
+     */
+    private fun convertRootLike(v: RtValue): ElementNode {
+        JsObjects.serializerElementRef(v)?.let { return convertElementRef(it) }
+        return convertElementFields(
+            typeName = JsObjects.getMember(v, "typeName"),
+            statementId = JsObjects.getMember(v, "statementId"),
+            props = JsObjects.getMember(v, "props"),
+        )
+    }
+
+    /**
+     * Plain `JSON.stringify` semantics for a value the reference serializer
+     * copies VERBATIM instead of routing through `serializeValue`: no
+     * element/action/AST duck-typing and, notably, no `{"$number": …}` — raw
+     * `JSON.stringify` writes `null` for NaN and ±Infinity.
+     *
+     * `null` (Kotlin) means the value is dropped entirely: `undefined` and
+     * functions are omitted from the emitted object.
+     */
+    internal fun rawJson(v: RtValue): PropValue? = when (v) {
+        is RtValue.Undefined, is RtValue.Func -> null
+        is RtValue.Null -> PropValue.Null
+        is RtValue.Bool -> PropValue.Bool(v.value)
+        is RtValue.Num -> if (v.value.isFinite()) PropValue.Num(v.value) else PropValue.Null
+        is RtValue.Str -> PropValue.Str(v.value)
+        is RtValue.Arr -> PropValue.Arr(v.items.map { rawJson(it) ?: PropValue.Null })
+        is RtValue.Proto ->
+            if (v.kind == JsProtoKind.ARRAY) PropValue.Arr(emptyList()) else PropValue.Obj(PropObject())
+
+        is RtValue.Obj, is RtValue.Element, is RtValue.Ast -> {
+            // `JSON.stringify` reads the SOURCE object's own keys; unlike the
+            // serializer's rebuild there is no `out[key] = …` assignment here,
+            // so an own `"__proto__"` key IS emitted
+            // (`JSON.stringify(Object.fromEntries([["__proto__",1]]))` is
+            // `{"__proto__":1}`).
+            val out = PropObject()
+            for (key in JsObjects.objectKeys(v) ?: emptyList()) {
+                rawJson(JsObjects.getMember(v, key))?.let { out[key] = it }
+            }
+            PropValue.Obj(out)
+        }
     }
 
     fun convertValue(v: RtValue): PropValue = when (v) {
@@ -82,10 +172,13 @@ internal object Pipeline {
             // `{"__proto__": TextContent(…), …}` row serializes as the
             // inherited ELEMENT (fixture `086-proto-component-valued`), and a row whose prototype is
             // an AST node serializes as `{"$ast": <own keys>}` (fixture `085-proto-object-valued`).
-            val element = JsObjects.elementView(v)
+            // NOTE the serializer's `isElementNode` is LOOSER than the runtime
+            // one: only `type === "element"` and a string `typeName`, no
+            // `props`/`partial` check (serialize.mjs:9-11).
+            val element = JsObjects.serializerElementRef(v)
             val steps = JsObjects.getMember(v, "steps")
             when {
-                element != null -> PropValue.Element(convertElement(element))
+                element != null -> PropValue.Element(convertElementRef(element))
                 // ActionPlan: { steps: [...] }
                 steps is RtValue.Arr ->
                     PropValue.Action(ActionPlan(steps.items.map { convertStep(it) }))
@@ -170,25 +263,58 @@ internal object Pipeline {
     }
 
     /**
-     * serialize.mjs `serializeStep`: sorted keys (handled by the serializer),
-     * `undefined` entries omitted, `valueAST` wrapped as `$ast` (which the
-     * [RtValue.Ast] branch of [convertValue] already does).
+     * serialize.mjs `serializeStep` — verbatim:
+     *
+     * ```js
+     * function serializeStep(step) {
+     *   const out = {};
+     *   for (const key of Object.keys(step).sort()) {
+     *     const v = step[key];
+     *     if (v === undefined) continue;
+     *     out[key] = key === "valueAST" ? { $ast: serializeAst(v) } : serializeValue(v);
+     *   }
+     *   return out;
+     * }
+     * ```
+     *
+     * Two rules that are easy to get wrong, and this port did:
+     *
+     * 1. It is `Object.keys(step)`, NOT a type switch. A step that is not a
+     *    plain object is BOXED, so it always serializes as an OBJECT:
+     *    `{steps: [1, 2]}` gives `[{}, {}]`, `{steps: ["ab"]}` gives
+     *    `[{"0":"a","1":"b"}]`, `{steps: [[1, 2]]}` gives `[{"0":1,"1":2}]`
+     *    and `{steps: [true]}` gives `[{}]` (fixture
+     *    `091-action-steps-nonobject`).
+     * 2. `valueAST` is wrapped by KEY NAME, not by value type. `{type: "set",
+     *    valueAST: 1}` gives `"valueAST": {"$ast": 1}`, and any other key
+     *    holding an AST value is wrapped by `serializeValue`'s own AST branch
+     *    instead (fixture `092-action-valueast-by-key`).
+     *
+     * A step of `null`/`undefined` makes the REFERENCE THROW
+     * (`Object.keys(null)`), taking the fixture generator with it, so no
+     * expected tree exists for it; the port emits `{}` — see the READMEs'
+     * KNOWN-DEVIATIONS.
      */
-    private fun convertStep(step: RtValue): PropValue = when (step) {
-        is RtValue.Obj -> PropValue.Obj(convertPlainObject(step.obj))
-        is RtValue.Element -> {
-            val el = step.element
-            val out = PropObject()
-            out["type"] = PropValue.Str("element")
-            out["typeName"] = PropValue.Str(el.typeName)
-            out["props"] = PropValue.Obj(convertPlainObject(el.props))
-            out["partial"] = PropValue.Bool(el.partial)
-            out["hasDynamicProps"] = PropValue.Bool(el.hasDynamicProps)
-            el.statementId?.let { out["statementId"] = PropValue.Str(it) }
-            PropValue.Obj(out)
+    private fun convertStep(step: RtValue): PropValue {
+        val out = PropObject()
+        for (key in JsObjects.objectKeys(step) ?: emptyList()) {
+            val value = JsObjects.getMember(step, key)
+            if (value is RtValue.Undefined) continue
+            if (key == "valueAST") {
+                // `{ $ast: serializeAst(v) }`; a function `v` survives
+                // `serializeAst` untouched and `JSON.stringify` then drops the
+                // `$ast` key, leaving `{}`.
+                out[key] = if (value is RtValue.Func) {
+                    PropValue.Obj(PropObject())
+                } else {
+                    PropValue.Ast(convertAstPlain(value))
+                }
+            } else {
+                if (value.isDroppedByJsonStringify) continue
+                jsAssign(out, key, convertValue(value))
+            }
         }
-
-        else -> convertValue(step)
+        return PropValue.Obj(out)
     }
 
     /**

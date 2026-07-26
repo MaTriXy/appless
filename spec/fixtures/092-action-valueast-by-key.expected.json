@@ -1,0 +1,131 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "valueAST is wrapped by key name"
+        }
+      },
+      {
+        "component": "KVList",
+        "props": {
+          "rows": [
+            {
+              "$action": {
+                "steps": [
+                  {
+                    "extra": 2,
+                    "type": "set",
+                    "valueAST": {
+                      "$ast": 1
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "$action": {
+                "steps": [
+                  {
+                    "type": "set",
+                    "valueAST": {
+                      "$ast": "hi"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "$action": {
+                "steps": [
+                  {
+                    "type": "set",
+                    "valueAST": {
+                      "$ast": [
+                        1,
+                        {
+                          "k": "Num",
+                          "v": 2
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "$action": {
+                "steps": [
+                  {
+                    "type": "set",
+                    "valueAST": {
+                      "$ast": null
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "$action": {
+                "steps": [
+                  {
+                    "target": {
+                      "$ast": {
+                        "k": "Num",
+                        "v": 3
+                      }
+                    },
+                    "type": "set"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "component": "Button",
+        "props": {
+          "action": {
+            "$action": {
+              "steps": [
+                {
+                  "target": "$count",
+                  "type": "set",
+                  "valueAST": {
+                    "$ast": {
+                      "k": "BinOp",
+                      "left": {
+                        "k": "StateRef",
+                        "n": "$count"
+                      },
+                      "op": "+",
+                      "right": {
+                        "k": "Num",
+                        "v": 1
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "label": "Real @Set for contrast"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {
+    "$count": 0
+  },
+  "runtimeErrors": []
+}

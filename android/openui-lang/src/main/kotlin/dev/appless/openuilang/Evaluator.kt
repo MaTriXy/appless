@@ -372,17 +372,11 @@ internal class Evaluator(store: Map<String, RtValue>) {
         } else {
             val out = RtObject()
             for ((key, v) in props.entries) {
-                out[key] = when (v) {
-                    is RtValue.Element -> RtValue.Element(evaluateElementInline(v.element))
-                    is RtValue.Arr -> RtValue.Arr(
-                        v.items.map {
-                            if (it is RtValue.Element) {
-                                RtValue.Element(evaluateElementInline(it.element))
-                            } else {
-                                it
-                            }
-                        }
-                    )
+                // `isElementNode(val)` / per-item — chain-aware duck-type tests.
+                out[key] = when {
+                    JsObjects.runtimeElementRef(v) != null -> recurseIfElement(v, inline = true)
+                    v is RtValue.Arr ->
+                        RtValue.Arr(v.items.map { recurseIfElement(it, inline = true) })
 
                     else -> v
                 }
@@ -796,11 +790,7 @@ internal class Evaluator(store: Map<String, RtValue>) {
                 // evaluator.js:421 — the element re-evaluation is gated on the
                 // schema context, so inside an Action the per-item element
                 // keeps whatever raw ASTs site 75 preserved.
-                if (schemaCtx != null && result is RtValue.Element) {
-                    RtValue.Element(evaluateElementInline(result.element))
-                } else {
-                    result
-                }
+                if (schemaCtx != null) recurseIfElement(result, inline = true) else result
             }
         )
     }

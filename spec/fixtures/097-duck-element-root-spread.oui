@@ -1,0 +1,6 @@
+# Same spread, but at the ROOT. `serializeExpected` calls `serializeElement` on
+# the evaluated root UNCONDITIONALLY, so a root that inherited its element
+# identity arrives there without a `typeName`: `{ component: undefined }` has
+# its key dropped by JSON.stringify and the tree begins at `statementId`.
+base = { type: "element", typeName: "Card", props: { children: [] }, partial: false }
+root = { "__proto__": base, z: 1 }

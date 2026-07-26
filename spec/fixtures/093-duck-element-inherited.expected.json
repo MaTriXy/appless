@@ -1,0 +1,50 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "Inherited element identity"
+        }
+      },
+      {
+        "component": "KVList",
+        "props": {
+          "rows": [
+            {
+              "component": "TextContent",
+              "statementId": "inhEl",
+              "props": {
+                "text": "inherited"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "component": "KVList",
+        "props": {
+          "rows": [
+            {
+              "component": "TextContent",
+              "statementId": "twoDeep",
+              "props": {
+                "text": "inherited"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

@@ -22,7 +22,7 @@ internal data class Fixture(
 
 internal object FixtureCorpus {
     /** The CI gate: exactly this many fixtures must be discovered. */
-    const val EXPECTED_SIZE: Int = 105
+    const val EXPECTED_SIZE: Int = 112
 
     /**
      * `spec/fixtures`, found by walking up from the module directory to the
@@ -105,8 +105,8 @@ internal object FixtureCorpus {
 class FixtureOracleTest {
 
     /**
-     * CI gate: exactly 105 fixtures must be discovered, and the exact line
-     * `fixtures exercised: 105` must reach stdout.
+     * CI gate: exactly 112 fixtures must be discovered, and the exact line
+     * `fixtures exercised: 112` must reach stdout.
      */
     @Test
     fun corpusSize() {
