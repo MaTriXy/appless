@@ -287,9 +287,17 @@ public final class StreamClient: ScreenStreaming {
             body["tools"] = tools.toolDefs
         }
 
+        // RN emits two message shapes with DIFFERENT key orders (stream.ts):
+        //   assistant → { role, content, tool_calls }
+        //   tool      → { role, tool_call_id, content }
+        // One flat hint reproduces both only because the two shapes are
+        // disjoint: a tool message never carries tool_calls and an assistant
+        // message never carries tool_call_id. So tool_call_id must sit BEFORE
+        // content and tool_calls AFTER it. (Found by the Kotlin port, which
+        // models per-object insertion order directly.)
         let keyOrder = [
             "model", "messages", "tools", "stream", "temperature", "max_completion_tokens",
-            "role", "content", "tool_calls", "tool_call_id",
+            "role", "tool_call_id", "content", "tool_calls",
             "id", "type", "function", "name", "arguments",
         ]
         let request = HTTPRequest(

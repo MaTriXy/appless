@@ -40,6 +40,15 @@ import Testing
         let toolMsg = msgs.first { $0["role"]?.stringValue == "tool" }
         #expect(toolMsg?["tool_call_id"]?.stringValue == "call_1")
         #expect(toolMsg?["content"]?.stringValue == "TOOL(web_search):goa weather")
+
+        // Byte-pin the replayed message ORDER, which a re-parse cannot see.
+        // RN (stream.ts) pushes { role, content, tool_calls } for the assistant
+        // and { role, tool_call_id, content } for the tool result; the wire
+        // bytes must match that, not a single canonical order.
+        let secondBody = try #require((await http.requests())[1].body)
+        let raw = try #require(String(data: secondBody, encoding: .utf8))
+        #expect(raw.contains(#"{"role":"assistant","content":null,"tool_calls":[{"id":"call_1","#))
+        #expect(raw.contains(#"{"role":"tool","tool_call_id":"call_1","content":"TOOL(web_search):goa weather"}"#))
     }
 
     @Test func splitArgumentsFragmentsAccumulateByIndex() async {
