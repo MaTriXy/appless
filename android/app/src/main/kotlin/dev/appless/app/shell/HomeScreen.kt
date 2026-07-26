@@ -44,6 +44,10 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -294,7 +298,12 @@ private fun AppIcon(
                         .size(20.dp)
                         .clip(CircleShape)
                         .background(Color(0xEB1C1C1E))
-                        .clickable(onClick = onClose),
+                        .clickable(onClick = onClose)
+                        // `accessibilityLabel={`Close ${app.name}`}` — HomeScreen.tsx L259.
+                        .semantics {
+                            contentDescription = "Close ${app.name}"
+                            role = Role.Button
+                        },
                     contentAlignment = Alignment.Center,
                 ) {
                     Text("✕", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
@@ -357,7 +366,12 @@ private fun AskBar(value: String, onValueChange: (String) -> Unit, onSubmit: () 
                     .size(32.dp)
                     .clip(CircleShape)
                     .background(Color.White)
-                    .clickable(onClick = onSubmit),
+                    .clickable(onClick = onSubmit)
+                    // `accessibilityLabel="Send"` — HomeScreen.tsx L467.
+                    .semantics {
+                        contentDescription = "Send"
+                        role = Role.Button
+                    },
                 contentAlignment = Alignment.Center,
             ) {
                 PhosphorIcon(name = "ArrowUp", tint = Color(0xFF1C1C1E), size = 16.dp)

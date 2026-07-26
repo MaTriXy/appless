@@ -1,5 +1,7 @@
 package dev.appless.app.compose
 
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.WebView
@@ -7,14 +9,11 @@ import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.captureToImage
-import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.unit.dp
 import dev.appless.uicore.ChartData
 import org.junit.Assert.assertEquals
@@ -25,6 +24,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.GraphicsMode
 
 /**
  * The assertions that need more than the text in the tree: layout arithmetic,
@@ -32,10 +32,15 @@ import org.robolectric.RobolectricTestRunner
  *
  * Uses `createAndroidComposeRule` (not the plain one) because two of these need
  * the hosting `Activity`: the `WebView` `MapView` creates lives in the Android
- * view hierarchy, not the composition, and `captureToImage` needs a window to
- * render into.
+ * view hierarchy rather than the composition, and the draw pass rasterizes the
+ * Compose host view out of that hierarchy.
  */
 @RunWith(RobolectricTestRunner::class)
+// The draw-pass tests below rasterize the composition. Robolectric's LEGACY
+// graphics mode stubs `Canvas` out entirely, so every capture would come back
+// uniform and the chart tests would fail for the wrong reason; NATIVE runs the
+// real Skia pipeline on the JVM.
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class RendererSemanticsTest {
 
     @get:Rule
@@ -146,10 +151,9 @@ class RendererSemanticsTest {
      * the semantics tree — which means every other chart assertion in this tier
      * only proves the chrome around it exists.
      *
-     * `captureToImage` forces a real measure/layout/DRAW, so the geometry code
+     * [paintsSomething] forces a real measure/layout/DRAW, so the geometry code
      * (`drawCartesianFrame`, the bar rects, `smoothPath`, `drawWedge`) actually
-     * executes. The assertion is that the canvas is not blank: at least one
-     * pixel differs from the corner background.
+     * executes. The assertion is that the surface is not uniform.
      */
     @Test
     fun a_bar_chart_actually_paints_pixels() {
@@ -187,22 +191,54 @@ class RendererSemanticsTest {
     }
 
     /**
-     * True when the rendered root contains more than one distinct pixel colour.
+     * True when the composition rasterizes to more than one distinct colour.
      *
-     * Deliberately weak on WHAT is drawn (a pixel-perfect baseline would be a
-     * screenshot test, which needs a device to be meaningful) and strong on
-     * THAT something is: a renderer that early-returns, or a `Canvas` lambda
-     * that throws and is swallowed, produces a uniform surface and fails.
+     * ### Why not `captureToImage()`
+     *
+     * Compose's own capture helper never completes under Robolectric — it waits
+     * on a real window callback and times out after 2 s
+     * (`ComposeTimeoutException`). Drawing the Android view hierarchy into a
+     * `Bitmap` by hand does the same job: Robolectric 4.14 runs graphics in
+     * NATIVE mode, so `View.draw` really rasterizes through Skia and every
+     * `Canvas` lambda in the tree executes.
+     *
+     * The assertion is deliberately weak on WHAT is painted — a pixel-perfect
+     * baseline is only meaningful on a real device and belongs in `androidTest`
+     * — and strong on THAT something is. A renderer that early-returns, or a
+     * `Canvas` block that never runs, leaves a uniform surface and fails.
+     * [a_chart_with_no_data_paints_nothing_at_all] is the negative control that
+     * proves this can distinguish the two.
      */
-    private fun paintsSomething(): Boolean {
-        val pixels = compose.onRoot().captureToImage().toPixelMap()
-        val first = pixels[0, 0]
-        for (y in 0 until pixels.height) {
-            for (x in 0 until pixels.width) {
-                if (pixels[x, y] != first) return true
+    private fun distinctPaintedColours(): Int {
+        compose.waitForIdle()
+        // The decor view is full-window and mostly empty; the Compose host view
+        // is exactly the composition's bounds, so a uniform result there really
+        // does mean "the composition painted nothing".
+        val target = findComposeView(compose.activity.window.decorView)
+            ?: error("no AndroidComposeView in the hierarchy")
+        val width = target.width.coerceAtLeast(1)
+        val height = target.height.coerceAtLeast(1)
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        target.draw(Canvas(bitmap))
+
+        val colours = HashSet<Int>()
+        for (y in 0 until height) {
+            for (x in 0 until width) colours.add(bitmap.getPixel(x, y))
+        }
+        return colours.size
+    }
+
+    private fun paintsSomething(): Boolean = distinctPaintedColours() > 1
+
+    /** The `AndroidComposeView` the rule's content is hosted in. */
+    private fun findComposeView(view: View): View? {
+        if (view.javaClass.name.endsWith("AndroidComposeView")) return view
+        if (view is ViewGroup) {
+            for (i in 0 until view.childCount) {
+                findComposeView(view.getChildAt(i))?.let { return it }
             }
         }
-        return false
+        return null
     }
 
     /**

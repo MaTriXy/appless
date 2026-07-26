@@ -97,4 +97,60 @@ class FormBridgeTest {
         val form = model.payload("f").toControllerFormState().single().second as CoreJson.Obj
         assertEquals(listOf("a", "b"), form.values.keys.toList())
     }
+
+    /**
+     * Insertion order is only MOST of the rule.
+     *
+     * React-lang keeps the payload in a plain JS object (`store.set(formName,
+     * { ...formData, [name]: wrapped })`, react-lang `useOpenUIState.js`), and
+     * `JSON.stringify` enumerates a plain object with `OrdinaryOwnPropertyKeys`
+     * (ES 10.1.11.1): every canonical array index FIRST, in ascending NUMERIC
+     * order, then the remaining keys in insertion order.
+     *
+     * So a form with fields named `10`, `zeta`, `2` reaches the model as
+     * `{"2":…,"10":…,"zeta":…}` — note `"10"` AFTER `"2"`. `:openui-lang` pins
+     * the same rule for the tree serializer
+     * (`spec/fixtures/075-object-key-index-order`); this is the form-state
+     * path's copy of it, and it is a live path because field names are chosen
+     * by the model.
+     */
+    @Test
+    fun `canonical array-index field names are hoisted and sorted numerically`() {
+        val model = FormStateModel()
+        for (name in listOf("10", "zeta", "2", "4294967295", "0", "01", "alpha")) {
+            model.set("f", name, "Input", FormValue.Str(name))
+        }
+
+        val form = model.payload("f").toControllerFormState().single().second as CoreJson.Obj
+        assertEquals(
+            // "4294967295" is out of array-index range and "01" has a redundant
+            // leading zero, so both stay in the string group, in insertion order.
+            listOf("0", "2", "10", "zeta", "4294967295", "01", "alpha"),
+            form.values.keys.toList(),
+        )
+    }
+
+    /** The same rule at the OUTER level — the form names themselves. */
+    @Test
+    fun `canonical array-index form names are hoisted in the store snapshot`() {
+        val model = FormStateModel()
+        for (form in listOf("10", "alpha", "2")) {
+            model.set(form, "x", "Input", FormValue.Str("v"))
+        }
+        assertEquals(
+            listOf("2", "10", "alpha"),
+            model.payload(null).toControllerFormState().map { it.first },
+        )
+    }
+
+    /** A payload with no index-shaped keys is untouched — the overwhelming case. */
+    @Test
+    fun `ordinary field names keep pure insertion order`() {
+        val model = FormStateModel()
+        for (name in listOf("zeta", "alpha", "middle")) {
+            model.set("f", name, "Input", FormValue.Str(name))
+        }
+        val form = model.payload("f").toControllerFormState().single().second as CoreJson.Obj
+        assertEquals(listOf("zeta", "alpha", "middle"), form.values.keys.toList())
+    }
 }

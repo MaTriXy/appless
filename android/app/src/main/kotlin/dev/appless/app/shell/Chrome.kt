@@ -29,6 +29,10 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -47,6 +51,9 @@ import dev.appless.app.theme.toColor
  * Material roles), not in the renderers' theme, so the chrome stays visually
  * separate from whatever the model just generated.
  */
+
+/** `accessibilityLabel="App switcher"` — `GenOS.tsx` L703. */
+internal const val SWITCHER_LABEL: String = "App switcher"
 
 /** `EASE` — `GenOS.tsx` L58: `Easing.bezier(0.22, 1, 0.32, 1)`. */
 internal val EASE: Easing = CubicBezierEasing(0.22f, 1f, 0.32f, 1f)
@@ -202,13 +209,22 @@ internal fun GestureHint(onDismiss: () -> Unit, modifier: Modifier = Modifier) {
 @Composable
 internal fun BackOrHomePill(isBack: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val t = LocalShellTheme.current
+    // `accessibilityLabel={stack.length > 1 ? "Back" : "Home"}` — GenOS.tsx L658.
+    // The glyph inside is a Lucide icon with no description of its own (as in
+    // RN), so without this the control is an unlabeled button to TalkBack and
+    // unaddressable to any test.
+    val label = if (isBack) "Back" else "Home"
     Box(
         modifier = modifier
             .size(34.dp)
             .clip(CircleShape)
             .background(t.chromeBg.toColor())
             .border(1.dp, t.chromeBorder.toColor(), CircleShape)
-            .clickable(onClick = onClick),
+            .clickable(onClick = onClick)
+            .semantics {
+                contentDescription = label
+                role = Role.Button
+            },
         contentAlignment = Alignment.Center,
     ) {
         LucideIcon(
@@ -229,7 +245,12 @@ internal fun SwitcherPill(onClick: () -> Unit, modifier: Modifier = Modifier) {
             .clip(CircleShape)
             .background(t.chromeBg.toColor())
             .border(1.dp, t.chromeBorder.toColor(), CircleShape)
-            .clickable(onClick = onClick),
+            .clickable(onClick = onClick)
+            // `accessibilityLabel="App switcher"` — GenOS.tsx L703.
+            .semantics {
+                contentDescription = SWITCHER_LABEL
+                role = Role.Button
+            },
         contentAlignment = Alignment.Center,
     ) {
         AppsIcon(color = t.chromeInk.toColor(), size = 18.dp)

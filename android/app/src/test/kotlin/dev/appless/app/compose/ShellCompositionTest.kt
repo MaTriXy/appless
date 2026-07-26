@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
@@ -210,14 +211,14 @@ class ShellCompositionTest {
 
         // 3. Back — the stack is 2 deep, so the top-left pill pops rather than
         //    minimizing (`ShellBack.action` / `BackOrHomePill(isBack = …)`).
-        compose.onNodeWithText("‹").performClick()
+        compose.onNodeWithContentDescription("Back").performClick()
         compose.waitForIdle()
         compose.onNodeWithText("Weather").assertIsDisplayed()
         compose.onAllNodesWithText("Hourly forecast").assertCountEquals(0)
 
         // 4. Back again at the root — this time it minimizes to the home grid,
         //    where the app becomes an icon (`homeApps` = MINIMIZED sessions).
-        compose.onNodeWithText("‹").performClick()
+        compose.onNodeWithContentDescription("Home").performClick()
         compose.waitForIdle()
         compose.onNodeWithText("appless").assertIsDisplayed()
         compose.onNodeWithText("Weather").assertIsDisplayed() // the home-grid tile label
@@ -237,7 +238,7 @@ class ShellCompositionTest {
         val afterOpen = streamer.requests.size
 
         // Minimize.
-        compose.onNodeWithText("‹").performClick()
+        compose.onNodeWithContentDescription("Home").performClick()
         compose.waitForIdle()
         compose.onNodeWithText("appless").assertIsDisplayed()
 
@@ -302,11 +303,15 @@ class ShellCompositionTest {
         startShell()
         openWeather()
 
-        compose.onNodeWithText("⧉").performClick()
+        compose.onNodeWithContentDescription("App switcher").performClick()
         compose.waitForIdle()
-        compose.onNodeWithText("Weather").assertIsDisplayed()
+        // "Weather" itself is ambiguous here — it is the home-grid tile label,
+        // the switcher card title AND the generated screen's CardHeader. The
+        // switcher's own close affordance is the unambiguous evidence that the
+        // app is listed there.
+        compose.onNodeWithContentDescription("Close Weather").assertIsDisplayed()
 
-        compose.onNodeWithText("✕").performClick()
+        compose.onNodeWithContentDescription("Close Weather").performClick()
         compose.waitForIdle()
 
         // No sessions left: the switcher's empty state, and the home grid has

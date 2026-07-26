@@ -104,15 +104,23 @@ class FormRoundTripTest {
     }
 
     /**
-     * Fields reach the model in UI ORDER, not in the order the composition
-     * happened to write them.
+     * Fields reach the model in FIRST-WRITE order — not in screen order.
      *
-     * Written as a probe: the three fields are typed into BACK TO FRONT, so an
-     * implementation that ordered by write time would produce `city, name,
-     * email` and fail.
+     * React-lang appends each newly written field to a plain object
+     * (`store.set(formName, { ...formData, [name]: wrapped })`, react-lang
+     * `useOpenUIState.js`), and a key that does not yet exist lands at the END.
+     * So the order the model sees is the order the fields were first touched,
+     * which for a typed form is the TYPING order.
+     *
+     * Written as a probe: the three inputs sit on screen as `name, email, city`
+     * and are typed into back to front. Screen order would give
+     * `name, email, city`; the RN behavior gives `city, email, name`, and that
+     * is what is asserted. (Seeded fields are the other half of this rule — see
+     * the Slider in
+     * [each_renderer_stamps_its_own_componentType_and_value_shape].)
      */
     @Test
-    fun fields_are_submitted_in_ui_order_even_when_filled_out_of_order() {
+    fun fields_are_submitted_in_first_write_order_not_screen_order() {
         val actions = compose.renderProgram(
             """
             root = Card([f])
@@ -133,7 +141,7 @@ class FormRoundTripTest {
 
         val form = payloadOf(actions).single().second
         assertEquals(
-            "insertion order must follow the SCREEN, not the typing order",
+            "first-write order, i.e. the typing order — NOT the screen order",
             listOf("city", "email", "name"),
             fields(form),
         )
@@ -302,10 +310,12 @@ class FormRoundTripTest {
         compose.waitForIdle()
 
         val form = payloadOf(actions).single().second
-        // The Select was never touched, so it is absent; the Slider IS present
-        // because its default is seeded (`props.value ?? props.defaultValue ??
-        // [props.min]`).
-        assertEquals(listOf("plain", "notes", "day", "seats"), fields(form))
+        // Order is FIRST-WRITE order (see
+        // `fields_are_submitted_in_first_write_order_not_screen_order`), and the
+        // Slider's seed is written by an effect when the screen settles —
+        // BEFORE anyone types. So `seats` leads, then the three typed fields in
+        // typing order. The Select was never touched and is absent entirely.
+        assertEquals(listOf("seats", "plain", "notes", "day"), fields(form))
         assertEquals("Input", str(field(form, "plain").values["componentType"]))
         assertEquals("TextArea", str(field(form, "notes").values["componentType"]))
         assertEquals("DatePicker", str(field(form, "day").values["componentType"]))
@@ -456,8 +466,10 @@ class FormRoundTripTest {
         compose.waitForIdle()
 
         assertEquals(
-            """{"signup":{"email":{"value":"a@b.co","componentType":"Input"},""" +
-                """"seats":{"value":[3],"componentType":"Slider"}}}""",
+            // `seats` leads because its default is seeded when the screen
+            // settles, before the email is typed — first-write order.
+            """{"signup":{"seats":{"value":[3],"componentType":"Slider"},""" +
+                """"email":{"value":"a@b.co","componentType":"Input"}}}""",
             actions.last.formState.stringified(),
         )
     }

@@ -57,12 +57,23 @@ public fun ScreenView(
  *
  * The two modules carry two DIFFERENT `JsonValue` types on purpose —
  * `:openui-lang`'s belongs to the contract/prop world and `:genos-core`'s to
- * the wire world — and neither depends on the other. This is the only bridge,
- * and it preserves key order, which the request JSON depends on (fields must
- * reach the model in UI order).
+ * the wire world — and neither depends on the other. This is the only bridge.
+ *
+ * ## Key order
+ *
+ * The payload is serialized straight into the request
+ * (`"\n\nSubmitted form values: " + JSON.stringify(formState)`,
+ * `spec/openui-lang.md` §9.4 step 6), so its key ORDER is what the model reads
+ * as the order of the form. React-lang holds that payload in a PLAIN JS OBJECT
+ * (`store.set(formName, { ...formData, [name]: wrapped })` — react-lang
+ * `hooks/useOpenUIState.js` `setFieldValue`), and `JSON.stringify` enumerates a
+ * plain object with `OrdinaryOwnPropertyKeys` (ES 10.1.11.1), NOT with
+ * insertion order alone.
+ *
+ * So insertion order is only most of the rule. [jsOwnKeyOrder] adds the rest.
  */
 public fun OrderedJson.toControllerFormState(): List<Pair<String, CoreJson>> =
-    pairs.map { (key, value) -> key to value.toCoreJson() }
+    jsOwnKeyOrder(pairs).map { (key, value) -> key to value.toCoreJson() }
 
 private fun LangJson.toCoreJson(): CoreJson = when (this) {
     LangJson.Null -> CoreJson.Null
@@ -70,10 +81,54 @@ private fun LangJson.toCoreJson(): CoreJson = when (this) {
     is LangJson.Num -> CoreJson.Num(value)
     is LangJson.Str -> CoreJson.Str(value)
     is LangJson.Arr -> CoreJson.Arr(value.map { it.toCoreJson() })
-    // LinkedHashMap in, LinkedHashMap out: insertion order IS the payload order.
     is LangJson.Obj -> CoreJson.Obj(
         LinkedHashMap<String, CoreJson>().also { out ->
-            for ((k, v) in value) out[k] = v.toCoreJson()
+            for ((k, v) in jsOwnKeyOrder(value.entries.map { it.key to it.value })) {
+                out[k] = v.toCoreJson()
+            }
         },
     )
+}
+
+/**
+ * `OrdinaryOwnPropertyKeys` (ES 10.1.11.1) applied to a plain object's entries
+ * in insertion order: every **canonical array index** first, in ascending
+ * NUMERIC order, then every remaining key in insertion order.
+ *
+ * A canonical array index is a string `k` with `ToString(ToUint32(k)) === k`
+ * and `ToUint32(k) != 2^32 - 1` — a non-empty run of ASCII digits with no
+ * redundant leading zero, valued at most `2^32 - 2`. So `"0"`, `"2"` and
+ * `"4294967294"` are hoisted while `""`, `"01"`, `"-0"`, `"1.0"` and
+ * `"4294967295"` are ordinary string keys.
+ *
+ * Concretely: a form whose fields are named `10`, `zeta`, `2` reaches the model
+ * as `{"2":…,"10":…,"zeta":…}`, because that is what the RN app sends. Field
+ * names are model-chosen, and a numbered questionnaire is exactly the shape the
+ * system prompt encourages, so this is a live path rather than a curiosity.
+ *
+ * `:openui-lang` spells the same rule for the tree serializer
+ * (`StringJs.jsOwnPropertyKeys`, pinned by
+ * `spec/fixtures/075-object-key-index-order`), but it is `internal` to that
+ * module; this is the form-state path's copy, in the module that owns the
+ * bridge.
+ */
+private fun <T> jsOwnKeyOrder(entries: List<Pair<String, T>>): List<Pair<String, T>> {
+    if (entries.none { canonicalArrayIndex(it.first) >= 0 }) return entries // the common case
+    val indices = entries.filter { canonicalArrayIndex(it.first) >= 0 }
+        .sortedBy { canonicalArrayIndex(it.first) }
+    val rest = entries.filter { canonicalArrayIndex(it.first) < 0 }
+    return indices + rest
+}
+
+/** The numeric value of a canonical array index, or `-1`. */
+private fun canonicalArrayIndex(key: String): Long {
+    val n = key.length
+    if (n == 0 || n > 10) return -1 // "4294967294" is 10 digits
+    if (key[0] == '0' && n > 1) return -1 // no redundant leading zeros
+    var value = 0L
+    for (c in key) {
+        if (c < '0' || c > '9') return -1
+        value = value * 10 + (c - '0')
+    }
+    return if (value > 4294967294L) -1 else value
 }

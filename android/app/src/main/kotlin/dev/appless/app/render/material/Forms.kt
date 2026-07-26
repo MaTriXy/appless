@@ -45,6 +45,7 @@ import dev.appless.app.icons.LucideIcon
 import dev.appless.app.render.ComposeRenderer
 import dev.appless.app.render.LocalFormName
 import dev.appless.app.render.LocalFormStore
+import dev.appless.app.render.LocalIsStreaming
 import dev.appless.app.render.LocalTriggerAction
 import dev.appless.app.render.RenderNode
 import dev.appless.app.render.actionPlan
@@ -78,11 +79,36 @@ import kotlin.math.roundToInt
 // ------------------------------------------------------------- field plumbing
 
 /**
- * `useFieldState(name, componentType, seedValue)` — `ui/shared/forms.ts`.
+ * `useFieldState(name, componentType, seedValue)` — `ui/shared/forms.ts`,
+ * whose seeding half is react-lang's `useSetDefaultValue`:
  *
- * The seed is applied ONCE and only while the field is unset, so a re-parse
- * mid-stream (the model is still emitting the screen) cannot overwrite what the
- * user has typed.
+ * ```js
+ * if (!isStreaming && existingValue === undefined && defaultValue !== undefined)
+ *   setFieldValue(formName, componentType, name, defaultValue, …)
+ * ```
+ * *(react-lang `context.js` L81-98.)*
+ *
+ * Both guards matter and they guard different things.
+ *
+ * `existingValue === undefined` is the one that stops a re-parse from clobbering
+ * what the user typed — that is [FormStore.seedDefault]'s "only when unset".
+ *
+ * `!isStreaming` is the one that makes seeding read the FINAL tree. Seeding is
+ * one-shot by construction — the unset-guard above refuses every later write —
+ * so whatever value is seeded from a mid-stream parse is permanent. Waiting for
+ * the stream to settle is what guarantees that value came from the finished
+ * screen.
+ *
+ * Observable difference, and what `StreamingSeedTest` pins: a prefilled field
+ * shows its PLACEHOLDER for as long as the screen is generating, then adopts
+ * the model-supplied value when the stream ends. Without the guard it fills in
+ * from the first parse that resolves the prop.
+ *
+ * (Measured, so as not to overclaim: with this port's incremental parser an
+ * incomplete statement is withheld entirely rather than auto-closed, so a
+ * TRUNCATED string value is not reachable — `value` only ever appears fully
+ * formed. The guard is carried because react-lang carries it and the resulting
+ * UI differs, not because a truncation was observed here.)
  */
 @Composable
 private fun rememberField(
@@ -92,9 +118,12 @@ private fun rememberField(
 ): FieldHandle {
     val store = LocalFormStore.current
     val formName = LocalFormName.current
+    val isStreaming = LocalIsStreaming.current
     val seeded = FormValue.seed(seed)
-    LaunchedEffect(formName, name, componentType, seeded) {
-        if (seeded != null) store.seedDefault(formName, name, componentType, seeded)
+    LaunchedEffect(formName, name, componentType, seeded, isStreaming) {
+        if (!isStreaming && seeded != null) {
+            store.seedDefault(formName, name, componentType, seeded)
+        }
     }
     return FieldHandle(
         value = store.value(formName, name),
