@@ -135,7 +135,9 @@ internal object PhotoGridRenderer : ComposeRenderer {
     override fun Render(node: ElementNode) {
         val t = LocalMdTheme.current
         // `.filter((im) => im?.src)` — entries without a src are dropped, L484.
-        val images = node["images"].items().mapNotNull { it.field("src").stringOrNull() }
+        val images = node["images"].items()
+            .mapNotNull { it.field("src").stringOrNull() }
+            .filter { it.isNotEmpty() }
         FlowRow(
             modifier = Modifier
                 .fillMaxWidth()

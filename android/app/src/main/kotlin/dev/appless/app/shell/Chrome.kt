@@ -285,8 +285,3 @@ internal object ChromeMetrics {
     /** The minimize target: 230 ≈ the home icon grid's offset — L566-570. */
     val minimizeTargetOffset = 230.dp
 }
-
-@Composable
-internal fun rowSpacer(height: androidx.compose.ui.unit.Dp) {
-    Box(Modifier.height(height))
-}

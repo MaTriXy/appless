@@ -6,7 +6,6 @@ import androidx.compose.runtime.remember
 import dev.appless.genoscore.Lang
 import dev.appless.openuilang.LibrarySchema
 import dev.appless.openuilang.StreamingParser
-import dev.appless.uicore.JsonWriter
 import dev.appless.uicore.OrderedJson
 import dev.appless.genoscore.JsonValue as CoreJson
 import dev.appless.openuilang.JsonValue as LangJson
@@ -78,9 +77,3 @@ private fun LangJson.toCoreJson(): CoreJson = when (this) {
         },
     )
 }
-
-/** `JSON.stringify(formState)` — used by the toast/debug paths and tests. */
-public fun OrderedJson.stringify(): String = stringified()
-
-/** Re-exported so callers do not reach into `ui-core` for one function. */
-public fun jsonNumber(value: Double): String = JsonWriter.number(value)

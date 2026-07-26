@@ -1,5 +1,74 @@
 import Foundation
 
+/// An INSERTION-ORDERED JSON object - the Swift stand-in for a JS object
+/// literal (and for Kotlin's `LinkedHashMap`). A Swift `Dictionary` has no
+/// order at all, so serializing one can only sort, which is NOT what
+/// `JSON.stringify` does at any depth.
+///
+/// Key order semantics are `OrdinaryOwnPropertyKeys` (ES 10.1.11.1), applied
+/// by `JSONValue.stringified()`: canonical array-index keys first in ascending
+/// NUMERIC order, then every remaining key in insertion order.
+///
+/// Re-assigning an existing key keeps its ORIGINAL position and replaces the
+/// value (JS `o.a = 1; o.b = 2; o.a = 3` still emits `a` first), matching both
+/// JS and `LinkedHashMap.put`.
+///
+/// `==` is deliberately ORDER-INSENSITIVE: two objects with the same keys and
+/// values are equal however they were built, which is the structural
+/// comparison every `JSONValue` assertion in this package wants. Ordering is a
+/// serialization concern, pinned by the byte-level tests.
+public struct JSONObject: Sendable, Equatable, ExpressibleByDictionaryLiteral {
+    private var order: [String] = []
+    private var storage: [String: JSONValue] = [:]
+
+    public init() {}
+
+    /// Build from an ordered key/value list; later duplicates keep the FIRST
+    /// position and the LAST value (JS assignment semantics).
+    public init(_ pairs: [(String, JSONValue)]) {
+        for (key, value) in pairs { self[key] = value }
+    }
+
+    /// Swift dictionary literals hand `init(dictionaryLiteral:)` their
+    /// elements in SOURCE order, so `.object(["role": …, "content": …])`
+    /// reads exactly like the RN object literal it ports.
+    public init(dictionaryLiteral elements: (String, JSONValue)...) {
+        self.init(elements)
+    }
+
+    public subscript(key: String) -> JSONValue? {
+        get { storage[key] }
+        set {
+            guard let newValue else {
+                if storage.removeValue(forKey: key) != nil {
+                    order.removeAll { $0 == key }
+                }
+                return
+            }
+            if storage.updateValue(newValue, forKey: key) == nil {
+                order.append(key)
+            }
+        }
+    }
+
+    /// Keys in INSERTION order (not `OrdinaryOwnPropertyKeys` order - that is
+    /// applied at serialization time).
+    public var insertionOrderedKeys: [String] { order }
+
+    /// Key/value pairs in insertion order.
+    public var pairs: [(String, JSONValue)] { order.map { ($0, storage[$0]!) } }
+
+    /// Unordered dictionary view (lookups, structural assertions).
+    public var dictionary: [String: JSONValue] { storage }
+
+    public var count: Int { order.count }
+    public var isEmpty: Bool { order.isEmpty }
+
+    public static func == (lhs: JSONObject, rhs: JSONObject) -> Bool {
+        lhs.storage == rhs.storage
+    }
+}
+
 /// Sendable JSON model used for tool-call arguments, form state, and request
 /// body assertions in tests.
 public enum JSONValue: Sendable, Equatable {
@@ -8,7 +77,7 @@ public enum JSONValue: Sendable, Equatable {
     case bool(Bool)
     case null
     case array([JSONValue])
-    case object([String: JSONValue])
+    case object(JSONObject)
 
     /// Parse a JSON document. Returns nil on malformed input.
     public static func parse(_ text: String) -> JSONValue? {

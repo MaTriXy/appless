@@ -88,8 +88,9 @@ schema rather than hard-coding it (`ContractSchema.renderableComponents` in
 Swift, `RendererRegistry` in `ui-core`), so the number cannot drift from the
 contract silently.
 
-The migration plan's Phase 3 row says "29 SwiftUI renderers". That is an
-arithmetic slip and is corrected in the plan.
+The migration plan's Phase 3 row used to say "29 SwiftUI renderers". That was an
+arithmetic slip; it has been corrected to 30 in the plan, along with an explicit
+33 − 3 = 30 note in §7.
 
 The conformance gate line is `renderers registered: N/30`:
 
@@ -224,9 +225,12 @@ This section is the point of the document. Be blunt about it.
    parsed). Both are syntax-level. Neither catches a type error, a missing
    argument label, a wrong `ViewBuilder` shape, or a `@State` misuse.
 
-2. **The Android `:app` module does not compile.** Compose renderers, shell,
-   chrome, key gate and the OkHttp/Keystore platform layer are written but red.
-   Nothing in the Compose layer is executed by any test.
+2. **No Compose composable has ever been executed.** `android/app` compiles and
+   assembles a debug APK, and its 71 unit tests are green — but every one of
+   them is a plain JVM test of surrounding logic. There is no Robolectric and no
+   `createComposeRule`, so the Material 3 renderers, shell, chrome and key gate
+   are compiled and never run. Additionally, nothing in CI gates the module at
+   all (there is no `android-app.yml`), so its green state is local only.
 
 3. **No simulator or device has ever run either native app.** Layout,
    scrolling, animation curves (the RN launch/push/pop transitions),
@@ -272,7 +276,7 @@ definitions and their exit criteria. Summary:
 | 3. iOS app | **in-flight** — code complete, verification blocked on macOS CI |
 | 4. iOS parity & hardening | **not started** |
 | 5. Kotlin parser + core | **done** (parser, `genos-core`, and `ui-core`) |
-| 6. Android app | **in-flight** — `:app` does not compile |
+| 6. Android app | **in-flight** — `:app` compiles, assembles and passes 71 JVM unit tests, but no Compose code is executed by a test and no workflow gates it |
 | 7. Wrap-up | **in-flight** — this document, the README rewrite and `all-gates.yml` |
 
 ---
@@ -295,8 +299,9 @@ python3 ios/AppLess/Scripts/parse-swiftui.py  # 22 files parsed, not type-checke
 cd android && ./gradlew :openui-lang:test :genos-core:test :ui-core:test --console=plain
 #   openui-lang 121 · genos-core 279 · ui-core 95
 
-# Android — the app module (currently RED)
-cd android && ./gradlew :app:assembleDebug --console=plain
+# Android — the app module (needs the Android SDK; not gated by any workflow)
+cd android && ./gradlew :app:assembleDebug :app:testDebugUnitTest --console=plain
+#   71 unit tests, 0 failures — but no Compose composable is executed
 
 # Cross-port differential fuzzing (local three-way, in one process)
 cd spec/fixtures/generator && node probes/run-differential.mjs

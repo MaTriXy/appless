@@ -156,7 +156,7 @@ private fun keyboardOptions(type: String?): KeyboardOptions = KeyboardOptions(
 @Composable
 private fun OutlinedField(
     field: FieldHandle,
-    componentTypeSetter: (String) -> Unit,
+    onValueChange: (String) -> Unit,
     placeholder: String?,
     keyboard: KeyboardOptions = KeyboardOptions.Default,
     visualTransformation: VisualTransformation = VisualTransformation.None,
@@ -171,7 +171,7 @@ private fun OutlinedField(
 
     BasicTextField(
         value = text,
-        onValueChange = componentTypeSetter,
+        onValueChange = onValueChange,
         modifier = outlinedFieldModifier(focused).then(extraModifier),
         textStyle = TextStyle(
             color = t.onSurface.toColor(),
@@ -208,7 +208,7 @@ internal object InputRenderer : ComposeRenderer {
         val type = node["type"].stringOrNull()
         OutlinedField(
             field = field,
-            componentTypeSetter = { field.set(FormValue.Str(it)) },
+            onValueChange = { field.set(FormValue.Str(it)) },
             placeholder = node["placeholder"].stringOrNull(),
             keyboard = keyboardOptions(type),
             visualTransformation = if (InputBehavior.isSecure(type)) {
@@ -228,7 +228,7 @@ internal object TextAreaRenderer : ComposeRenderer {
         val field = rememberField(name, "TextArea", node["value"])
         OutlinedField(
             field = field,
-            componentTypeSetter = { field.set(FormValue.Str(it)) },
+            onValueChange = { field.set(FormValue.Str(it)) },
             placeholder = node["placeholder"].stringOrNull(),
             singleLine = false,
             extraModifier = Modifier.defaultMinSize(
@@ -252,7 +252,7 @@ internal object DatePickerRenderer : ComposeRenderer {
         val field = rememberField(name, "DatePicker", node["value"])
         OutlinedField(
             field = field,
-            componentTypeSetter = { field.set(FormValue.Str(it)) },
+            onValueChange = { field.set(FormValue.Str(it)) },
             placeholder = if (node["mode"].stringOrNull() == "range") {
                 "YYYY-MM-DD → YYYY-MM-DD"
             } else {
@@ -503,7 +503,8 @@ internal object ButtonRenderer : ComposeRenderer {
             else -> if (destructive) t.error.toColor() else t.primary.toColor()
         }
         val compact = MaterialMetrics.isCompactButton(node["size"].stringOrNull())
-        val label = node["label"].stringOrNull() ?: ""
+        // `props.label ?? ""` — the message an ACTION-LESS button sends.
+        val label = node["label"].reactText()
 
         Box(
             modifier = Modifier
@@ -532,7 +533,7 @@ internal object ButtonRenderer : ComposeRenderer {
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                text = node["label"].reactText(),
+                text = label,
                 color = foreground,
                 fontSize = MaterialMetrics.BUTTON_FONT_SIZE.sp,
                 fontWeight = FontWeight.Medium,

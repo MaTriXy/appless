@@ -40,8 +40,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.appless.app.AppLessApplication
@@ -97,7 +95,6 @@ internal fun GenOSShell(app: AppLessApplication, schema: LibrarySchema) {
     val generating = top?.status == ScreenStatus.PENDING || top?.status == ScreenStatus.STREAMING
 
     val insets = WindowInsets.safeDrawing.asPaddingValues()
-    val layoutDirection = LocalLayoutDirection.current
     val topInset = insets.calculateTopPadding()
     val bottomInset = insets.calculateBottomPadding()
 
@@ -426,11 +423,6 @@ internal fun GenOSShell(app: AppLessApplication, schema: LibrarySchema) {
             )
         }
     }
-
-    // `layoutDirection` is read so the inset padding above stays correct under
-    // RTL; Compose's PaddingValues accessors need it explicitly.
-    @Suppress("UNUSED_EXPRESSION")
-    layoutDirection
 }
 
 /** Toast payload — the `key` forces a fresh animation for a repeated message. */

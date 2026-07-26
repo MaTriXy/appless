@@ -228,7 +228,7 @@ Status column measured at commit `b052036`; counts and the full evidence are in
 | **3. iOS app** | **30** SwiftUI renderers, shell, transitions, KeyGate; Xcode project | App runs on device/simulator; manual parity script vs RN app passes | **IN FLIGHT** — all 30 renderers and the full shell are written; `AppLessCore` carries 220 Linux tests. **Exit criterion NOT met:** SwiftUI has never been type-checked (Linux compiles it to an empty module) and no simulator or device has run it. Blocked on the first `ios-app.yml` run. |
 | **4. iOS parity & hardening** | Side-by-side checklist vs RN (per capability row in §6), streaming perf at ~1 850 tok/s, memory | Checklist signed off | **NOT STARTED** — requires a running app |
 | **5. Kotlin parser + core** | Port Layers 1–2 informed by the settled spec; same fixtures | Fixtures + unit tests green on JVM CI | **DONE** — `openui-lang` 121 tests (97 fixtures), `genos-core` 279, plus `ui-core` 95 (an added module, see §12) |
-| **6. Android app** | Compose renderers (M3), shell, predictive back | Parity checklist vs RN Material build | **IN FLIGHT** — Compose renderers, shell, chrome, key gate and the OkHttp/Keystore layer are written but `:app:compileDebugKotlin` currently **fails**; nothing in the Compose layer is executed by any test |
+| **6. Android app** | Compose renderers (M3), shell, predictive back | Parity checklist vs RN Material build | **IN FLIGHT** — `:app` compiles, assembles a debug APK and passes 71 JVM unit tests. **Exit criterion NOT met:** no Compose composable is executed by any test (no Robolectric, no `createComposeRule`), no device or emulator has run it, and no workflow gates the module |
 | **7. Wrap-up** | README rewrite, CI for all three, decide RN app's long-term fate (kept as reference per current decision) | Docs merged | **IN FLIGHT** — `MIGRATION_STATUS.md`, the README rewrite and the `all-gates.yml` umbrella workflow are in; the Android SDK workflow does not exist yet |
 
 **Environment note:** Phases 0, 1, 2 and 5 are pure logic and can be built and tested
@@ -256,7 +256,8 @@ API calls. It is a real mitigation, and it is not a substitute: see
 | `differential-fuzz.yml` | ubuntu ×2 | Both parser ports byte-compared to the JS oracle over pinned + prefix + non-monotonic + mutation campaigns |
 | `all-gates.yml` | ubuntu ×3 | Umbrella, no path filter: the spec gates, all three Swift suites, and the three pure-Kotlin modules on every push and PR |
 
-There is no Android-SDK workflow yet, because `:app` does not compile yet.
+There is no Android-SDK workflow yet. That is now the largest CI gap: `:app`
+builds and tests green locally and nothing gates it.
 
 ## 10. Risks & mitigations
 

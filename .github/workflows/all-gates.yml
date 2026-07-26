@@ -24,9 +24,12 @@
 #   * It does NOT run the macOS tier. `xcodebuild`-ing AppLessUI for the iOS
 #     device and simulator SDKs is the whole point of `ios-app.yml` and costs a
 #     macOS runner; duplicating it here would double that cost for every push.
-#   * It does NOT run the Android SDK tier (`:app:assembleDebug`). The `:app`
-#     module does not compile yet (see docs/MIGRATION_STATUS.md); when it does,
-#     its gate belongs in a dedicated `android-app.yml`, not here.
+#   * It does NOT run the Android SDK tier (`:app:assembleDebug`,
+#     `:app:testDebugUnitTest`). That needs an SDK install on the runner, and
+#     the `:app` module is still mid-write (see docs/MIGRATION_STATUS.md). Its
+#     gate belongs in a dedicated `android-app.yml` owned by whoever finishes
+#     the module — that workflow does not exist yet, and its absence is
+#     currently the largest hole in this repo's CI coverage.
 #   * It does NOT run the differential-fuzz campaigns. Those are minutes-long
 #     and already gated by `differential-fuzz.yml` on the paths that matter.
 #
@@ -148,8 +151,8 @@ jobs:
   #
   # `:openui-lang`, `:genos-core` and `:ui-core` are deliberately pure
   # Kotlin/JVM libraries with no Android dependency, so they run headlessly on
-  # any JDK 21 without an SDK install. `:app` is excluded — it needs the Android
-  # SDK and does not currently compile.
+  # any JDK 21 without an SDK install. `:app` is excluded because it needs the
+  # Android SDK, not because it is broken — it belongs in `android-app.yml`.
   android-pure:
     name: android — openui-lang, genos-core, ui-core (no SDK)
     runs-on: ubuntu-latest
@@ -196,6 +199,6 @@ jobs:
           done
           echo "all Linux-runnable gates green"
           echo "NOT covered here: SwiftUI compilation (ios-app.yml, macOS)," \
-               "the Android :app module (no workflow yet — it does not compile)," \
+               "the Android :app module (no workflow exists yet)," \
                "differential fuzzing (differential-fuzz.yml), and any" \
-               "simulator/device behavior (unverified anywhere)."
+               "simulator/emulator/device behavior (unverified anywhere)."

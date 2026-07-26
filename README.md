@@ -206,12 +206,12 @@ generated openui-lang the same way: Cupertino on iOS, Material 3 on Android.
 | Kotlin parser (`openui-lang`) | done — 121 tests |
 | Kotlin core (`genos-core`) | done — 279 tests |
 | Kotlin `ui-core` (M3 tokens, icon map, renderer logic) | done — 95 tests |
-| Compose app (`android/app`) | **in flight — does not currently compile** |
+| Compose app (`android/app`) | **in flight** — compiles and passes 71 unit tests, but no Compose code is executed by a test and no CI workflow gates it |
 
-**Neither native app runs end to end yet.** No simulator or device has launched
-either one; no native build has talked to the model. What is done is the hard,
-testable half — two independent parser and runtime ports that byte-match the JS
-reference — and that half is genuinely done.
+**Neither native app runs end to end yet.** No simulator, emulator or device has
+launched either one; no native build has talked to the model. What is done is
+the hard, testable half — two independent parser and runtime ports that
+byte-match the JS reference — and that half is genuinely done.
 
 Authoritative status, including everything that is *not* verified anywhere,
 lives in **[`docs/MIGRATION_STATUS.md`](docs/MIGRATION_STATUS.md)**. The design
@@ -253,7 +253,8 @@ Android SDK:
 cd android && ./gradlew :openui-lang:test :genos-core:test :ui-core:test
 ```
 
-`:app` needs the Android SDK and is mid-write.
+`:app` needs the Android SDK and is mid-write; it builds and tests locally with
+`./gradlew :app:assembleDebug :app:testDebugUnitTest` but is not gated by CI.
 
 **Cross-port differential fuzzing** — feeds generated programs through both
 ports and the JS oracle and byte-compares the results:

@@ -93,7 +93,7 @@ internal object ListItemRenderer : ComposeRenderer {
             // `typeof leading === "string" && leading` first, then the
             // `{src}` object form — `components.tsx` L179-190.
             val leadingName = leading.stringOrNull()
-            val leadingSrc = leading.field("src").stringOrNull()
+            val leadingSrc = leading.field("src").stringOrNull()?.takeIf { it.isNotEmpty() }
             when {
                 !leadingName.isNullOrEmpty() -> TonalIcon(leadingName)
                 leadingSrc != null -> SemanticImg(
