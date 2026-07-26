@@ -5,11 +5,11 @@
  "campaigns": [
   "pinned"
  ],
- "corpusSize": 101,
- "fixtureCount": 97,
+ "corpusSize": 109,
+ "fixtureCount": 105,
  "seedCount": 4,
- "sessionCount": 39,
- "stepCount": 313,
+ "sessionCount": 49,
+ "stepCount": 389,
  "sessions": [
   {
    "campaign": "pinned",
@@ -1265,10 +1265,397 @@
   },
   {
    "campaign": "pinned",
-   "name": "pinned-nonmonotonic/000-019-numbers+p:114-mid-number+020-unicode-emoji",
+   "name": "pinned-prefix/088-prototype-member-access",
+   "sources": [
+    "$obj = { a: 1 }\n$arr = [1, 2]\ncard = TextContent(\"hi\")\nroot = Card([\n  TextContent($obj.toString + \"|\" + $obj.constructor + \"|\" + $obj.hasOwnProperty),\n  TextContent(\"arr=\" + $arr.constructor),\n  TextContent(\"n=\" + $obj.toString.name + \" l=\" + $obj.toString.length),\n  TextContent(\"p=\" + $obj.__proto__.constructor + \" q=\" + $obj.__proto__.__proto__),\n  TextContent(\"el=\" + card.typeName + \"/\" + card.partial + \"/\" + card.type),\n  KVList([{ key: \"fn\", value: $obj.toString }])\n])\n"
+   ],
+   "steps": [
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     20
+    ],
+    [
+     0,
+     40
+    ],
+    [
+     0,
+     60
+    ],
+    [
+     0,
+     80
+    ],
+    [
+     0,
+     100
+    ],
+    [
+     0,
+     120
+    ],
+    [
+     0,
+     140
+    ],
+    [
+     0,
+     160
+    ],
+    [
+     0,
+     180
+    ],
+    [
+     0,
+     200
+    ],
+    [
+     0,
+     220
+    ],
+    [
+     0,
+     240
+    ],
+    [
+     0,
+     260
+    ],
+    [
+     0,
+     280
+    ],
+    [
+     0,
+     300
+    ],
+    [
+     0,
+     320
+    ],
+    [
+     0,
+     340
+    ],
+    [
+     0,
+     360
+    ],
+    [
+     0,
+     380
+    ],
+    [
+     0,
+     400
+    ],
+    [
+     0,
+     420
+    ],
+    [
+     0,
+     440
+    ],
+    [
+     0,
+     460
+    ],
+    [
+     0,
+     468
+    ],
+    [
+     0,
+     469
+    ],
+    [
+     0,
+     470
+    ],
+    [
+     0,
+     471
+    ],
+    [
+     0,
+     472
+    ],
+    [
+     0,
+     473
+    ],
+    [
+     0,
+     474
+    ],
+    [
+     0,
+     475
+    ],
+    [
+     0,
+     476
+    ],
+    [
+     0,
+     477
+    ],
+    [
+     0,
+     478
+    ],
+    [
+     0,
+     479
+    ],
+    [
+     0,
+     480
+    ]
+   ],
+   "expected": [
+    "{\n  \"root\": null,\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": null,\n  \"meta\": {\n    \"incomplete\": false,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": null,\n  \"meta\": {\n    \"incomplete\": false,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$arr\": [\n      1,\n      2\n    ],\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"TextContent\",\n    \"statementId\": \"card\",\n    \"props\": {\n      \"text\": \"hi\"\n    }\n  },\n  \"meta\": {\n    \"incomplete\": false,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$arr\": [\n      1,\n      2\n    ],\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": []\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [\n      \"TextConte\"\n    ],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$arr\": [\n      1,\n      2\n    ],\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"function toString() { [native code] }\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$arr\": [\n      1,\n      2\n    ],\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"function toString() { [native code] }|\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$arr\": [\n      1,\n      2\n    ],\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"function toString() { [native code] }|function Object() { [native code] }|\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$arr\": [\n      1,\n      2\n    ],\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"function toString() { [native code] }|function Object() { [native code] }|function hasOwnProperty() { [native code] }\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [\n      \"TextCo\"\n    ],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$arr\": [\n      1,\n      2\n    ],\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"function toString() { [native code] }|function Object() { [native code] }|function hasOwnProperty() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"style\": null,\n          \"text\": \"arr=,\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$arr\": [\n      1,\n      2\n    ],\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"function toString() { [native code] }|function Object() { [native code] }|function hasOwnProperty() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"arr=function Number() { [native code] },function Number() { [native code] }\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [\n      \"Text\"\n    ],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$arr\": [\n      1,\n      2\n    ],\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"function toString() { [native code] }|function Object() { [native code] }|function hasOwnProperty() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"arr=function Number() { [native code] },function Number() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"style\": null,\n          \"text\": \"n=\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$arr\": [\n      1,\n      2\n    ],\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"function toString() { [native code] }|function Object() { [native code] }|function hasOwnProperty() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"arr=function Number() { [native code] },function Number() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"n=toString l=\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$arr\": [\n      1,\n      2\n    ],\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"function toString() { [native code] }|function Object() { [native code] }|function hasOwnProperty() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"arr=function Number() { [native code] },function Number() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"n=toString l=\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$arr\": [\n      1,\n      2\n    ],\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"function toString() { [native code] }|function Object() { [native code] }|function hasOwnProperty() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"arr=function Number() { [native code] },function Number() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"n=toString l=0\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [\n      \"TextContent\"\n    ],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$arr\": [\n      1,\n      2\n    ],\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"function toString() { [native code] }|function Object() { [native code] }|function hasOwnProperty() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"arr=function Number() { [native code] },function Number() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"n=toString l=0\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p=\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$arr\": [\n      1,\n      2\n    ],\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"function toString() { [native code] }|function Object() { [native code] }|function hasOwnProperty() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"arr=function Number() { [native code] },function Number() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"n=toString l=0\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p=function Object() { [native code] } q\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$arr\": [\n      1,\n      2\n    ],\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"function toString() { [native code] }|function Object() { [native code] }|function hasOwnProperty() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"arr=function Number() { [native code] },function Number() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"n=toString l=0\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"style\": null,\n          \"text\": \"p=function Object() { [native code] } q=\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$arr\": [\n      1,\n      2\n    ],\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"function toString() { [native code] }|function Object() { [native code] }|function hasOwnProperty() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"arr=function Number() { [native code] },function Number() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"n=toString l=0\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p=function Object() { [native code] } q=\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [\n      \"TextCo\"\n    ],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$arr\": [\n      1,\n      2\n    ],\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"function toString() { [native code] }|function Object() { [native code] }|function hasOwnProperty() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"arr=function Number() { [native code] },function Number() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"n=toString l=0\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p=function Object() { [native code] } q=\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"el=\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$arr\": [\n      1,\n      2\n    ],\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"function toString() { [native code] }|function Object() { [native code] }|function hasOwnProperty() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"arr=function Number() { [native code] },function Number() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"n=toString l=0\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p=function Object() { [native code] } q=\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"el=TextContent/[object Object]\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$arr\": [\n      1,\n      2\n    ],\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"function toString() { [native code] }|function Object() { [native code] }|function hasOwnProperty() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"arr=function Number() { [native code] },function Number() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"n=toString l=0\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p=function Object() { [native code] } q=\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"el=TextContent/false/\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [\n      \"car\"\n    ],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$arr\": [\n      1,\n      2\n    ],\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"function toString() { [native code] }|function Object() { [native code] }|function hasOwnProperty() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"arr=function Number() { [native code] },function Number() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"n=toString l=0\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p=function Object() { [native code] } q=\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"el=TextContent/false/element\"\n        }\n      },\n      {\n        \"component\": \"KVList\",\n        \"props\": {\n          \"rows\": [\n            {}\n          ]\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$arr\": [\n      1,\n      2\n    ],\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"function toString() { [native code] }|function Object() { [native code] }|function hasOwnProperty() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"arr=function Number() { [native code] },function Number() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"n=toString l=0\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p=function Object() { [native code] } q=\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"el=TextContent/false/element\"\n        }\n      },\n      {\n        \"component\": \"KVList\",\n        \"props\": {\n          \"rows\": [\n            {\n              \"?\": null,\n              \"key\": \"fn\",\n              \"value\": null\n            }\n          ]\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$arr\": [\n      1,\n      2\n    ],\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"function toString() { [native code] }|function Object() { [native code] }|function hasOwnProperty() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"arr=function Number() { [native code] },function Number() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"n=toString l=0\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p=function Object() { [native code] } q=\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"el=TextContent/false/element\"\n        }\n      },\n      {\n        \"component\": \"KVList\",\n        \"props\": {\n          \"rows\": [\n            {\n              \"key\": \"fn\"\n            }\n          ]\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$arr\": [\n      1,\n      2\n    ],\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"function toString() { [native code] }|function Object() { [native code] }|function hasOwnProperty() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"arr=function Number() { [native code] },function Number() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"n=toString l=0\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p=function Object() { [native code] } q=\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"el=TextContent/false/element\"\n        }\n      },\n      {\n        \"component\": \"KVList\",\n        \"props\": {\n          \"rows\": [\n            {\n              \"key\": \"fn\"\n            }\n          ]\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$arr\": [\n      1,\n      2\n    ],\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"function toString() { [native code] }|function Object() { [native code] }|function hasOwnProperty() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"arr=function Number() { [native code] },function Number() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"n=toString l=0\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p=function Object() { [native code] } q=\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"el=TextContent/false/element\"\n        }\n      },\n      {\n        \"component\": \"KVList\",\n        \"props\": {\n          \"rows\": [\n            {\n              \"key\": \"fn\"\n            }\n          ]\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$arr\": [\n      1,\n      2\n    ],\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"function toString() { [native code] }|function Object() { [native code] }|function hasOwnProperty() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"arr=function Number() { [native code] },function Number() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"n=toString l=0\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p=function Object() { [native code] } q=\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"el=TextContent/false/element\"\n        }\n      },\n      {\n        \"component\": \"KVList\",\n        \"props\": {\n          \"rows\": [\n            {\n              \"key\": \"fn\"\n            }\n          ]\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$arr\": [\n      1,\n      2\n    ],\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"function toString() { [native code] }|function Object() { [native code] }|function hasOwnProperty() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"arr=function Number() { [native code] },function Number() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"n=toString l=0\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p=function Object() { [native code] } q=\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"el=TextContent/false/element\"\n        }\n      },\n      {\n        \"component\": \"KVList\",\n        \"props\": {\n          \"rows\": [\n            {\n              \"key\": \"fn\"\n            }\n          ]\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$arr\": [\n      1,\n      2\n    ],\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"function toString() { [native code] }|function Object() { [native code] }|function hasOwnProperty() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"arr=function Number() { [native code] },function Number() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"n=toString l=0\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p=function Object() { [native code] } q=\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"el=TextContent/false/element\"\n        }\n      },\n      {\n        \"component\": \"KVList\",\n        \"props\": {\n          \"rows\": [\n            {\n              \"key\": \"fn\"\n            }\n          ]\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$arr\": [\n      1,\n      2\n    ],\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"function toString() { [native code] }|function Object() { [native code] }|function hasOwnProperty() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"arr=function Number() { [native code] },function Number() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"n=toString l=0\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p=function Object() { [native code] } q=\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"el=TextContent/false/element\"\n        }\n      },\n      {\n        \"component\": \"KVList\",\n        \"props\": {\n          \"rows\": [\n            {\n              \"key\": \"fn\"\n            }\n          ]\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$arr\": [\n      1,\n      2\n    ],\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"function toString() { [native code] }|function Object() { [native code] }|function hasOwnProperty() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"arr=function Number() { [native code] },function Number() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"n=toString l=0\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p=function Object() { [native code] } q=\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"el=TextContent/false/element\"\n        }\n      },\n      {\n        \"component\": \"KVList\",\n        \"props\": {\n          \"rows\": [\n            {\n              \"key\": \"fn\"\n            }\n          ]\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$arr\": [\n      1,\n      2\n    ],\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"function toString() { [native code] }|function Object() { [native code] }|function hasOwnProperty() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"arr=function Number() { [native code] },function Number() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"n=toString l=0\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p=function Object() { [native code] } q=\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"el=TextContent/false/element\"\n        }\n      },\n      {\n        \"component\": \"KVList\",\n        \"props\": {\n          \"rows\": [\n            {\n              \"key\": \"fn\"\n            }\n          ]\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$arr\": [\n      1,\n      2\n    ],\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"function toString() { [native code] }|function Object() { [native code] }|function hasOwnProperty() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"arr=function Number() { [native code] },function Number() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"n=toString l=0\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p=function Object() { [native code] } q=\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"el=TextContent/false/element\"\n        }\n      },\n      {\n        \"component\": \"KVList\",\n        \"props\": {\n          \"rows\": [\n            {\n              \"key\": \"fn\"\n            }\n          ]\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$arr\": [\n      1,\n      2\n    ],\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"function toString() { [native code] }|function Object() { [native code] }|function hasOwnProperty() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"arr=function Number() { [native code] },function Number() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"n=toString l=0\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p=function Object() { [native code] } q=\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"el=TextContent/false/element\"\n        }\n      },\n      {\n        \"component\": \"KVList\",\n        \"props\": {\n          \"rows\": [\n            {\n              \"key\": \"fn\"\n            }\n          ]\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$arr\": [\n      1,\n      2\n    ],\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"function toString() { [native code] }|function Object() { [native code] }|function hasOwnProperty() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"arr=function Number() { [native code] },function Number() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"n=toString l=0\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p=function Object() { [native code] } q=\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"el=TextContent/false/element\"\n        }\n      },\n      {\n        \"component\": \"KVList\",\n        \"props\": {\n          \"rows\": [\n            {\n              \"key\": \"fn\"\n            }\n          ]\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": false,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$arr\": [\n      1,\n      2\n    ],\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"function toString() { [native code] }|function Object() { [native code] }|function hasOwnProperty() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"arr=function Number() { [native code] },function Number() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"n=toString l=0\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p=function Object() { [native code] } q=\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"el=TextContent/false/element\"\n        }\n      },\n      {\n        \"component\": \"KVList\",\n        \"props\": {\n          \"rows\": [\n            {\n              \"key\": \"fn\"\n            }\n          ]\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": false,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$arr\": [\n      1,\n      2\n    ],\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n"
+   ]
+  },
+  {
+   "campaign": "pinned",
+   "name": "pinned-prefix/090-sort-ascii-collation",
+   "sources": [
+    "labels = [\"a-b\", \"ab\", \" s\", \"a b c\", \"a.b\", \"[object Object]\", \"co-op\", \"coop\", \"A\", \"a\", \"-x\", \"_x\", \"ab \", \"a b\"]\nroot = Card([\n  CardHeader(\"ascii collation\"),\n  TextContent(\"all=\" + @Sort(labels)),\n  TextContent(\"p1=\" + @Sort([\" s\", \"1\"])),\n  TextContent(\"p2=\" + @Sort([\"-0\", \"[object Object]\"])),\n  TextContent(\"p3=\" + @Sort([\"a-b\", \"a.b\"]))\n])\n"
+   ],
+   "steps": [
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     15
+    ],
+    [
+     0,
+     30
+    ],
+    [
+     0,
+     45
+    ],
+    [
+     0,
+     60
+    ],
+    [
+     0,
+     75
+    ],
+    [
+     0,
+     90
+    ],
+    [
+     0,
+     105
+    ],
+    [
+     0,
+     120
+    ],
+    [
+     0,
+     135
+    ],
+    [
+     0,
+     150
+    ],
+    [
+     0,
+     165
+    ],
+    [
+     0,
+     180
+    ],
+    [
+     0,
+     195
+    ],
+    [
+     0,
+     210
+    ],
+    [
+     0,
+     225
+    ],
+    [
+     0,
+     240
+    ],
+    [
+     0,
+     255
+    ],
+    [
+     0,
+     270
+    ],
+    [
+     0,
+     285
+    ],
+    [
+     0,
+     300
+    ],
+    [
+     0,
+     315
+    ],
+    [
+     0,
+     330
+    ],
+    [
+     0,
+     339
+    ],
+    [
+     0,
+     340
+    ],
+    [
+     0,
+     341
+    ],
+    [
+     0,
+     342
+    ],
+    [
+     0,
+     343
+    ],
+    [
+     0,
+     344
+    ],
+    [
+     0,
+     345
+    ],
+    [
+     0,
+     346
+    ],
+    [
+     0,
+     347
+    ],
+    [
+     0,
+     348
+    ],
+    [
+     0,
+     349
+    ],
+    [
+     0,
+     350
+    ],
+    [
+     0,
+     351
+    ]
+   ],
+   "expected": [
+    "{\n  \"root\": null,\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": null,\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": null,\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": null,\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": null,\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": null,\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": null,\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": null,\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": null,\n  \"meta\": {\n    \"incomplete\": false,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": []\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [\n      \"Ca\"\n    ],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"title\": \"ascii\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"title\": \"ascii collation\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"title\": \"ascii collation\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"a\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"title\": \"ascii collation\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"all=\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [\n      \"la\"\n    ],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"title\": \"ascii collation\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"all= s,_x,-x,[object Object],a,A,a b,a b c,a-b,a.b,ab,ab ,co-op,coop\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [\n      \"TextC\"\n    ],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"title\": \"ascii collation\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"all= s,_x,-x,[object Object],a,A,a b,a b c,a-b,a.b,ab,ab ,co-op,coop\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"style\": null,\n          \"text\": \"p1=\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"title\": \"ascii collation\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"all= s,_x,-x,[object Object],a,A,a b,a b c,a-b,a.b,ab,ab ,co-op,coop\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p1= s,1\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"title\": \"ascii collation\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"all= s,_x,-x,[object Object],a,A,a b,a b c,a-b,a.b,ab,ab ,co-op,coop\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p1= s,1\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [\n      \"TextCon\"\n    ],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"title\": \"ascii collation\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"all= s,_x,-x,[object Object],a,A,a b,a b c,a-b,a.b,ab,ab ,co-op,coop\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p1= s,1\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p2=\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [\n      \"S\"\n    ],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"title\": \"ascii collation\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"all= s,_x,-x,[object Object],a,A,a b,a b c,a-b,a.b,ab,ab ,co-op,coop\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p1= s,1\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p2=-0,[ob\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"title\": \"ascii collation\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"all= s,_x,-x,[object Object],a,A,a b,a b c,a-b,a.b,ab,ab ,co-op,coop\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p1= s,1\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p2=-0,[object Object]\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"title\": \"ascii collation\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"all= s,_x,-x,[object Object],a,A,a b,a b c,a-b,a.b,ab,ab ,co-op,coop\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p1= s,1\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p2=-0,[object Object]\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [\n      \"TextConten\"\n    ],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"title\": \"ascii collation\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"all= s,_x,-x,[object Object],a,A,a b,a b c,a-b,a.b,ab,ab ,co-op,coop\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p1= s,1\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p2=-0,[object Object]\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p3=\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [\n      \"Sort\"\n    ],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"title\": \"ascii collation\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"all= s,_x,-x,[object Object],a,A,a b,a b c,a-b,a.b,ab,ab ,co-op,coop\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p1= s,1\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p2=-0,[object Object]\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p3=a-b\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"title\": \"ascii collation\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"all= s,_x,-x,[object Object],a,A,a b,a b c,a-b,a.b,ab,ab ,co-op,coop\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p1= s,1\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p2=-0,[object Object]\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p3=,a-b\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"title\": \"ascii collation\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"all= s,_x,-x,[object Object],a,A,a b,a b c,a-b,a.b,ab,ab ,co-op,coop\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p1= s,1\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p2=-0,[object Object]\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p3=a,a-b\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"title\": \"ascii collation\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"all= s,_x,-x,[object Object],a,A,a b,a b c,a-b,a.b,ab,ab ,co-op,coop\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p1= s,1\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p2=-0,[object Object]\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p3=a-b,a.\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"title\": \"ascii collation\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"all= s,_x,-x,[object Object],a,A,a b,a b c,a-b,a.b,ab,ab ,co-op,coop\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p1= s,1\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p2=-0,[object Object]\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p3=a-b,a.b\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"title\": \"ascii collation\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"all= s,_x,-x,[object Object],a,A,a b,a b c,a-b,a.b,ab,ab ,co-op,coop\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p1= s,1\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p2=-0,[object Object]\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p3=a-b,a.b\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"title\": \"ascii collation\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"all= s,_x,-x,[object Object],a,A,a b,a b c,a-b,a.b,ab,ab ,co-op,coop\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p1= s,1\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p2=-0,[object Object]\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p3=a-b,a.b\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"title\": \"ascii collation\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"all= s,_x,-x,[object Object],a,A,a b,a b c,a-b,a.b,ab,ab ,co-op,coop\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p1= s,1\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p2=-0,[object Object]\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p3=a-b,a.b\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"title\": \"ascii collation\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"all= s,_x,-x,[object Object],a,A,a b,a b c,a-b,a.b,ab,ab ,co-op,coop\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p1= s,1\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p2=-0,[object Object]\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p3=a-b,a.b\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"title\": \"ascii collation\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"all= s,_x,-x,[object Object],a,A,a b,a b c,a-b,a.b,ab,ab ,co-op,coop\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p1= s,1\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p2=-0,[object Object]\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p3=a-b,a.b\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"title\": \"ascii collation\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"all= s,_x,-x,[object Object],a,A,a b,a b c,a-b,a.b,ab,ab ,co-op,coop\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p1= s,1\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p2=-0,[object Object]\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p3=a-b,a.b\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"title\": \"ascii collation\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"all= s,_x,-x,[object Object],a,A,a b,a b c,a-b,a.b,ab,ab ,co-op,coop\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p1= s,1\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p2=-0,[object Object]\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p3=a-b,a.b\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": false,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"title\": \"ascii collation\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"all= s,_x,-x,[object Object],a,A,a b,a b c,a-b,a.b,ab,ab ,co-op,coop\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p1= s,1\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p2=-0,[object Object]\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p3=a-b,a.b\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": false,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n"
+   ]
+  },
+  {
+   "campaign": "pinned",
+   "name": "pinned-nonmonotonic/000-019-numbers+seed/001-round-ties+020-unicode-emoji",
    "sources": [
     "root = Card([\n  CardHeader(\"Numbers\"),\n  KVList([\n    {label: \"int\", value: 42},\n    {label: \"negative\", value: -17},\n    {label: \"decimal\", value: 3.5},\n    {label: \"exponent\", value: 12.5e1},\n    {label: \"neg-exponent\", value: 1e-2},\n    {label: \"zero\", value: 0}\n  ], \"LITERALS\"),\n  Slider(\"amount\", \"continuous\", -10, 99.5, 0.5)\n])\n",
-    "root = Card([Slider(\"n\", \"continuous\", 0, 12.5e",
+    "root = Card([\n  CardHeader(\"Round ties\"),\n  KVList([\n    {label: \"half\", value: @Round(0.5)},\n    {label: \"neg-half\", value: @Round(-0.5)},\n    {label: \"one-half\", value: @Round(1.5)},\n    {label: \"neg-one-half\", value: @Round(-1.5)},\n    {label: \"two-half\", value: @Round(2.5)},\n    {label: \"neg-two-half\", value: @Round(-2.5)},\n    {label: \"eps-below-half\", value: @Round(0.49999999999999994)},\n    {label: \"neg-third\", value: @Round(-0.3)},\n    {label: \"neg-two-thirds\", value: @Round(-0.7)},\n    {label: \"pow2-half\", value: @Round(4503599627370496.5)},\n    {label: \"d2-tie\", value: @Round(1.005, 2)},\n    {label: \"d2-neg-tie\", value: @Round(-1.005, 2)},\n    {label: \"d1-tie\", value: @Round(0.05, 1)},\n    {label: \"d1-neg-tie\", value: @Round(-0.15, 1)},\n    {label: \"d-neg\", value: @Round(1234.5678, -2)},\n    {label: \"str\", value: \"\" + @Round(-0.5)}\n  ], \"ROUND\")\n])\n",
     "root = Card([\n  CardHeader(\"Café ☕️\", \"日本語 テスト\"),\n  TextContent(\"Emoji inside strings: 🚀🌍🎉 stay intact\"),\n  TextContent(\"Accents: naïve résumé über\")\n])\n"
    ],
    "steps": [
@@ -1318,10 +1705,10 @@
   },
   {
    "campaign": "pinned",
-   "name": "pinned-nonmonotonic/001-016-string-escapes+p:114-mid-number",
+   "name": "pinned-nonmonotonic/001-016-string-escapes+seed/001-round-ties",
    "sources": [
     "root = Card([\n  CardHeader(\"Escapes\"),\n  TextContent(\"Line1\\nLine2\\tTabbed \\\"quoted\\\" back\\\\slash\"),\n  TextContent(\"Unicode: \\u0041\\u00e9 slash: \\/ bell-ish: \\b\\f\\r end\")\n])\n",
-    "root = Card([Slider(\"n\", \"continuous\", 0, 12.5e"
+    "root = Card([\n  CardHeader(\"Round ties\"),\n  KVList([\n    {label: \"half\", value: @Round(0.5)},\n    {label: \"neg-half\", value: @Round(-0.5)},\n    {label: \"one-half\", value: @Round(1.5)},\n    {label: \"neg-one-half\", value: @Round(-1.5)},\n    {label: \"two-half\", value: @Round(2.5)},\n    {label: \"neg-two-half\", value: @Round(-2.5)},\n    {label: \"eps-below-half\", value: @Round(0.49999999999999994)},\n    {label: \"neg-third\", value: @Round(-0.3)},\n    {label: \"neg-two-thirds\", value: @Round(-0.7)},\n    {label: \"pow2-half\", value: @Round(4503599627370496.5)},\n    {label: \"d2-tie\", value: @Round(1.005, 2)},\n    {label: \"d2-neg-tie\", value: @Round(-1.005, 2)},\n    {label: \"d1-tie\", value: @Round(0.05, 1)},\n    {label: \"d1-neg-tie\", value: @Round(-0.15, 1)},\n    {label: \"d-neg\", value: @Round(1234.5678, -2)},\n    {label: \"str\", value: \"\" + @Round(-0.5)}\n  ], \"ROUND\")\n])\n"
    ],
    "steps": [
     [
@@ -1400,166 +1787,141 @@
   },
   {
    "campaign": "pinned",
-   "name": "pinned-nonmonotonic/002-seed/001-round-ties+020-unicode-emoji",
+   "name": "pinned-nonmonotonic/002-088-prototype-member-access+seed/004-string-hazards",
    "sources": [
-    "root = Card([\n  CardHeader(\"Round ties\"),\n  KVList([\n    {label: \"half\", value: @Round(0.5)},\n    {label: \"neg-half\", value: @Round(-0.5)},\n    {label: \"one-half\", value: @Round(1.5)},\n    {label: \"neg-one-half\", value: @Round(-1.5)},\n    {label: \"two-half\", value: @Round(2.5)},\n    {label: \"neg-two-half\", value: @Round(-2.5)},\n    {label: \"eps-below-half\", value: @Round(0.49999999999999994)},\n    {label: \"neg-third\", value: @Round(-0.3)},\n    {label: \"neg-two-thirds\", value: @Round(-0.7)},\n    {label: \"pow2-half\", value: @Round(4503599627370496.5)},\n    {label: \"d2-tie\", value: @Round(1.005, 2)},\n    {label: \"d2-neg-tie\", value: @Round(-1.005, 2)},\n    {label: \"d1-tie\", value: @Round(0.05, 1)},\n    {label: \"d1-neg-tie\", value: @Round(-0.15, 1)},\n    {label: \"d-neg\", value: @Round(1234.5678, -2)},\n    {label: \"str\", value: \"\" + @Round(-0.5)}\n  ], \"ROUND\")\n])\n",
-    "root = Card([\n  CardHeader(\"Café ☕️\", \"日本語 テスト\"),\n  TextContent(\"Emoji inside strings: 🚀🌍🎉 stay intact\"),\n  TextContent(\"Accents: naïve résumé über\")\n])\n"
+    "$obj = { a: 1 }\n$arr = [1, 2]\ncard = TextContent(\"hi\")\nroot = Card([\n  TextContent($obj.toString + \"|\" + $obj.constructor + \"|\" + $obj.hasOwnProperty),\n  TextContent(\"arr=\" + $arr.constructor),\n  TextContent(\"n=\" + $obj.toString.name + \" l=\" + $obj.toString.length),\n  TextContent(\"p=\" + $obj.__proto__.constructor + \" q=\" + $obj.__proto__.__proto__),\n  TextContent(\"el=\" + card.typeName + \"/\" + card.partial + \"/\" + card.type),\n  KVList([{ key: \"fn\", value: $obj.toString }])\n])\n",
+    "$name = \" padded \"\nroot = Card([\n  CardHeader(\"String hazards\", \"sub\\ttab\"),\n  KVList([\n    {label: \"escapes\", value: \"q\\\"b\\\\s\\nn\\rr\\ttAuA\"},\n    {label: \"nbsp\", value: \"a b\"},\n    {label: \"bom\", value: \"﻿head\"},\n    {label: \"combining\", value: \"é\"},\n    {label: \"astral\", value: \"🎉🚀\"},\n    {label: \"u2028\", value: \"a b\"},\n    {label: \"u0085\", value: \"ab\"},\n    {label: \"bad-escape\", value: \"keep \\q and \\x41 literal\"},\n    {label: \"concat\", value: \"n=\" + 1 + 2},\n    {label: \"coerce-nbsp\", value: \" 12.5 \" * 1},\n    {label: \"coerce-u2028\", value: \" 1e3 \" * 1},\n    {label: \"coerce-empty\", value: \"\" * 1},\n    {label: \"trimmed\", value: $name},\n    {label: \"ternary\", value: $name ? \"yes\" : \"no\"}\n  ], \"STRINGS\")\n])\n"
    ],
    "steps": [
     [
      0,
-     669
+     16
+    ],
+    [
+     1,
+     719
     ],
     [
      0,
-     866
+     480
     ],
     [
      0,
-     185
+     277
     ],
     [
      0,
-     764
-    ],
-    [
-     0,
-     781
-    ],
-    [
-     1,
-     130
-    ],
-    [
-     1,
-     121
-    ],
-    [
-     1,
-     114
-    ],
-    [
-     1,
-     127
-    ],
-    [
-     1,
-     4
-    ],
-    [
-     1,
-     156
-    ],
-    [
-     1,
-     27
-    ],
-    [
-     1,
      0
     ],
     [
-     1,
-     0
+     0,
+     79
     ],
     [
      1,
-     0
+     597
     ],
     [
      1,
-     21
+     554
+    ],
+    [
+     1,
+     521
+    ],
+    [
+     1,
+     583
+    ],
+    [
+     1,
+     20
+    ],
+    [
+     1,
+     719
+    ],
+    [
+     1,
+     124
+    ],
+    [
+     1,
+     2
     ]
    ],
    "expected": [
-    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"title\": \"Round ties\"\n        }\n      },\n      {\n        \"component\": \"KVList\",\n        \"props\": {\n          \"rows\": [\n            {\n              \"label\": \"half\",\n              \"value\": 1\n            },\n            {\n              \"label\": \"neg-half\",\n              \"value\": 0\n            },\n            {\n              \"label\": \"one-half\",\n              \"value\": 2\n            },\n            {\n              \"label\": \"neg-one-half\",\n              \"value\": -1\n            },\n            {\n              \"label\": \"two-half\",\n              \"value\": 3\n            },\n            {\n              \"label\": \"neg-two-half\",\n              \"value\": -2\n            },\n            {\n              \"label\": \"eps-below-half\",\n              \"value\": 0\n            },\n            {\n              \"label\": \"neg-third\",\n              \"value\": 0\n            },\n            {\n              \"label\": \"neg-two-thirds\",\n              \"value\": -1\n            },\n            {\n              \"label\": \"pow2-half\",\n              \"value\": 4503599627370496\n            },\n            {\n              \"label\": \"d2-tie\",\n              \"value\": 1\n            },\n            {\n              \"label\": \"d2-neg-tie\",\n              \"value\": -1\n            },\n            {\n              \"?\": null,\n              \"label\": null\n            }\n          ]\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
-    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"title\": \"Round ties\"\n        }\n      },\n      {\n        \"component\": \"KVList\",\n        \"props\": {\n          \"header\": \"ROUND\",\n          \"rows\": [\n            {\n              \"label\": \"half\",\n              \"value\": 1\n            },\n            {\n              \"label\": \"neg-half\",\n              \"value\": 0\n            },\n            {\n              \"label\": \"one-half\",\n              \"value\": 2\n            },\n            {\n              \"label\": \"neg-one-half\",\n              \"value\": -1\n            },\n            {\n              \"label\": \"two-half\",\n              \"value\": 3\n            },\n            {\n              \"label\": \"neg-two-half\",\n              \"value\": -2\n            },\n            {\n              \"label\": \"eps-below-half\",\n              \"value\": 0\n            },\n            {\n              \"label\": \"neg-third\",\n              \"value\": 0\n            },\n            {\n              \"label\": \"neg-two-thirds\",\n              \"value\": -1\n            },\n            {\n              \"label\": \"pow2-half\",\n              \"value\": 4503599627370496\n            },\n            {\n              \"label\": \"d2-tie\",\n              \"value\": 1\n            },\n            {\n              \"label\": \"d2-neg-tie\",\n              \"value\": -1\n            },\n            {\n              \"label\": \"d1-tie\",\n              \"value\": 0.1\n            },\n            {\n              \"label\": \"d1-neg-tie\",\n              \"value\": -0.1\n            },\n            {\n              \"label\": \"d-neg\",\n              \"value\": 1200\n            },\n            {\n              \"label\": \"str\",\n              \"value\": \"0\"\n            }\n          ]\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
-    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"title\": \"Round ties\"\n        }\n      },\n      {\n        \"component\": \"KVList\",\n        \"props\": {\n          \"rows\": [\n            {\n              \"label\": \"half\",\n              \"value\": 1\n            },\n            {\n              \"label\": \"neg-half\",\n              \"value\": 0\n            },\n            {\n              \"label\": \"one-half\",\n              \"value\": 2\n            }\n          ]\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
-    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"title\": \"Round ties\"\n        }\n      },\n      {\n        \"component\": \"KVList\",\n        \"props\": {\n          \"rows\": [\n            {\n              \"label\": \"half\",\n              \"value\": 1\n            },\n            {\n              \"label\": \"neg-half\",\n              \"value\": 0\n            },\n            {\n              \"label\": \"one-half\",\n              \"value\": 2\n            },\n            {\n              \"label\": \"neg-one-half\",\n              \"value\": -1\n            },\n            {\n              \"label\": \"two-half\",\n              \"value\": 3\n            },\n            {\n              \"label\": \"neg-two-half\",\n              \"value\": -2\n            },\n            {\n              \"label\": \"eps-below-half\",\n              \"value\": 0\n            },\n            {\n              \"label\": \"neg-third\",\n              \"value\": 0\n            },\n            {\n              \"label\": \"neg-two-thirds\",\n              \"value\": -1\n            },\n            {\n              \"label\": \"pow2-half\",\n              \"value\": 4503599627370496\n            },\n            {\n              \"label\": \"d2-tie\",\n              \"value\": 1\n            },\n            {\n              \"label\": \"d2-neg-tie\",\n              \"value\": -1\n            },\n            {\n              \"label\": \"d1-tie\",\n              \"value\": 0.1\n            },\n            {\n              \"label\": \"d1-neg-tie\",\n              \"value\": -0.1\n            },\n            {\n              \"?\": null,\n              \"la\": null\n            }\n          ]\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
-    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"title\": \"Round ties\"\n        }\n      },\n      {\n        \"component\": \"KVList\",\n        \"props\": {\n          \"rows\": [\n            {\n              \"label\": \"half\",\n              \"value\": 1\n            },\n            {\n              \"label\": \"neg-half\",\n              \"value\": 0\n            },\n            {\n              \"label\": \"one-half\",\n              \"value\": 2\n            },\n            {\n              \"label\": \"neg-one-half\",\n              \"value\": -1\n            },\n            {\n              \"label\": \"two-half\",\n              \"value\": 3\n            },\n            {\n              \"label\": \"neg-two-half\",\n              \"value\": -2\n            },\n            {\n              \"label\": \"eps-below-half\",\n              \"value\": 0\n            },\n            {\n              \"label\": \"neg-third\",\n              \"value\": 0\n            },\n            {\n              \"label\": \"neg-two-thirds\",\n              \"value\": -1\n            },\n            {\n              \"label\": \"pow2-half\",\n              \"value\": 4503599627370496\n            },\n            {\n              \"label\": \"d2-tie\",\n              \"value\": 1\n            },\n            {\n              \"label\": \"d2-neg-tie\",\n              \"value\": -1\n            },\n            {\n              \"label\": \"d1-tie\",\n              \"value\": 0.1\n            },\n            {\n              \"label\": \"d1-neg-tie\",\n              \"value\": -0.1\n            },\n            {\n              \"?\": null,\n              \"label\": \"d-neg\",\n              \"val\": null\n            }\n          ]\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
-    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"subtitle\": \"日本語 テスト\",\n          \"title\": \"Café ☕️\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"Emoji inside strings: 🚀🌍🎉 stay intact\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"Accent\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
-    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"subtitle\": \"日本語 テスト\",\n          \"title\": \"Café ☕️\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"Emoji inside strings: 🚀🌍🎉 stay intact\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [\n      \"TextConten\"\n    ],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
-    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"subtitle\": \"日本語 テスト\",\n          \"title\": \"Café ☕️\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"Emoji inside strings: 🚀🌍🎉 stay intact\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [\n      \"Tex\"\n    ],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
-    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"subtitle\": \"日本語 テスト\",\n          \"title\": \"Café ☕️\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"Emoji inside strings: 🚀🌍🎉 stay intact\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"Acc\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
-    "{\n  \"root\": null,\n  \"meta\": {\n    \"incomplete\": false,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
-    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"subtitle\": \"日本語 テスト\",\n          \"title\": \"Café ☕️\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"Emoji inside strings: 🚀🌍🎉 stay intact\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"Accents: naïve résumé über\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": false,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
-    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": []\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": [\n      {\n        \"code\": \"missing-required\",\n        \"component\": \"CardHeader\",\n        \"path\": \"/title\",\n        \"message\": \"missing required field \\\"title\\\"\",\n        \"statementId\": \"root\"\n      }\n    ]\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": null,\n  \"meta\": {\n    \"incomplete\": false,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"subtitle\": \"sub\\ttab\",\n          \"title\": \"String hazards\"\n        }\n      },\n      {\n        \"component\": \"KVList\",\n        \"props\": {\n          \"header\": \"STRINGS\",\n          \"rows\": [\n            {\n              \"label\": \"escapes\",\n              \"value\": \"q\\\"b\\\\s\\nn\\rr\\ttAuA\"\n            },\n            {\n              \"label\": \"nbsp\",\n              \"value\": \"a b\"\n            },\n            {\n              \"label\": \"bom\",\n              \"value\": \"﻿head\"\n            },\n            {\n              \"label\": \"combining\",\n              \"value\": \"é\"\n            },\n            {\n              \"label\": \"astral\",\n              \"value\": \"🎉🚀\"\n            },\n            {\n              \"label\": \"u2028\",\n              \"value\": \"a b\"\n            },\n            {\n              \"label\": \"u0085\",\n              \"value\": \"ab\"\n            },\n            {\n              \"label\": \"bad-escape\",\n              \"value\": \"keep \\\\q and \\\\x41 literal\"\n            },\n            {\n              \"label\": \"concat\",\n              \"value\": \"n=12\"\n            },\n            {\n              \"label\": \"coerce-nbsp\",\n              \"value\": 12.5\n            },\n            {\n              \"label\": \"coerce-u2028\",\n              \"value\": 1000\n            },\n            {\n              \"label\": \"coerce-empty\",\n              \"value\": 0\n            },\n            {\n              \"label\": \"trimmed\",\n              \"value\": \" padded \"\n            },\n            {\n              \"label\": \"ternary\",\n              \"value\": \"yes\"\n            }\n          ]\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": false,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$name\": \" padded \"\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"function toString() { [native code] }|function Object() { [native code] }|function hasOwnProperty() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"arr=function Number() { [native code] },function Number() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"n=toString l=0\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p=function Object() { [native code] } q=\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"el=TextContent/false/element\"\n        }\n      },\n      {\n        \"component\": \"KVList\",\n        \"props\": {\n          \"rows\": [\n            {\n              \"key\": \"fn\"\n            }\n          ]\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": false,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$arr\": [\n      1,\n      2\n    ],\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"function toString() { [native code] }|function Object() { [native code] }|function hasOwnProperty() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"arr=function Number() { [native code] },function Number() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"n=toString l=0\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [\n      \"TextCont\"\n    ],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$arr\": [\n      1,\n      2\n    ],\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n",
     "{\n  \"root\": null,\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
-    "{\n  \"root\": null,\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
-    "{\n  \"root\": null,\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
-    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": []\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [\n      \"CardH\"\n    ],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n"
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": []\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [\n      \"TextCont\"\n    ],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$arr\": [\n      1,\n      2\n    ],\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"subtitle\": \"sub\\ttab\",\n          \"title\": \"String hazards\"\n        }\n      },\n      {\n        \"component\": \"KVList\",\n        \"props\": {\n          \"rows\": [\n            {\n              \"label\": \"escapes\",\n              \"value\": \"q\\\"b\\\\s\\nn\\rr\\ttAuA\"\n            },\n            {\n              \"label\": \"nbsp\",\n              \"value\": \"a b\"\n            },\n            {\n              \"label\": \"bom\",\n              \"value\": \"﻿head\"\n            },\n            {\n              \"label\": \"combining\",\n              \"value\": \"é\"\n            },\n            {\n              \"label\": \"astral\",\n              \"value\": \"🎉🚀\"\n            },\n            {\n              \"label\": \"u2028\",\n              \"value\": \"a b\"\n            },\n            {\n              \"label\": \"u0085\",\n              \"value\": \"ab\"\n            },\n            {\n              \"label\": \"bad-escape\",\n              \"value\": \"keep \\\\q and \\\\x41 literal\"\n            },\n            {\n              \"label\": \"concat\",\n              \"value\": \"n=12\"\n            },\n            {\n              \"label\": \"coerce-nbsp\",\n              \"value\": 12.5\n            },\n            {\n              \"label\": \"coerce-u2028\",\n              \"value\": 1000\n            },\n            {\n              \"?\": null,\n              \"label\": \"coerce-empty\",\n              \"val\": null\n            }\n          ]\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$name\": \" padded \"\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"subtitle\": \"sub\\ttab\",\n          \"title\": \"String hazards\"\n        }\n      },\n      {\n        \"component\": \"KVList\",\n        \"props\": {\n          \"rows\": [\n            {\n              \"label\": \"escapes\",\n              \"value\": \"q\\\"b\\\\s\\nn\\rr\\ttAuA\"\n            },\n            {\n              \"label\": \"nbsp\",\n              \"value\": \"a b\"\n            },\n            {\n              \"label\": \"bom\",\n              \"value\": \"﻿head\"\n            },\n            {\n              \"label\": \"combining\",\n              \"value\": \"é\"\n            },\n            {\n              \"label\": \"astral\",\n              \"value\": \"🎉🚀\"\n            },\n            {\n              \"label\": \"u2028\",\n              \"value\": \"a b\"\n            },\n            {\n              \"label\": \"u0085\",\n              \"value\": \"ab\"\n            },\n            {\n              \"label\": \"bad-escape\",\n              \"value\": \"keep \\\\q and \\\\x41 literal\"\n            },\n            {\n              \"label\": \"concat\",\n              \"value\": \"n=12\"\n            },\n            {\n              \"label\": \"coerce-nbsp\",\n              \"value\": 12.5\n            },\n            {\n              \"label\": \"coerce-u2028\",\n              \"value\": \"\"\n            }\n          ]\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$name\": \" padded \"\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"subtitle\": \"sub\\ttab\",\n          \"title\": \"String hazards\"\n        }\n      },\n      {\n        \"component\": \"KVList\",\n        \"props\": {\n          \"rows\": [\n            {\n              \"label\": \"escapes\",\n              \"value\": \"q\\\"b\\\\s\\nn\\rr\\ttAuA\"\n            },\n            {\n              \"label\": \"nbsp\",\n              \"value\": \"a b\"\n            },\n            {\n              \"label\": \"bom\",\n              \"value\": \"﻿head\"\n            },\n            {\n              \"label\": \"combining\",\n              \"value\": \"é\"\n            },\n            {\n              \"label\": \"astral\",\n              \"value\": \"🎉🚀\"\n            },\n            {\n              \"label\": \"u2028\",\n              \"value\": \"a b\"\n            },\n            {\n              \"label\": \"u0085\",\n              \"value\": \"ab\"\n            },\n            {\n              \"label\": \"bad-escape\",\n              \"value\": \"keep \\\\q and \\\\x41 literal\"\n            },\n            {\n              \"label\": \"concat\",\n              \"value\": \"n=12\"\n            },\n            {\n              \"label\": \"coerce-nbsp\",\n              \"value\": 12.5\n            }\n          ]\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$name\": \" padded \"\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"subtitle\": \"sub\\ttab\",\n          \"title\": \"String hazards\"\n        }\n      },\n      {\n        \"component\": \"KVList\",\n        \"props\": {\n          \"rows\": [\n            {\n              \"label\": \"escapes\",\n              \"value\": \"q\\\"b\\\\s\\nn\\rr\\ttAuA\"\n            },\n            {\n              \"label\": \"nbsp\",\n              \"value\": \"a b\"\n            },\n            {\n              \"label\": \"bom\",\n              \"value\": \"﻿head\"\n            },\n            {\n              \"label\": \"combining\",\n              \"value\": \"é\"\n            },\n            {\n              \"label\": \"astral\",\n              \"value\": \"🎉🚀\"\n            },\n            {\n              \"label\": \"u2028\",\n              \"value\": \"a b\"\n            },\n            {\n              \"label\": \"u0085\",\n              \"value\": \"ab\"\n            },\n            {\n              \"label\": \"bad-escape\",\n              \"value\": \"keep \\\\q and \\\\x41 literal\"\n            },\n            {\n              \"label\": \"concat\",\n              \"value\": \"n=12\"\n            },\n            {\n              \"label\": \"coerce-nbsp\",\n              \"value\": 12.5\n            },\n            {\n              \"label\": \"coerce-u2028\",\n              \"value\": 1000\n            },\n            {\n              \"label\": \"coer\"\n            }\n          ]\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$name\": \" padded \"\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": null,\n  \"meta\": {\n    \"incomplete\": false,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$name\": \" padded \"\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"subtitle\": \"sub\\ttab\",\n          \"title\": \"String hazards\"\n        }\n      },\n      {\n        \"component\": \"KVList\",\n        \"props\": {\n          \"header\": \"STRINGS\",\n          \"rows\": [\n            {\n              \"label\": \"escapes\",\n              \"value\": \"q\\\"b\\\\s\\nn\\rr\\ttAuA\"\n            },\n            {\n              \"label\": \"nbsp\",\n              \"value\": \"a b\"\n            },\n            {\n              \"label\": \"bom\",\n              \"value\": \"﻿head\"\n            },\n            {\n              \"label\": \"combining\",\n              \"value\": \"é\"\n            },\n            {\n              \"label\": \"astral\",\n              \"value\": \"🎉🚀\"\n            },\n            {\n              \"label\": \"u2028\",\n              \"value\": \"a b\"\n            },\n            {\n              \"label\": \"u0085\",\n              \"value\": \"ab\"\n            },\n            {\n              \"label\": \"bad-escape\",\n              \"value\": \"keep \\\\q and \\\\x41 literal\"\n            },\n            {\n              \"label\": \"concat\",\n              \"value\": \"n=12\"\n            },\n            {\n              \"label\": \"coerce-nbsp\",\n              \"value\": 12.5\n            },\n            {\n              \"label\": \"coerce-u2028\",\n              \"value\": 1000\n            },\n            {\n              \"label\": \"coerce-empty\",\n              \"value\": 0\n            },\n            {\n              \"label\": \"trimmed\",\n              \"value\": \" padded \"\n            },\n            {\n              \"label\": \"ternary\",\n              \"value\": \"yes\"\n            }\n          ]\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": false,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$name\": \" padded \"\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"subtitle\": \"sub\\ttab\",\n          \"title\": \"String hazards\"\n        }\n      },\n      {\n        \"component\": \"KVList\",\n        \"props\": {\n          \"rows\": [\n            {\n              \"label\": \"escapes\",\n              \"value\": \"q\\\"b\\\\\"\n            }\n          ]\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$name\": \" padded \"\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": null,\n  \"meta\": {\n    \"incomplete\": false,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n"
    ]
   },
   {
    "campaign": "pinned",
-   "name": "pinned-nonmonotonic/003-016-string-escapes+p:114-mid-number",
+   "name": "pinned-nonmonotonic/003-p:114-mid-number+088-prototype-member-access",
    "sources": [
-    "root = Card([\n  CardHeader(\"Escapes\"),\n  TextContent(\"Line1\\nLine2\\tTabbed \\\"quoted\\\" back\\\\slash\"),\n  TextContent(\"Unicode: \\u0041\\u00e9 slash: \\/ bell-ish: \\b\\f\\r end\")\n])\n",
-    "root = Card([Slider(\"n\", \"continuous\", 0, 12.5e"
+    "root = Card([Slider(\"n\", \"continuous\", 0, 12.5e",
+    "$obj = { a: 1 }\n$arr = [1, 2]\ncard = TextContent(\"hi\")\nroot = Card([\n  TextContent($obj.toString + \"|\" + $obj.constructor + \"|\" + $obj.hasOwnProperty),\n  TextContent(\"arr=\" + $arr.constructor),\n  TextContent(\"n=\" + $obj.toString.name + \" l=\" + $obj.toString.length),\n  TextContent(\"p=\" + $obj.__proto__.constructor + \" q=\" + $obj.__proto__.__proto__),\n  TextContent(\"el=\" + card.typeName + \"/\" + card.partial + \"/\" + card.type),\n  KVList([{ key: \"fn\", value: $obj.toString }])\n])\n"
    ],
    "steps": [
     [
      0,
-     104
+     28
+    ],
+    [
+     0,
+     6
     ],
     [
      1,
-     23
+     241
+    ],
+    [
+     1,
+     238
     ],
     [
      0,
-     174
+     47
     ],
     [
      0,
-     174
+     47
     ],
     [
      0,
-     174
+     47
     ],
     [
      0,
-     106
+     29
     ],
     [
      0,
-     48
-    ],
-    [
-     0,
-     164
-    ],
-    [
-     0,
-     124
-    ],
-    [
-     0,
-     0
-    ],
-    [
-     0,
-     0
-    ],
-    [
-     0,
-     9
+     13
     ]
    ],
    "expected": [
-    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"title\": \"Escapes\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"Line1\\nLine2\\tTabbed \\\"quoted\\\" back\\\\slash\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [\n      \"T\"\n    ],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
-    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": []\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": [\n      {\n        \"code\": \"missing-required\",\n        \"component\": \"Slider\",\n        \"path\": \"/variant\",\n        \"message\": \"missing required field \\\"variant\\\"\",\n        \"statementId\": \"root\"\n      },\n      {\n        \"code\": \"missing-required\",\n        \"component\": \"Slider\",\n        \"path\": \"/min\",\n        \"message\": \"missing required field \\\"min\\\"\",\n        \"statementId\": \"root\"\n      },\n      {\n        \"code\": \"missing-required\",\n        \"component\": \"Slider\",\n        \"path\": \"/max\",\n        \"message\": \"missing required field \\\"max\\\"\",\n        \"statementId\": \"root\"\n      }\n    ]\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
-    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"title\": \"Escapes\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"Line1\\nLine2\\tTabbed \\\"quoted\\\" back\\\\slash\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"Unicode: Aé slash: / bell-ish: \\b\\f\\r end\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": false,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
-    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"title\": \"Escapes\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"Line1\\nLine2\\tTabbed \\\"quoted\\\" back\\\\slash\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"Unicode: Aé slash: / bell-ish: \\b\\f\\r end\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": false,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
-    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"title\": \"Escapes\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"Line1\\nLine2\\tTabbed \\\"quoted\\\" back\\\\slash\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"Unicode: Aé slash: / bell-ish: \\b\\f\\r end\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": false,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
-    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"title\": \"Escapes\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"Line1\\nLine2\\tTabbed \\\"quoted\\\" back\\\\slash\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [\n      \"Tex\"\n    ],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
-    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"title\": \"Escapes\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [\n      \"TextCon\"\n    ],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
-    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"title\": \"Escapes\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"Line1\\nLine2\\tTabbed \\\"quoted\\\" back\\\\slash\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"Unicode: Aé slash: / bell-ish: \\b\\f\\r\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
-    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"title\": \"Escapes\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"Line1\\nLine2\\tTabbed \\\"quoted\\\" back\\\\slash\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"Unicode:\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
-    "{\n  \"root\": null,\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
-    "{\n  \"root\": null,\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
-    "{\n  \"root\": null,\n  \"meta\": {\n    \"incomplete\": false,\n    \"unresolved\": [\n      \"Ca\"\n    ],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n"
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": []\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": [\n      {\n        \"code\": \"missing-required\",\n        \"component\": \"Slider\",\n        \"path\": \"/min\",\n        \"message\": \"missing required field \\\"min\\\"\",\n        \"statementId\": \"root\"\n      },\n      {\n        \"code\": \"missing-required\",\n        \"component\": \"Slider\",\n        \"path\": \"/max\",\n        \"message\": \"missing required field \\\"max\\\"\",\n        \"statementId\": \"root\"\n      }\n    ]\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": null,\n  \"meta\": {\n    \"incomplete\": false,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"function toString() { [native code] }|function Object() { [native code] }|function hasOwnProperty() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"arr=function Number() { [native code] },function Number() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"n=toString l=\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$arr\": [\n      1,\n      2\n    ],\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"function toString() { [native code] }|function Object() { [native code] }|function hasOwnProperty() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"arr=function Number() { [native code] },function Number() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"n=toString\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$arr\": [\n      1,\n      2\n    ],\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"Slider\",\n        \"props\": {\n          \"max\": {\n            \"$number\": \"NaN\"\n          },\n          \"min\": 0,\n          \"name\": \"n\",\n          \"variant\": \"continuous\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"Slider\",\n        \"props\": {\n          \"max\": {\n            \"$number\": \"NaN\"\n          },\n          \"min\": 0,\n          \"name\": \"n\",\n          \"variant\": \"continuous\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"Slider\",\n        \"props\": {\n          \"max\": {\n            \"$number\": \"NaN\"\n          },\n          \"min\": 0,\n          \"name\": \"n\",\n          \"variant\": \"continuous\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": []\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": [\n      {\n        \"code\": \"missing-required\",\n        \"component\": \"Slider\",\n        \"path\": \"/min\",\n        \"message\": \"missing required field \\\"min\\\"\",\n        \"statementId\": \"root\"\n      },\n      {\n        \"code\": \"missing-required\",\n        \"component\": \"Slider\",\n        \"path\": \"/max\",\n        \"message\": \"missing required field \\\"max\\\"\",\n        \"statementId\": \"root\"\n      }\n    ]\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n",
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": []\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n"
    ]
   },
   {
@@ -2008,6 +2370,134 @@
    ],
    "expected": [
     "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"subtitle\": \"sub\\ttab\",\n          \"title\": \"String hazards\"\n        }\n      },\n      {\n        \"component\": \"KVList\",\n        \"props\": {\n          \"header\": \"STRINGS\",\n          \"rows\": [\n            {\n              \"label\": \"escapes\",\n              \"value\": \"q\\\"b\\\\s\\nn\\rr\\ttAuA\"\n            },\n            {\n              \"label\": \"nbsp\",\n              \"value\": \"a b\"\n            },\n            {\n              \"label\": \"bom\",\n              \"value\": \"﻿head\"\n            },\n            {\n              \"label\": \"combining\",\n              \"value\": \"é\"\n            },\n            {\n              \"label\": \"astral\",\n              \"value\": \"🎉🚀\"\n            },\n            {\n              \"label\": \"u2028\",\n              \"value\": \"{ b\"\n            },\n            {\n              \"label\": \"u0085\",\n              \"value\": \"ab\"\n            },\n            {\n              \"label\": \"bad-escape\",\n              \"value\": \"keep \\\\q and \\\\x41 literal\"\n            },\n            {\n              \"label\": \"concat\",\n              \"value\": \"n=12\"\n            },\n            {\n              \"label\": \"coerce-nbsp\",\n              \"value\": 12.5\n            },\n            {\n              \"label\": \"coerce-u2028\",\n              \"value\": 1000\n            },\n            {\n              \"label\": \"coerce-empty\",\n              \"value\": 0\n            },\n            {\n              \"label\": \"trimmed\",\n              \"value\": \" padded \"\n            },\n            {\n              \"label\": \"ternary\",\n              \"value\": \"yes\"\n            }\n          ]\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": false,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$name\": \" padded \"\n  },\n  \"runtimeErrors\": []\n}\n"
+   ]
+  },
+  {
+   "campaign": "pinned",
+   "name": "pinned-mutation/088-prototype-member-access#00-delete@59",
+   "sources": [
+    "$obj = { a: 1 }\n$arr = [1, 2]\ncard = TextContent(\"hi\")\nroot= Card([\n  TextContent($obj.toString + \"|\" + $obj.constructor + \"|\" + $obj.hasOwnProperty),\n  TextContent(\"arr=\" + $arr.constructor),\n  TextContent(\"n=\" + $obj.toString.name + \" l=\" + $obj.toString.length),\n  TextContent(\"p=\" + $obj.__proto__.constructor + \" q=\" + $obj.__proto__.__proto__),\n  TextContent(\"el=\" + card.typeName + \"/\" + card.partial + \"/\" + card.type),\n  KVList([{ key: \"fn\", value: $obj.toString }])\n])\n"
+   ],
+   "steps": [
+    [
+     0,
+     479
+    ]
+   ],
+   "expected": [
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"function toString() { [native code] }|function Object() { [native code] }|function hasOwnProperty() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"arr=function Number() { [native code] },function Number() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"n=toString l=0\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p=function Object() { [native code] } q=\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"el=TextContent/false/element\"\n        }\n      },\n      {\n        \"component\": \"KVList\",\n        \"props\": {\n          \"rows\": [\n            {\n              \"key\": \"fn\"\n            }\n          ]\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": false,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$arr\": [\n      1,\n      2\n    ],\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n"
+   ]
+  },
+  {
+   "campaign": "pinned",
+   "name": "pinned-mutation/088-prototype-member-access#01-delete@270",
+   "sources": [
+    "$obj = { a: 1 }\n$arr = [1, 2]\ncard = TextContent(\"hi\")\nroot = Card([\n  TextContent($obj.toString + \"|\" + $obj.constructor + \"|\" + $obj.hasOwnProperty),\n  TextContent(\"arr=\" + $arr.constructor),\n  TextContent(\"n=\" + $obj.toString.name + \" l=\" + $obj.toString.length),\n  TxtContent(\"p=\" + $obj.__proto__.constructor + \" q=\" + $obj.__proto__.__proto__),\n  TextContent(\"el=\" + card.typeName + \"/\" + card.partial + \"/\" + card.type),\n  KVList([{ key: \"fn\", value: $obj.toString }])\n])\n"
+   ],
+   "steps": [
+    [
+     0,
+     479
+    ]
+   ],
+   "expected": [
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"function toString() { [native code] }|function Object() { [native code] }|function hasOwnProperty() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"arr=function Number() { [native code] },function Number() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"n=toString l=0\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"el=TextContent/false/element\"\n        }\n      },\n      {\n        \"component\": \"KVList\",\n        \"props\": {\n          \"rows\": [\n            {\n              \"key\": \"fn\"\n            }\n          ]\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": false,\n    \"unresolved\": [],\n    \"errors\": [\n      {\n        \"code\": \"unknown-component\",\n        \"component\": \"TxtContent\",\n        \"path\": \"\",\n        \"message\": \"Unknown component \\\"TxtContent\\\" — not found in catalog or builtins\",\n        \"statementId\": \"root\"\n      }\n    ]\n  },\n  \"state\": {\n    \"$arr\": [\n      1,\n      2\n    ],\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n"
+   ]
+  },
+  {
+   "campaign": "pinned",
+   "name": "pinned-mutation/088-prototype-member-access#02-insert@185",
+   "sources": [
+    "$obj = { a: 1 }\n$arr = [1, 2]\ncard = TextContent(\"hi\")\nroot = Card([\n  TextContent($obj.toString + \"|\" + $obj.constructor + \"|\" + $obj.hasOwnProperty),\n  TextContent(\"arr=\" + $arr.const)ructor),\n  TextContent(\"n=\" + $obj.toString.name + \" l=\" + $obj.toString.length),\n  TextContent(\"p=\" + $obj.__proto__.constructor + \" q=\" + $obj.__proto__.__proto__),\n  TextContent(\"el=\" + card.typeName + \"/\" + card.partial + \"/\" + card.type),\n  KVList([{ key: \"fn\", value: $obj.toString }])\n])\n"
+   ],
+   "steps": [
+    [
+     0,
+     481
+    ]
+   ],
+   "expected": [
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"function toString() { [native code] }|function Object() { [native code] }|function hasOwnProperty() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"arr=,\"\n        }\n      },\n      null,\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"n=toString l=0\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p=function Object() { [native code] } q=\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"el=TextContent/false/element\"\n        }\n      },\n      {\n        \"component\": \"KVList\",\n        \"props\": {\n          \"rows\": [\n            {\n              \"key\": \"fn\"\n            }\n          ]\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": false,\n    \"unresolved\": [\n      \"ructor\"\n    ],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$arr\": [\n      1,\n      2\n    ],\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n"
+   ]
+  },
+  {
+   "campaign": "pinned",
+   "name": "pinned-mutation/088-prototype-member-access#03-replace@32",
+   "sources": [
+    "$obj = { a: 1 }\n$arr = [1, 2]\nca{d = TextContent(\"hi\")\nroot = Card([\n  TextContent($obj.toString + \"|\" + $obj.constructor + \"|\" + $obj.hasOwnProperty),\n  TextContent(\"arr=\" + $arr.constructor),\n  TextContent(\"n=\" + $obj.toString.name + \" l=\" + $obj.toString.length),\n  TextContent(\"p=\" + $obj.__proto__.constructor + \" q=\" + $obj.__proto__.__proto__),\n  TextContent(\"el=\" + card.typeName + \"/\" + card.partial + \"/\" + card.type),\n  KVList([{ key: \"fn\", value: $obj.toString }])\n])\n"
+   ],
+   "steps": [
+    [
+     0,
+     480
+    ]
+   ],
+   "expected": [
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"function toString() { [native code] }|function Object() { [native code] }|function hasOwnProperty() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"arr=function Number() { [native code] },function Number() { [native code] }\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"n=toString l=0\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p=function Object() { [native code] } q=\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"el=//\"\n        }\n      },\n      {\n        \"component\": \"KVList\",\n        \"props\": {\n          \"rows\": [\n            {\n              \"key\": \"fn\"\n            }\n          ]\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": true,\n    \"unresolved\": [\n      \"card\",\n      \"card\",\n      \"card\"\n    ],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$arr\": [\n      1,\n      2\n    ],\n    \"$obj\": {\n      \"a\": 1\n    }\n  },\n  \"runtimeErrors\": []\n}\n"
+   ]
+  },
+  {
+   "campaign": "pinned",
+   "name": "pinned-mutation/090-sort-ascii-collation#00-delete@213",
+   "sources": [
+    "labels = [\"a-b\", \"ab\", \" s\", \"a b c\", \"a.b\", \"[object Object]\", \"co-op\", \"coop\", \"A\", \"a\", \"-x\", \"_x\", \"ab \", \"a b\"]\nroot = Card([\n  CardHeader(\"ascii collation\"),\n  TextContent(\"all=\" + @Sort(labels)),\n  TextContnt(\"p1=\" + @Sort([\" s\", \"1\"])),\n  TextContent(\"p2=\" + @Sort([\"-0\", \"[object Object]\"])),\n  TextContent(\"p3=\" + @Sort([\"a-b\", \"a.b\"]))\n])\n"
+   ],
+   "steps": [
+    [
+     0,
+     350
+    ]
+   ],
+   "expected": [
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"title\": \"ascii collation\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"all= s,_x,-x,[object Object],a,A,a b,a b c,a-b,a.b,ab,ab ,co-op,coop\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p2=-0,[object Object]\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p3=a-b,a.b\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": false,\n    \"unresolved\": [],\n    \"errors\": [\n      {\n        \"code\": \"unknown-component\",\n        \"component\": \"TextContnt\",\n        \"path\": \"\",\n        \"message\": \"Unknown component \\\"TextContnt\\\" — not found in catalog or builtins\",\n        \"statementId\": \"root\"\n      }\n    ]\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n"
+   ]
+  },
+  {
+   "campaign": "pinned",
+   "name": "pinned-mutation/090-sort-ascii-collation#01-delete@158",
+   "sources": [
+    "labels = [\"a-b\", \"ab\", \" s\", \"a b c\", \"a.b\", \"[object Object]\", \"co-op\", \"coop\", \"A\", \"a\", \"-x\", \"_x\", \"ab \", \"a b\"]\nroot = Card([\n  CardHeader(\"ascii collatin\"),\n  TextContent(\"all=\" + @Sort(labels)),\n  TextContent(\"p1=\" + @Sort([\" s\", \"1\"])),\n  TextContent(\"p2=\" + @Sort([\"-0\", \"[object Object]\"])),\n  TextContent(\"p3=\" + @Sort([\"a-b\", \"a.b\"]))\n])\n"
+   ],
+   "steps": [
+    [
+     0,
+     350
+    ]
+   ],
+   "expected": [
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"title\": \"ascii collatin\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"all= s,_x,-x,[object Object],a,A,a b,a b c,a-b,a.b,ab,ab ,co-op,coop\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p1= s,1\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p2=-0,[object Object]\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p3=a-b,a.b\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": false,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n"
+   ]
+  },
+  {
+   "campaign": "pinned",
+   "name": "pinned-mutation/090-sort-ascii-collation#02-delete@72",
+   "sources": [
+    "labels = [\"a-b\", \"ab\", \" s\", \"a b c\", \"a.b\", \"[object Object]\", \"co-op\",\"coop\", \"A\", \"a\", \"-x\", \"_x\", \"ab \", \"a b\"]\nroot = Card([\n  CardHeader(\"ascii collation\"),\n  TextContent(\"all=\" + @Sort(labels)),\n  TextContent(\"p1=\" + @Sort([\" s\", \"1\"])),\n  TextContent(\"p2=\" + @Sort([\"-0\", \"[object Object]\"])),\n  TextContent(\"p3=\" + @Sort([\"a-b\", \"a.b\"]))\n])\n"
+   ],
+   "steps": [
+    [
+     0,
+     350
+    ]
+   ],
+   "expected": [
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      {\n        \"component\": \"CardHeader\",\n        \"props\": {\n          \"title\": \"ascii collation\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"all= s,_x,-x,[object Object],a,A,a b,a b c,a-b,a.b,ab,ab ,co-op,coop\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p1= s,1\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p2=-0,[object Object]\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p3=a-b,a.b\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": false,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {},\n  \"runtimeErrors\": []\n}\n"
+   ]
+  },
+  {
+   "campaign": "pinned",
+   "name": "pinned-mutation/090-sort-ascii-collation#03-replace@133",
+   "sources": [
+    "labels = [\"a-b\", \"ab\", \" s\", \"a b c\", \"a.b\", \"[object Object]\", \"co-op\", \"coop\", \"A\", \"a\", \"-x\", \"_x\", \"ab \", \"a b\"]\nroot = Card([\n  $ardHeader(\"ascii collation\"),\n  TextContent(\"all=\" + @Sort(labels)),\n  TextContent(\"p1=\" + @Sort([\" s\", \"1\"])),\n  TextContent(\"p2=\" + @Sort([\"-0\", \"[object Object]\"])),\n  TextContent(\"p3=\" + @Sort([\"a-b\", \"a.b\"]))\n])\n"
+   ],
+   "steps": [
+    [
+     0,
+     351
+    ]
+   ],
+   "expected": [
+    "{\n  \"root\": {\n    \"component\": \"Card\",\n    \"statementId\": \"root\",\n    \"props\": {},\n    \"children\": [\n      null,\n      \"ascii collation\",\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"all= s,_x,-x,[object Object],a,A,a b,a b c,a-b,a.b,ab,ab ,co-op,coop\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p1= s,1\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p2=-0,[object Object]\"\n        }\n      },\n      {\n        \"component\": \"TextContent\",\n        \"props\": {\n          \"text\": \"p3=a-b,a.b\"\n        }\n      }\n    ]\n  },\n  \"meta\": {\n    \"incomplete\": false,\n    \"unresolved\": [],\n    \"errors\": []\n  },\n  \"state\": {\n    \"$ardHeader\": null\n  },\n  \"runtimeErrors\": []\n}\n"
    ]
   }
  ]

@@ -325,7 +325,11 @@ export function buildPinnedSessions(corpus) {
   const fixtures = corpus ?? discoverCorpus();
   const byName = new Map(fixtures.map((f) => [f.name, f]));
   // Deterministic, meaningful cross-section: surrogate pairs, escapes, streaming
-  // partials, and the numeric/rounding fixtures the ports have diverged on.
+  // partials, and the fixtures the ports have ACTUALLY diverged on - which is
+  // the selection rule, so the two newest divergence classes are here too:
+  // the JS prototype chain (inherited functions reached through member access)
+  // and `@Sort`'s ASCII collation, where `java.text.Collator` and Foundation
+  // disagreed with V8 and with each other.
   const wanted = [
     "020-unicode-emoji",
     "016-string-escapes",
@@ -334,6 +338,8 @@ export function buildPinnedSessions(corpus) {
     "partial/114-mid-number",
     "seed/001-round-ties",
     "seed/004-string-hazards",
+    "088-prototype-member-access",
+    "090-sort-ascii-collation",
   ].filter((n) => byName.has(n));
   const chosen = wanted.length ? wanted.map((n) => byName.get(n)) : fixtures.slice(0, 5);
 
