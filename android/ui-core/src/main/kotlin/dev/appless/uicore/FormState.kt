@@ -220,17 +220,30 @@ public data class OrderedJson(public val pairs: List<Pair<String, JsonValue>> = 
 
     public operator fun get(key: String): JsonValue? = pairs.firstOrNull { it.first == key }?.second
 
-    /** `JSON.stringify(formState)` with insertion order preserved. */
-    public fun stringified(): String =
-        pairs.joinToString(",", prefix = "{", postfix = "}") { (k, v) ->
-            JsonWriter.string(k) + ":" + JsonWriter.write(v)
-        }
+    /**
+     * `JSON.stringify(formState)`.
+     *
+     * The FORM-NAME level is an object like any other, so it gets
+     * [JsonWriter.jsOwnKeyOrder] too - a form named `"2"` hoists ahead of one
+     * named `"checkout"`.
+     */
+    public fun stringified(): String {
+        val byKey = pairs.associate { it }
+        return JsonWriter.jsOwnKeyOrder(pairs.map { it.first })
+            .joinToString(",", prefix = "{", postfix = "}") { k ->
+                JsonWriter.string(k) + ":" + JsonWriter.write(byKey.getValue(k))
+            }
+    }
 }
 
 /**
  * `JSON.stringify` for [JsonValue], matching JS number formatting and string
- * escaping. Object keys are emitted in map iteration order (the maps built here
- * are `LinkedHashMap`s, so that is insertion order).
+ * escaping.
+ *
+ * Object keys follow `OrdinaryOwnPropertyKeys` (ES 10.1.11.1) at EVERY depth,
+ * NOT raw map order: every canonical array index first in ascending NUMERIC
+ * order, then the remaining keys in insertion order (the maps built here are
+ * `LinkedHashMap`s, so that is the order they were written in).
  */
 public object JsonWriter {
 
@@ -240,9 +253,60 @@ public object JsonWriter {
         is JsonValue.Num -> number(value.value)
         is JsonValue.Str -> string(value.value)
         is JsonValue.Arr -> value.value.joinToString(",", "[", "]") { write(it) }
-        is JsonValue.Obj -> value.value.entries.joinToString(",", "{", "}") { (k, v) ->
-            string(k) + ":" + write(v)
+        is JsonValue.Obj -> jsOwnKeyOrder(value.value.keys).joinToString(",", "{", "}") { k ->
+            string(k) + ":" + write(value.value.getValue(k))
         }
+    }
+
+    /** Largest canonical array index: 2^32 - 2. `"4294967295"` is NOT one. */
+    private const val MAX_ARRAY_INDEX: Long = 4294967294L
+
+    /**
+     * The numeric value of [key] when it is a *canonical array index* - a
+     * string `k` with `ToString(ToUint32(k)) === k` - else -1.
+     *
+     * Canonical rules out a leading zero (`"01"`), a sign, whitespace, a
+     * decimal point, an exponent, and anything above 2^32 - 2.
+     */
+    private fun canonicalArrayIndex(key: String): Long {
+        val n = key.length
+        if (n == 0 || n > 10) return -1
+        if (key[0] == '0' && n > 1) return -1
+        var value = 0L
+        for (c in key) {
+            if (c < '0' || c > '9') return -1
+            value = value * 10 + (c - '0')
+        }
+        return if (value > MAX_ARRAY_INDEX) -1 else value
+    }
+
+    /**
+     * `OrdinaryOwnPropertyKeys`: indices first, ascending numerically; then
+     * every other key in the order given (for a `LinkedHashMap`, insertion
+     * order).
+     *
+     * Pinned against node:
+     * ```
+     * let h={}; for (const k of ["b","10","2","a","4294967294","4294967295","01"])
+     *   h={...h,[k]:1};
+     * Object.keys(h)
+     * // ["2","10","4294967294","b","a","4294967295","01"]
+     * ```
+     *
+     * Note this is NOT the same total order as the parser's
+     * `JS_OWN_KEY_ORDER`: that one serves `serialize.mjs`, which does
+     * `Object.keys(v).sort()` first, so its non-index keys come out in
+     * code-unit order. Here the non-index keys keep INSERTION order, because
+     * react-lang's form store never sorts - it writes
+     * `{ ...formData, [name]: wrapped }`.
+     */
+    internal fun jsOwnKeyOrder(keys: Collection<String>): List<String> {
+        val indices = ArrayList<String>()
+        val rest = ArrayList<String>()
+        for (k in keys) if (canonicalArrayIndex(k) >= 0) indices.add(k) else rest.add(k)
+        if (indices.isEmpty()) return rest
+        indices.sortBy { canonicalArrayIndex(it) }
+        return indices + rest
     }
 
     /** `JSON.stringify(n)`: non-finite numbers become `null`, integers lose `.0`. */

@@ -42,6 +42,65 @@ class FormStateTest {
         )
     }
 
+    /**
+     * `JSON.stringify` walks `OrdinaryOwnPropertyKeys`, so a field NAMED like a
+     * canonical array index hoists ahead of every string key, in ascending
+     * NUMERIC order - even though react-lang's store never sorts. Pure
+     * insertion order (what this writer emitted before) is wrong here.
+     *
+     * The negative cases are the point: `"4294967295"` is one past the largest
+     * array index and `"01"` is not canonical, so BOTH stay in the string
+     * group, in insertion order. A serializer that merely sorted
+     * digit-looking keys would get those two wrong.
+     *
+     * Byte-pinned against node:
+     * ```
+     * const w=(value,componentType)=>({value,componentType});
+     * let h={}; for (const k of ["b","10","2","a","4294967294","4294967295","01"])
+     *   h={...h,[k]:w(k,"Input")};
+     * JSON.stringify({h})
+     * ```
+     */
+    @Test
+    fun `array-index field names hoist and sort numerically`() {
+        val state = FormStateModel()
+        for (name in listOf("b", "10", "2", "a", "4294967294", "4294967295", "01")) {
+            state.set("h", name, "Input", FormValue.Str(name))
+        }
+        fun f(k: String) = """"$k":{"value":"$k","componentType":"Input"}"""
+        assertEquals(
+            """{"h":{""" +
+                listOf("2", "10", "4294967294", "b", "a", "4294967295", "01").joinToString(",") { f(it) } +
+                """}}""",
+            state.payload("h").stringified(),
+        )
+    }
+
+    /**
+     * The FORM-NAME level is an object too, so the same rule applies there.
+     * This is the level a fix applied only inside the app's controller bridge
+     * would miss.
+     *
+     * Byte-pinned against node:
+     * ```
+     * let s={}; for (const k of ["checkout","2","10"]) s={...s,[k]:{}};
+     * Object.keys(s)   // ["2","10","checkout"]
+     * ```
+     */
+    @Test
+    fun `array-index form names hoist at the top level too`() {
+        val state = FormStateModel()
+        state.set("checkout", "x", "Input", FormValue.Str("1"))
+        state.set("2", "y", "Input", FormValue.Str("2"))
+        state.set("10", "z", "Input", FormValue.Str("3"))
+        assertEquals(
+            """{"2":{"y":{"value":"2","componentType":"Input"}},""" +
+                """"10":{"z":{"value":"3","componentType":"Input"}},""" +
+                """"checkout":{"x":{"value":"1","componentType":"Input"}}}""",
+            state.payload(null).stringified(),
+        )
+    }
+
     @Test
     fun `a form with data submits only that form, otherwise the whole store`() {
         val state = FormStateModel()
