@@ -333,6 +333,14 @@ private struct JSONParser {
 
     private var current: Unicode.Scalar? { index < scalars.count ? scalars[index] : nil }
 
+    private func peek(_ offset: Int) -> Unicode.Scalar? {
+        let j = index + offset
+        return j < scalars.count ? scalars[j] : nil
+    }
+
+    /// U+FFFD, what a lone surrogate becomes the moment JS UTF-8-encodes it.
+    fileprivate static let replacement = Unicode.Scalar(0xFFFD)!
+
     mutating func skipWhitespace() {
         while let c = current, c == " " || c == "\t" || c == "\n" || c == "\r" {
             index += 1
@@ -445,25 +453,36 @@ private struct JSONParser {
                 case "r": out.append("\r")
                 case "t": out.append("\t")
                 case "u":
-                    // Known divergence (pinned by tests): JSON.parse ACCEPTS
-                    // a lone-surrogate \u escape (the JS string keeps the
-                    // unpaired surrogate; it becomes U+FFFD only when later
-                    // UTF-8-encoded). Swift String cannot represent a lone
-                    // surrogate at all, so this parser rejects the document
-                    // and the SSE layer skips the whole chunk - RN would
-                    // instead deliver the delta with a replacement-character
-                    // artifact. Accepted as a Swift String limit.
+                    // `JSON.parse` ACCEPTS a lone-surrogate \u escape: the JS
+                    // string keeps the unpaired UTF-16 unit and it degrades to
+                    // U+FFFD only when the string is later UTF-8-encoded (HTTP
+                    // body, JSON re-stringify) or rendered. Swift String cannot
+                    // hold a lone surrogate, so the parser substitutes U+FFFD
+                    // HERE - the same net observable result as RN, one step
+                    // earlier. Rejecting the document instead (the previous
+                    // behavior) made the SSE layer drop the WHOLE chunk, losing
+                    // a delta RN delivers. See README KNOWN-DEVIATIONS #2.
                     guard let first = parseHex4() else { return nil }
                     if (0xD800...0xDBFF).contains(first) {
-                        // Surrogate pair.
-                        guard current == "\\" else { return nil }
-                        index += 1
-                        guard current == "u" else { return nil }
-                        index += 1
-                        guard let second = parseHex4(), (0xDC00...0xDFFF).contains(second) else { return nil }
-                        let combined = 0x10000 + ((first - 0xD800) << 10) + (second - 0xDC00)
-                        guard let scalar = Unicode.Scalar(combined) else { return nil }
-                        out.append(scalar)
+                        // High surrogate: take a following \uDC00-\uDFFF as the
+                        // pair's low half, otherwise it is unpaired.
+                        let save = index
+                        if current == "\\", peek(1) == "u" {
+                            index += 2
+                            if let second = parseHex4(), (0xDC00...0xDFFF).contains(second) {
+                                let combined = 0x10000 + ((first - 0xD800) << 10) + (second - 0xDC00)
+                                // Always a valid scalar for the input ranges.
+                                out.append(Unicode.Scalar(UInt32(combined)) ?? Self.replacement)
+                                continue
+                            }
+                            // Not a low surrogate: rewind so the escape is
+                            // re-read as its own (possibly lone) unit.
+                            index = save
+                        }
+                        out.append(Self.replacement)
+                    } else if (0xDC00...0xDFFF).contains(first) {
+                        // Lone LOW surrogate.
+                        out.append(Self.replacement)
                     } else if let scalar = Unicode.Scalar(UInt32(first)) {
                         out.append(scalar)
                     } else {

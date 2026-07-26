@@ -113,7 +113,7 @@ public struct ExaSearchTool: ToolExecuting {
             url: "https://api.exa.ai/search",
             method: "POST",
             headers: ["Content-Type": "application/json", "x-api-key": apiKey ?? ""],
-            body: Data(body.stringified(keyOrder: ["query", "numResults", "contents", "text", "maxCharacters"]).utf8)
+            body: Data(body.stringified().utf8)
         )
         let (head, data) = try await http.fetch(request)
         guard head.ok else {

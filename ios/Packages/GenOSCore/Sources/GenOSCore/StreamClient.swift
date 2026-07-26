@@ -273,33 +273,24 @@ public final class StreamClient: ScreenStreaming {
             throw StreamError("No Cerebras API key set")
         }
 
-        var body: [String: JSONValue] = [
-            "model": .string(config.model),
-            "messages": .array(
-                [messageJSON(ChatMessage(role: .system, content: systemPrompt()))]
-                    + convo.map(messageJSON)
-            ),
-            "stream": .bool(true),
-            "temperature": .number(GenOSConstants.temperature),
-            "max_completion_tokens": .number(Double(GenOSConstants.maxCompletionTokens)),
-        ]
+        // RN's request literal, key for key (stream.ts): the optional `tools`
+        // key is spread in AFTER `messages` and before `stream`. `JSONObject`
+        // is insertion-ordered, so this reads as the wire order it produces -
+        // no flat keyOrder hint, and adding a key here can no longer reorder
+        // anything else.
+        var body = JSONObject()
+        body["model"] = .string(config.model)
+        body["messages"] = .array(
+            [messageJSON(ChatMessage(role: .system, content: systemPrompt()))]
+                + convo.map(messageJSON)
+        )
         if includeTools, let tools {
             body["tools"] = tools.toolDefs
         }
+        body["stream"] = .bool(true)
+        body["temperature"] = .number(GenOSConstants.temperature)
+        body["max_completion_tokens"] = .number(Double(GenOSConstants.maxCompletionTokens))
 
-        // RN emits two message shapes with DIFFERENT key orders (stream.ts):
-        //   assistant → { role, content, tool_calls }
-        //   tool      → { role, tool_call_id, content }
-        // One flat hint reproduces both only because the two shapes are
-        // disjoint: a tool message never carries tool_calls and an assistant
-        // message never carries tool_call_id. So tool_call_id must sit BEFORE
-        // content and tool_calls AFTER it. (Found by the Kotlin port, which
-        // models per-object insertion order directly.)
-        let keyOrder = [
-            "model", "messages", "tools", "stream", "temperature", "max_completion_tokens",
-            "role", "tool_call_id", "content", "tool_calls",
-            "id", "type", "function", "name", "arguments",
-        ]
         let request = HTTPRequest(
             url: "\(config.baseURL)/chat/completions",
             method: "POST",

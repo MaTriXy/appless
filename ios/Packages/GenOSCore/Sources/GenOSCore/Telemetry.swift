@@ -90,12 +90,11 @@ public enum Telemetry {
                 "platform": .string(platform),
             ]),
         ])
-        let keyOrder = ["api_key", "event", "distinct_id", "properties", "$lib", "platform"]
         return HTTPRequest(
             url: "\(posthogHost)/i/v0/e/",
             method: "POST",
             headers: ["Content-Type": "application/json"],
-            body: Data(body.stringified(keyOrder: keyOrder).utf8)
+            body: Data(body.stringified().utf8)
         )
     }
 
