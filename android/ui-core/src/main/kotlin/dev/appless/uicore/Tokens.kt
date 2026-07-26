@@ -323,22 +323,22 @@ public data class ShellTheme(
         public fun of(dark: Boolean): ShellTheme {
             val m = Tokens.theme(dark)
             return ShellTheme(
-                bg = m.surface,                        // theme.android.ts L17
-                group = m.surfaceContainer,            // theme.android.ts L18
-                ink = m.onSurface,                     // theme.android.ts L19
-                ink2 = m.onSurfaceVariant,             // theme.android.ts L20
-                ink3 = m.outline,                      // theme.android.ts L21
-                sep = m.outlineVariant,                // theme.android.ts L22
-                fill = m.surfaceContainerHigh,         // theme.android.ts L23
-                tint = m.primary,                      // theme.android.ts L24
-                green = m.success,                     // theme.android.ts L25
-                red = m.error,                         // theme.android.ts L26
-                bubble = m.surfaceContainerHigh,       // theme.android.ts L27
-                chromeBg = m.secondaryContainer,       // theme.android.ts L28
-                chromeInk = m.onSecondaryContainer,    // theme.android.ts L29
-                chromeBorder = m.outlineVariant,       // theme.android.ts L30
-                chartPalette = m.chartPalette,         // theme.android.ts L31
-                dark = dark,                           // theme.android.ts L32
+                bg = m.surface,                           // theme.android.ts L15
+                group = m.surfaceContainer,               // theme.android.ts L16
+                ink = m.onSurface,                        // theme.android.ts L17
+                ink2 = m.onSurfaceVariant,                // theme.android.ts L18
+                ink3 = m.outline,                         // theme.android.ts L19
+                sep = m.outlineVariant,                   // theme.android.ts L20
+                fill = m.surfaceContainerHigh,            // theme.android.ts L21
+                tint = m.primary,                         // theme.android.ts L22
+                green = m.success,                        // theme.android.ts L23
+                red = m.error,                            // theme.android.ts L24
+                bubble = m.surfaceContainerHigh,          // theme.android.ts L25
+                chromeBg = m.secondaryContainer,          // theme.android.ts L26
+                chromeInk = m.onSecondaryContainer,       // theme.android.ts L27
+                chromeBorder = m.outlineVariant,          // theme.android.ts L28
+                chartPalette = m.chartPalette,            // theme.android.ts L29
+                dark = dark,                              // theme.android.ts L30
             )
         }
 
