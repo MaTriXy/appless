@@ -152,9 +152,11 @@ import Testing
             return
         }
         #expect(event.formName == "compose")
+        // `{ value, componentType }` - react-lang's `setFieldValue` wrapper
+        // literal, pinned by `spec/openui-lang.md` §9.4.
         #expect(
             event.formState.stringified
-                == #"{"compose":{"body":{"componentType":"TextArea","value":"hi"}}}"#)
+                == #"{"compose":{"body":{"value":"hi","componentType":"TextArea"}}}"#)
     }
 
     // MARK: - Tap gating and Chips

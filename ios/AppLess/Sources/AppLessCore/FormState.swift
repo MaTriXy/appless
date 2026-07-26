@@ -200,9 +200,17 @@ public struct FormStateModel: Sendable, Equatable {
 
     // MARK: Payload
 
-    /// One form as `{ field: { value, componentType }, … }`.
+    /// One form as `{ field: { value, componentType }, … }`, fields in UI
+    /// insertion order.
+    ///
+    /// react-lang writes the field level as `{ ...formData, [name]: wrapped }`
+    /// (`hooks/useOpenUIState.js` `setFieldValue`), so a new field is appended
+    /// and an overwritten one keeps its original position. A Swift
+    /// `Dictionary` here would serialize SORTED and silently reorder the
+    /// "Submitted form values: {…}" bytes, so this builds `GenOSCore`'s
+    /// insertion-ordered `JSONObject` instead.
     public func payloadObject(form: String) -> GenosJSONValue {
-        var object: [String: GenosJSONValue] = [:]
+        var object = GenOSCore.JSONObject()
         for field in fields(in: form) { object[field.name] = field.wrapped }
         return .object(object)
     }

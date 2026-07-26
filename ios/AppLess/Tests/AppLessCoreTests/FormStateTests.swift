@@ -39,10 +39,66 @@ import Testing
 
         let payload = model.payload(formName: "f")
         #expect(payload.keys == ["f"])
+        // Byte-pinned against node:
+        //   const w=(value,componentType)=>({value,componentType});
+        //   let f={}; f={...f,email:w("a@b.c","Input")}; f={...f,size:w([4],"Slider")};
+        //   JSON.stringify({f})
+        // Note `value` BEFORE `componentType` - react-lang builds the wrapper as
+        // `const wrapped = { value, componentType }` (`useOpenUIState.js`
+        // `setFieldValue`), and `spec/openui-lang.md` §9.4 pins that order.
         #expect(
             payload.stringified
-                == #"{"f":{"email":{"componentType":"Input","value":"a@b.c"},"#
-                    + #""size":{"componentType":"Slider","value":[4]}}}"#)
+                == #"{"f":{"email":{"value":"a@b.c","componentType":"Input"},"#
+                    + #""size":{"value":[4],"componentType":"Slider"}}}"#)
+    }
+
+    /// The field level is INSERTION-ordered, not sorted - the case a
+    /// `[String: JSONValue]` could not express. Every field here is written in
+    /// reverse-alphabetical order, so a sorted serializer produces different
+    /// bytes; `zulu` is then overwritten to pin that a re-assignment keeps its
+    /// ORIGINAL position (JS `{...formData, [name]: wrapped}` semantics).
+    ///
+    /// Byte-pinned against node:
+    ///   const w=(value,componentType)=>({value,componentType});
+    ///   let g={}; g={...g,zulu:w("1","Input")}; g={...g,mike:w("2","Input")};
+    ///   g={...g,alpha:w("3","Input")}; g={...g,zulu:w("9","Input")};
+    ///   JSON.stringify({g})
+    @Test func fieldsSerializeInInsertionOrderNotSorted() {
+        var model = FormStateModel()
+        model.set(form: "g", name: "zulu", componentType: "Input", value: .string("1"))
+        model.set(form: "g", name: "mike", componentType: "Input", value: .string("2"))
+        model.set(form: "g", name: "alpha", componentType: "Input", value: .string("3"))
+        model.set(form: "g", name: "zulu", componentType: "Input", value: .string("9"))
+
+        #expect(
+            model.payload(formName: "g").stringified
+                == #"{"g":{"zulu":{"value":"9","componentType":"Input"},"#
+                    + #""mike":{"value":"2","componentType":"Input"},"#
+                    + #""alpha":{"value":"3","componentType":"Input"}}}"#)
+    }
+
+    /// Canonical array-index field names sort NUMERICALLY and hoist ahead of
+    /// every string key, at the field level too - `OrdinaryOwnPropertyKeys`
+    /// applies to this object like any other. An insertion-ordered
+    /// serializer that FORGOT the index hoist would emit them in write order,
+    /// so this probes the path the fix does not take.
+    ///
+    /// Byte-pinned against node:
+    ///   const w=(value,componentType)=>({value,componentType});
+    ///   let h={}; for (const k of ["b","10","2","a"]) h={...h,[k]:w(k,"Input")};
+    ///   JSON.stringify({h})
+    @Test func numericFieldNamesStillHoistAndSortNumerically() {
+        var model = FormStateModel()
+        for name in ["b", "10", "2", "a"] {
+            model.set(form: "h", name: name, componentType: "Input", value: .string(name))
+        }
+
+        #expect(
+            model.payload(formName: "h").stringified
+                == #"{"h":{"2":{"value":"2","componentType":"Input"},"#
+                    + #""10":{"value":"10","componentType":"Input"},"#
+                    + #""b":{"value":"b","componentType":"Input"},"#
+                    + #""a":{"value":"a","componentType":"Input"}}}"#)
     }
 
     @Test func payloadFallsBackToTheWholeSnapshot() {
