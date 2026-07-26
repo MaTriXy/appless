@@ -1,4 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.AppLess" parent="android:Theme.Material.NoActionBar" />
+    <!--
+      A bare, edge-to-edge splash theme. Every real color comes from Compose
+      (`AppLessTheme`, built from ui-core's ported Material 3 tokens) — this
+      exists only so the window between process start and first composition is
+      not a white flash in dark mode.
+    -->
+    <style name="Theme.AppLess" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/appless_window_background</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+    </style>
 </resources>

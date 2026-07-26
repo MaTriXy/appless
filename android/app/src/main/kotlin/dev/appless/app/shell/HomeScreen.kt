@@ -164,7 +164,7 @@ internal fun HomeScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Column(
-                    modifier = Modifier.padding(vertical = 10.dp, start = 10.dp),
+                    modifier = Modifier.padding(top = 10.dp, bottom = 10.dp, start = 10.dp),
                     verticalArrangement = Arrangement.spacedBy(22.dp),
                 ) {
                     for (slot in slots) {

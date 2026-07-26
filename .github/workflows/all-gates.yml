@@ -1,0 +1,201 @@
+# all-gates — the umbrella gate.
+#
+# WHY THIS EXISTS
+# ---------------
+# The per-area workflows (spec-gates, ios-app, differential-fuzz) are all
+# path-filtered: a change under `android/` does not run `spec-gates`, a change
+# under `spec/` does not run the Android module tests, and so on. That is the
+# right default for iteration speed, but it means no single check ever proves
+# "the Linux-runnable half of this repo is green at this commit".
+#
+# This workflow does exactly that, on EVERY push and pull request, with no path
+# filter. It re-runs the cheap, Linux-runnable gates:
+#
+#   spec-generator   fixture corpus regenerates deterministically, committed
+#                    trees are fresh, contract schema matches contract.tsx, the
+#                    assembled prompt is byte-identical to the shipped one
+#   swift-packages   OpenUILang + GenOSCore + AppLessCore under `swift test`
+#                    in the official Swift 6.1 container
+#   android-pure     :openui-lang :genos-core :ui-core under `./gradlew test`
+#                    (pure Kotlin/JVM — deliberately NO Android SDK needed)
+#
+# WHAT IT DELIBERATELY DOES NOT DO
+# --------------------------------
+#   * It does NOT run the macOS tier. `xcodebuild`-ing AppLessUI for the iOS
+#     device and simulator SDKs is the whole point of `ios-app.yml` and costs a
+#     macOS runner; duplicating it here would double that cost for every push.
+#   * It does NOT run the Android SDK tier (`:app:assembleDebug`). The `:app`
+#     module does not compile yet (see docs/MIGRATION_STATUS.md); when it does,
+#     its gate belongs in a dedicated `android-app.yml`, not here.
+#   * It does NOT run the differential-fuzz campaigns. Those are minutes-long
+#     and already gated by `differential-fuzz.yml` on the paths that matter.
+#
+# `workflow_call` is not used because none of the existing workflows declare a
+# `workflow_call` trigger — calling them would require editing files this
+# workflow does not own. Duplicating three short job bodies is the more robust
+# option, and each duplicated step is a one-liner that the owning workflow also
+# runs, so drift is cheap to spot.
+name: all-gates
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: all-gates-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ── Layer 0: the shared spec ────────────────────────────────────────────────
+  spec-generator:
+    name: spec — fixtures, contract schema, prompt
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: spec/fixtures/generator/package-lock.json
+
+      - name: Install (applies + verifies the react-lang patch)
+        working-directory: spec/fixtures/generator
+        run: npm ci
+
+      - name: Regenerate the corpus and run the generator suite
+        working-directory: spec/fixtures/generator
+        run: |
+          npm run generate
+          npm test
+
+      - name: Committed expected trees are fresh
+        run: git diff --exit-code spec/fixtures
+
+      - name: Contract schema matches contract.tsx
+        run: |
+          node spec/contract/export-schema.mjs
+          git diff --exit-code spec/contract/genos.schema.json
+
+      - name: Assembled prompt is byte-identical to the shipped SYSTEM_PROMPT
+        run: node spec/prompt/check-prompt.mjs
+
+  # ── Layers 1–3, Swift: everything Linux can actually compile ────────────────
+  #
+  # NOTE: `AppLessUI` (the SwiftUI half) compiles to an EMPTY module here —
+  # every file is behind `#if canImport(SwiftUI)`, which Linux does not satisfy.
+  # This job proves AppLessCore, not the views. Only `ios-app.yml` on macOS
+  # type-checks the SwiftUI.
+  swift-packages:
+    name: swift — OpenUILang, GenOSCore, AppLessCore
+    runs-on: ubuntu-latest
+    # Same toolchain the packages declare (swift-tools-version 6.1), and the
+    # same image differential-fuzz.yml uses, so a green run here means the same
+    # thing it means there.
+    container: swift:6.1-jammy
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: swift --version
+
+      - name: OpenUILang — swift test
+        working-directory: ios/Packages/OpenUILang
+        run: swift test
+
+      - name: GenOSCore — swift test
+        working-directory: ios/Packages/GenOSCore
+        run: swift test
+
+      - name: AppLess — swift test (AppLessCore; AppLessUI is empty on Linux)
+        working-directory: ios/AppLess
+        run: |
+          set -euo pipefail
+          swift test 2>&1 | tee "$RUNNER_TEMP/appless-tests.log"
+
+      # On Linux this is the DECLARED count (30 components the contract requires
+      # a renderer for). The LIVE count — that `registerCupertinoRenderers()`
+      # really wired all 30 — can only be asserted on macOS, and ios-app.yml
+      # does that.
+      - name: "Conformance gate — renderers registered: 30/30 (declared)"
+        run: |
+          set -euo pipefail
+          if ! grep -q "renderers registered: 30/30" "$RUNNER_TEMP/appless-tests.log"; then
+            echo "conformance gate line missing — a contract component is undeclared or unwired"
+            grep -n "renderers registered" "$RUNNER_TEMP/appless-tests.log" || true
+            exit 1
+          fi
+          echo "renderers registered: 30/30 (declared count; SwiftUI does not compile on Linux)"
+
+      - name: SwiftUI — syntax check with the canImport guards forced on
+        run: python3 ios/AppLess/Scripts/parse-swiftui.py
+
+      - name: Upload test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: all-gates-appless-test-log
+          path: ${{ runner.temp }}/appless-tests.log
+          if-no-files-found: ignore
+
+  # ── Layers 1–3, Kotlin: the pure-JVM modules only ───────────────────────────
+  #
+  # `:openui-lang`, `:genos-core` and `:ui-core` are deliberately pure
+  # Kotlin/JVM libraries with no Android dependency, so they run headlessly on
+  # any JDK 21 without an SDK install. `:app` is excluded — it needs the Android
+  # SDK and does not currently compile.
+  android-pure:
+    name: android — openui-lang, genos-core, ui-core (no SDK)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Pure Kotlin/JVM modules — test
+        working-directory: android
+        run: ./gradlew :openui-lang:test :genos-core:test :ui-core:test --console=plain
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: all-gates-android-test-results
+          path: android/*/build/test-results/test/*.xml
+          if-no-files-found: ignore
+
+  # ── One check to require on the branch ──────────────────────────────────────
+  all-gates:
+    name: all gates green
+    runs-on: ubuntu-latest
+    needs: [spec-generator, swift-packages, android-pure]
+    if: always()
+    steps:
+      - name: Fail if any gate failed
+        run: |
+          set -euo pipefail
+          echo "spec-generator: ${{ needs.spec-generator.result }}"
+          echo "swift-packages: ${{ needs.swift-packages.result }}"
+          echo "android-pure:   ${{ needs.android-pure.result }}"
+          for r in "${{ needs.spec-generator.result }}" \
+                   "${{ needs.swift-packages.result }}" \
+                   "${{ needs.android-pure.result }}"; do
+            [ "$r" = "success" ] || { echo "a gate did not succeed"; exit 1; }
+          done
+          echo "all Linux-runnable gates green"
+          echo "NOT covered here: SwiftUI compilation (ios-app.yml, macOS)," \
+               "the Android :app module (no workflow yet — it does not compile)," \
+               "differential fuzzing (differential-fuzz.yml), and any" \
+               "simulator/device behavior (unverified anywhere)."

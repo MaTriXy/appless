@@ -1,0 +1,160 @@
+# Android app gate — the Compose half of the port.
+#
+# Unlike the iOS side (where `swift build` on Linux compiles every
+# `#if canImport(SwiftUI)` file to nothing and a real Xcode is needed), the
+# Android toolchain runs entirely on ubuntu-latest: `:app:assembleDebug` is a
+# REAL Compose compile plus resource merge, dex and APK package. If a
+# composable does not build, this job is red.
+#
+# Gates:
+#   1. The three PURE Kotlin/JVM modules stay green — `:openui-lang` (parser
+#      fixture oracle), `:genos-core` (store/controller/stream scenarios),
+#      `:ui-core` (tokens, icon map, chart/form/action logic).
+#   2. `:app:testDebugUnitTest` — the shell's decision tables (navigation,
+#      back-gesture mapping, action/command routing), the icon bridge, the
+#      form-payload bridge, and the renderer conformance report.
+#   3. `renderers registered: 30/30`, grepped from the `:app` test log
+#      SPECIFICALLY. `:ui-core` prints the same line for its DECLARED count
+#      while its registry is empty, so grepping the whole build would pass on
+#      a completely unwired UI — the count has to come from the module that
+#      actually registers the composables.
+#   4. THE POINT: `:app:assembleDebug` compiles all 30 Material 3 renderers and
+#      the OS shell against the real Compose compiler and produces an APK.
+name: android-app
+
+on:
+  push:
+    paths:
+      - "android/**"
+      - "spec/**"
+      - ".github/workflows/android-app.yml"
+  pull_request:
+    paths:
+      - "android/**"
+      - "spec/**"
+      - ".github/workflows/android-app.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: android-app-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android-app:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    defaults:
+      run:
+        working-directory: android
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # The Gradle toolchain spec is `jvmToolchain(21)` in every module and
+      # `compileOptions` targets 21, so anything older fails at configuration.
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up the Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: ""
+
+      # compileSdk 35 + build-tools 35.0.0 — pinned so a floating "latest"
+      # cannot change what the UI is compiled against.
+      - name: Install the pinned SDK packages
+        run: |
+          set -euo pipefail
+          sdkmanager --install "platforms;android-35" "build-tools;35.0.0" "platform-tools"
+          echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Toolchain report
+        run: |
+          set -euo pipefail
+          java -version
+          ./gradlew --version
+          echo "ANDROID_HOME=${ANDROID_HOME:-unset} ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-unset}"
+
+      # ------------------------------------------------------- pure JVM tiers
+
+      - name: Pure modules — openui-lang, genos-core, ui-core
+        run: |
+          set -euo pipefail
+          ./gradlew :openui-lang:test :genos-core:test :ui-core:test \
+            --console=plain 2>&1 | tee "$RUNNER_TEMP/pure-modules.log"
+
+      - name: Pure modules — corpus and scenario floors
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/pure-modules.log"
+          grep -q "fixtures exercised:" "$log" || {
+            echo "openui-lang did not report its fixture count"; exit 1; }
+          grep -q "core scenarios:" "$log" || {
+            echo "genos-core did not report its scenario count"; exit 1; }
+          grep -E "fixtures exercised:|core scenarios:" "$log"
+
+      # ------------------------------------------------------------ app tests
+
+      - name: App unit tests — shell logic, icon bridge, conformance
+        run: |
+          set -euo pipefail
+          ./gradlew :app:testDebugUnitTest \
+            --console=plain 2>&1 | tee "$RUNNER_TEMP/app-tests.log"
+
+      - name: "Conformance gate — renderers registered: 30/30"
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/app-tests.log"
+          if ! grep -q "renderers registered: 30/30" "$log"; then
+            echo "conformance gate line missing from the :app test log —"
+            echo "a contract component has no Material renderer wired."
+            grep -n "renderers registered" "$log" || true
+            grep -n "missing" "$log" || true
+            exit 1
+          fi
+          echo "renderers registered: 30/30"
+
+      # --------------------------------------------------- THE Compose compile
+
+      # This is the gate the workflow exists for: a real Compose compilation of
+      # all 30 renderers and the OS shell, plus resource merge, dex and package.
+      - name: App — assembleDebug (real Compose compile)
+        run: ./gradlew :app:assembleDebug --console=plain
+
+      - name: APK — exists and carries the spec assets
+        run: |
+          set -euo pipefail
+          apk="app/build/outputs/apk/debug/app-debug.apk"
+          test -f "$apk" || { echo "no APK at $apk"; exit 1; }
+          ls -l "$apk"
+          # The system prompt and the contract schema are staged out of spec/;
+          # an APK without them would run but never render a valid screen.
+          unzip -l "$apk" | grep -q "assets/system-prompt.txt" || {
+            echo "APK is missing assets/system-prompt.txt"; exit 1; }
+          unzip -l "$apk" | grep -q "assets/genos.schema.json" || {
+            echo "APK is missing assets/genos.schema.json"; exit 1; }
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-logs
+          path: |
+            ${{ runner.temp }}/pure-modules.log
+            ${{ runner.temp }}/app-tests.log
+          if-no-files-found: ignore
+
+      - name: Upload the debug APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: appless-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error

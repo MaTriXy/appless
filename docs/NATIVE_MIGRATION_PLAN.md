@@ -1,5 +1,12 @@
 # AppLess Native Migration Plan
 
+> **Status:** this is the *plan*. For what has actually been built and measured,
+> see **[MIGRATION_STATUS.md](MIGRATION_STATUS.md)** — it carries the live test
+> counts, the module-by-module converged/in-flight table, and an explicit list
+> of what is not verified anywhere. Where the two disagree, the status document
+> is right; this one is edited only to correct outright errors and to record
+> phase progress (§9) and how execution diverged from the plan (§12).
+
 **Goal:** migrate AppLess from React Native/Expo to two fully native apps — **iOS in Swift/SwiftUI** and **Android in Kotlin/Jetpack Compose** — in this repository (monorepo), building iOS first, keeping the existing RN app untouched as the behavioral reference until parity is reached.
 
 The plan is bottom-to-top: a platform-neutral spec at the base, pure-logic runtimes above it, UI renderers above that, the OS shell on top.
@@ -83,6 +90,14 @@ both complete programs and prefix-truncated streaming snapshots. Target: 60–80
 fixtures covering every component, nesting, references, actions, bindings, escapes,
 malformed input, fences, `@OS` responses.
 
+> **Actual:** 97 fixtures — 82 complete (`spec/fixtures/*.oui`) and 15 streaming
+> (`spec/fixtures/partial/*.oui`). The corpus grew past the target because
+> cross-port checking kept finding behavior no existing fixture pinned:
+> 89 → 90 (JS own-key ordering, fixture 075) → 97 (the `schemaCtx` two-mode
+> evaluator and the reserved-call / `@Each` / `__proto__` / `toString`-shadowing
+> family, fixtures 076–082). `spec-gates.yml` enforces floors of ≥60 complete
+> and ≥12 partial so the corpus can only grow.
+
 ### 3.3 Component contract as JSON Schema
 
 `ui/contract.tsx` already defines every component with Zod. Export via
@@ -163,6 +178,16 @@ Each contract entry becomes **one SwiftUI view** (Cupertino) and **one Compose
 composable** (Material 3). The iOS app drops the Material renderer set entirely and
 vice-versa — each native app is *simpler* than the RN original.
 
+> **The number that matters is 30, not 33.** The contract exports 33 components
+> (`spec/contract/genos.schema.json`, `componentCount: 33`); three of them —
+> `Series`, `SelectItem`, `TabItem` — are structural placeholders defined as
+> `component: () => null` and consumed by their parents. **33 − 3 = 30
+> renderable components**, which is what `GenosRenderers` in `contract.tsx`
+> declares and what each design system must implement. Both registries
+> (`ContractSchema.renderableComponents` in Swift, `RendererRegistry` in
+> `ui-core`) *derive* this from the schema rather than hard-coding it, and the
+> CI gate line is `renderers registered: N/30`.
+
 | Group | Components | iOS notes | Android notes |
 |---|---|---|---|
 | Structure | Card (root), CardHeader, TextContent, TextCallout | large-title header; vertical scroll | M3 typography; `LazyColumn` |
@@ -189,23 +214,49 @@ must include the icon-name → SF Symbol / Material Symbol mapping table.
 
 ## 9. Execution phases
 
-Each phase has an exit criterion; later phases don't start until it's met.
+Each phase has an exit criterion. **The original plan said later phases don't
+start until it's met; in practice they were run in parallel — see §12.**
 
-| Phase | Work | Exit criterion |
-|---|---|---|
-| **0. Spec & fixtures** | Write `spec/` (grammar, JSON-Schema contract, capability map, icon map); fixture generator script in RN app; review the react-lang **patch** to capture behavioral deviations; wire prompt generation from spec | Fixtures generated & reviewed; RN app's prompt regenerated from spec byte-identical to today's |
-| **1. Swift parser** (`OpenUILang`) | Tokenizer → statement parser → reference resolver → partial-tree builder; fixture runner | 100% of golden fixtures pass on Linux CI (`swift test`) |
-| **2. Swift core** (`GenOSCore`) | Models, ScreenStore + controller, SSE client + tool loop, tools (Exa/images), Keychain, telemetry | Unit tests green incl. mocked stream/tool-loop tests; parity constants asserted |
-| **3. iOS app** | 29 SwiftUI renderers, shell, transitions, KeyGate; Xcode project | App runs on device/simulator; manual parity script vs RN app passes |
-| **4. iOS parity & hardening** | Side-by-side checklist vs RN (per capability row in §6), streaming perf at ~1 850 tok/s, memory | Checklist signed off |
-| **5. Kotlin parser + core** | Port Layers 1–2 informed by the settled spec; same fixtures | Fixtures + unit tests green on JVM CI |
-| **6. Android app** | Compose renderers (M3), shell, predictive back | Parity checklist vs RN Material build |
-| **7. Wrap-up** | README rewrite, CI for all three, decide RN app's long-term fate (kept as reference per current decision) | Docs merged |
+Status column measured at commit `b052036`; counts and the full evidence are in
+[MIGRATION_STATUS.md](MIGRATION_STATUS.md).
+
+| Phase | Work | Exit criterion | Status |
+|---|---|---|---|
+| **0. Spec & fixtures** | Write `spec/` (grammar, JSON-Schema contract, capability map, icon map); fixture generator script in RN app; review the react-lang **patch** to capture behavioral deviations; wire prompt generation from spec | Fixtures generated & reviewed; RN app's prompt regenerated from spec byte-identical to today's | **DONE** — 97 fixtures; `spec-gates.yml` enforces prompt byte-identity, schema freshness and corpus floors |
+| **1. Swift parser** (`OpenUILang`) | Tokenizer → statement parser → reference resolver → partial-tree builder; fixture runner | 100% of golden fixtures pass on Linux CI (`swift test`) | **DONE** — 25 test functions, one parameterized over all 97 fixtures |
+| **2. Swift core** (`GenOSCore`) | Models, ScreenStore + controller, SSE client + tool loop, tools (Exa/images), Keychain, telemetry | Unit tests green incl. mocked stream/tool-loop tests; parity constants asserted | **DONE** — 203 tests |
+| **3. iOS app** | **30** SwiftUI renderers, shell, transitions, KeyGate; Xcode project | App runs on device/simulator; manual parity script vs RN app passes | **IN FLIGHT** — all 30 renderers and the full shell are written; `AppLessCore` carries 220 Linux tests. **Exit criterion NOT met:** SwiftUI has never been type-checked (Linux compiles it to an empty module) and no simulator or device has run it. Blocked on the first `ios-app.yml` run. |
+| **4. iOS parity & hardening** | Side-by-side checklist vs RN (per capability row in §6), streaming perf at ~1 850 tok/s, memory | Checklist signed off | **NOT STARTED** — requires a running app |
+| **5. Kotlin parser + core** | Port Layers 1–2 informed by the settled spec; same fixtures | Fixtures + unit tests green on JVM CI | **DONE** — `openui-lang` 121 tests (97 fixtures), `genos-core` 279, plus `ui-core` 95 (an added module, see §12) |
+| **6. Android app** | Compose renderers (M3), shell, predictive back | Parity checklist vs RN Material build | **IN FLIGHT** — Compose renderers, shell, chrome, key gate and the OkHttp/Keystore layer are written but `:app:compileDebugKotlin` currently **fails**; nothing in the Compose layer is executed by any test |
+| **7. Wrap-up** | README rewrite, CI for all three, decide RN app's long-term fate (kept as reference per current decision) | Docs merged | **IN FLIGHT** — `MIGRATION_STATUS.md`, the README rewrite and the `all-gates.yml` umbrella workflow are in; the Android SDK workflow does not exist yet |
 
 **Environment note:** Phases 0, 1, 2 and 5 are pure logic and can be built and tested
 in this cloud environment (Swift-on-Linux / JVM). Phases 3, 4, 6 need Xcode/Android
 SDK — code is written here; build-and-run feedback comes from your machine or CI
 (GitHub Actions `macos` runners for iOS, `ubuntu` + Android SDK for Android).
+
+**How that note played out.** It is the single most consequential line in this
+plan. Because Phases 3 and 6 cannot be verified here, both ports respond the
+same way: push every decision that *can* be tested on Linux/JVM out of the view
+layer and into a pure module (`AppLessCore` on iOS, `ui-core` on Android) —
+chart domains and tick geometry, pie geometry, stacking, form state and payload
+shape, action-plan → outcome mapping, map zoom → span, semantic-image policy,
+icon and token tables, command routing, session/shell reducers, even the
+wordmark's vector path. What is left in SwiftUI/Compose is layout and platform
+API calls. It is a real mitigation, and it is not a substitute: see
+[MIGRATION_STATUS.md §5](MIGRATION_STATUS.md#5-what-is-not-verified--anywhere).
+
+### 9.1 CI workflows
+
+| Workflow | Runner | Gates |
+|---|---|---|
+| `spec-gates.yml` | ubuntu | Fixture determinism/freshness, contract schema vs `contract.tsx`, prompt byte-identity, fixture pairing + corpus floors |
+| `ios-app.yml` | **macos-15** | All three Swift suites, the **live** `renderers registered: 30/30`, and `xcodebuild` of `AppLessUI` for the iOS device and simulator SDKs — the only real SwiftUI compile anywhere |
+| `differential-fuzz.yml` | ubuntu ×2 | Both parser ports byte-compared to the JS oracle over pinned + prefix + non-monotonic + mutation campaigns |
+| `all-gates.yml` | ubuntu ×3 | Umbrella, no path filter: the spec gates, all three Swift suites, and the three pure-Kotlin modules on every push and PR |
+
+There is no Android-SDK workflow yet, because `:app` does not compile yet.
 
 ## 10. Risks & mitigations
 
@@ -223,3 +274,114 @@ SDK — code is written here; build-and-run feedback comes from your machine or 
 - New features beyond parity (Liquid Glass renderer, real integrations, voice input).
 - Publishing/App Store work.
 - Rewriting the RN app (it stays frozen as the reference implementation).
+
+---
+
+## 12. What changed vs. the original plan
+
+Four things about how this was actually executed differ from §9 enough to be
+worth recording, because they are the parts worth reusing.
+
+### 12.1 Phases ran in parallel, not in sequence
+
+§9 says "later phases don't start until [the exit criterion] is met". That held
+for the *dependency* order — nothing was built before the spec it depends on —
+but not for the *calendar*. Multiple agents worked concurrently on different
+layers, and the commit history shows it plainly: `WIP checkpoint: genos-core and
+ui-core mid-implementation (does NOT compile)` describes two Android modules in
+flight at once; `WIP checkpoint: SwiftUI shell views, Compose app packages, fuzz
+drivers` describes three.
+
+That only works with a discipline the plan did not anticipate, and it is the
+convention worth keeping: **every checkpoint commit states which modules are red
+and re-verifies that the converged ones are still green.** A commit that leaves
+a module non-compiling says so in its subject line (`does NOT compile`,
+`work in progress`, `mid-write`) and names the modules that remain green
+underneath. "Converged" and "in-flight" became the two states a module can be
+in, and `MIGRATION_STATUS.md` exists to make that distinction permanently
+visible rather than buried in commit bodies.
+
+The cost is that the tree is red more often than a strictly sequential build
+would be. The mitigation is `all-gates.yml`: one unconditional check that runs
+every Linux-runnable gate on every push, so "which converged modules are green
+right now" is answerable without reading commit messages.
+
+### 12.2 Differential fuzzing became a first-class technique
+
+The plan's verification story was the fixture corpus: 60–80 golden files, both
+ports pass them, done. That is necessary and it is not sufficient — a fixture
+only pins behavior somebody thought to write a fixture for, and the interesting
+divergences between an ECMAScript reference and a Swift/Kotlin port are exactly
+the ones nobody thinks of (`Math.round` at `0.49999999999999994`;
+`Double.MIN_VALUE` printing `4.9E-324` instead of `5e-324`; a valid byte
+swallowed at stream end by a UTF-8 decoder's tail scan).
+
+Every real divergence found in review was found by *ad-hoc* differential
+fuzzing — generating inputs, running them through both the JS oracle and the
+port, and byte-comparing. `differential-fuzz.yml` promotes that from a review
+habit into a standing gate, with four campaigns over a fixed seed:
+
+- **pinned** — a committed corpus (39 sessions / 313 steps) whose oracle
+  expectations are checked in, so a regression is a diff rather than a rerun;
+  the same job regenerates it and requires byte-identity, which gates the
+  generator's determinism too.
+- **prefix** — every UTF-16 code-unit prefix of every fixture fed cumulatively
+  to one streaming parser (~23k steps). This is the streaming/incremental path
+  that `fixtures/partial/` samples and this exhausts.
+- **nonmonotonic** — seeded shrink and cross-fixture switch sequences, i.e. the
+  cache-reset path prefix fuzzing structurally cannot reach.
+- **mutation** — seeded single-code-point insert/delete/replace over every
+  fixture from a hazard alphabet (quotes, brackets, backslash, CR, LF, NBSP,
+  U+FEFF, combining acute, `@`, `$`, `#`, `//`).
+
+The topology is worth stealing: rather than pay for a macOS runner to compare
+Swift against Kotlin directly, two ubuntu jobs each compare one port against the
+*same* JS oracle (node + Kotlin on plain ubuntu, node + Swift in the
+`swift:6.1-jammy` container). Agreement with a common oracle is agreement with
+each other, so it is a three-way gate at two-thirds the runner cost.
+
+### 12.3 The shared oracle found defects neither port's own suite could
+
+§10 lists "two parsers drifting over time" as a risk mitigated by "same fixture
+corpus runs in both CIs". The corpus did more than prevent drift — writing the
+second port *found bugs in the first*, and comparing both against the JS found
+bugs in both:
+
+- Kotlin found Swift's **tool-message key order** bug. RN emits
+  `{role, content, tool_calls}` for assistant messages but
+  `{role, tool_call_id, content}` for tool messages; Swift used one flat order
+  hint and got the second shape wrong. Kotlin models per-object insertion order
+  directly and was right. Swift's own assertions *re-parsed the request body*,
+  so they could not see key order at all — a whole class of defect its suite was
+  structurally blind to.
+- Both ports had independently **collapsed lang-core's two-mode evaluator**:
+  `evaluate(node, context, schemaCtx)` branches on whether the third argument is
+  present, and action-plan construction deliberately omits it so raw `StateRef`
+  ASTs survive unresolved. Both resolved unconditionally. Fixtures 076–082 and
+  the corpus jump 90 → 97 came out of that one finding and its neighbors.
+- Both ports had the same wrong `@Round` (`floor(x + 0.5)`) and the same wrong
+  serialized key ordering (flat sort, missing JS's array-index-first rule).
+
+Two independent implementations of the same spec disagree in ways one
+implementation plus its own tests never will. That is the argument for keeping
+both ports graded by one oracle even after the migration lands, and for the
+rule that a contract change must add fixtures first.
+
+### 12.4 Two modules the plan did not name
+
+`AppLessCore` (iOS) and `ui-core` (Android) do not appear in §2's target
+layout. They exist because of the environment note in §9: they are the
+Linux/JVM-testable homes for everything the view layer would otherwise hide.
+`ui-core` alone carries 95 tests covering M3 tokens, the Material Symbols map,
+the 30/30 renderer registry, chart and pie geometry, form state, action mapping
+and image policy — all of which §2 implicitly assigned to `android/app`, where
+none of it would be testable today.
+
+Their test suites also adopted a convention the plan did not specify:
+**re-parse the RN source rather than trust a copy.** Token tests check that each
+cited value points at its exact declaring line in the RN theme; icon tables are
+re-extracted from `spec/icon-map.md`; the iOS shell tests re-read `GenOS.tsx`,
+`HomeScreen.tsx`, `Switcher.tsx`, `KeyGate.tsx` and `applessLogo.ts` from the
+working tree. This makes the RN app a live oracle for the port rather than a
+snapshot someone transcribed once, which is what §10's "RN app kept runnable as
+oracle" mitigation actually requires to work.

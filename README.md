@@ -9,14 +9,26 @@
   <a href="https://openui.com">openui.com</a> &nbsp;&middot;&nbsp;
   <a href="#demo">Demo</a> &nbsp;&middot;&nbsp;
   <a href="#quick-start">Quick start</a> &nbsp;&middot;&nbsp;
-  <a href="#how-it-works">How it works</a>
+  <a href="#how-it-works">How it works</a> &nbsp;&middot;&nbsp;
+  <a href="#the-native-migration">Native migration</a>
 </p>
 
 <p align="center">
   <img alt="Expo SDK 54" src="https://img.shields.io/badge/Expo-SDK%2054-000020?logo=expo&logoColor=white" />
   <img alt="React Native" src="https://img.shields.io/badge/React%20Native-0.81-61DAFB?logo=react&logoColor=black" />
+  <img alt="Swift 6.1" src="https://img.shields.io/badge/Swift-6.1-F05138?logo=swift&logoColor=white" />
+  <img alt="Kotlin JVM 21" src="https://img.shields.io/badge/Kotlin-JVM%2021-7F52FF?logo=kotlin&logoColor=white" />
   <img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-green.svg" />
 </p>
+
+> [!NOTE]
+> **A native migration is underway.** AppLess is being rewritten as two fully
+> native apps — Swift/SwiftUI on iOS and Kotlin/Compose on Android — alongside
+> the React Native app, which stays frozen as the behavioral reference. The
+> parsers and core runtimes are done and tested; the UI layers are not runnable
+> end to end yet. **The React Native app below is the one you can run today.**
+> See [the native migration](#the-native-migration) and
+> [`docs/MIGRATION_STATUS.md`](docs/MIGRATION_STATUS.md).
 
 ---
 
@@ -140,13 +152,118 @@ platforms can look native without ever drifting the prompt:
 - [`ui/shared/`](src/genos/ui/shared) - chart, map, form, and image logic shared
   by every design system.
 
+The native ports keep the same split. `spec/contract/genos.schema.json` replaces
+`contract.tsx` as the machine-readable source, and each port derives its
+renderer set from it rather than hard-coding a list - so a component added to
+the contract fails both ports' conformance gates until someone implements it.
+
+## Repository layout
+
+The repo holds the running React Native app and the in-progress native ports
+side by side, with a shared, platform-neutral spec between them.
+
+```
+appless/
+├── src/, App.tsx, __tests__/   RN app (Expo SDK 54) — runnable today, and the
+│                               behavioral reference the ports are graded against
+├── spec/                       platform-neutral source of truth
+│   ├── openui-lang.md            the grammar + streaming semantics
+│   ├── contract/                 the 33-component contract as JSON Schema
+│   ├── prompt/                   the system prompt, assembled from sections
+│   ├── icon-map.md               icon name -> SF Symbol / Material Symbol
+│   └── fixtures/                 97 golden fixtures: .oui -> .expected.json
+├── ios/                        Swift
+│   ├── Packages/OpenUILang/      streaming openui-lang parser
+│   ├── Packages/GenOSCore/       store, controller, SSE client, tool loop, tools
+│   └── AppLess/                  AppLessCore (pure Swift) + AppLessUI (SwiftUI)
+├── android/                    Kotlin
+│   ├── openui-lang/              the parser port
+│   ├── genos-core/               the core port
+│   ├── ui-core/                  M3 tokens, icon map, renderer logic (pure JVM)
+│   └── app/                      the Compose app
+└── docs/                       the plan and the live status
+```
+
+The trick that keeps three implementations honest: **`spec/fixtures/` is
+generated from the real react-lang parser**, and both native parsers are graded
+against that same corpus. Nobody's reading of the grammar is authoritative — the
+running RN parser is.
+
+## The native migration
+
+Two fully native apps, no React Native runtime, both rendering the same
+generated openui-lang the same way: Cupertino on iOS, Material 3 on Android.
+
+**Where it stands** — measured, not estimated:
+
+| | Status |
+|---|---|
+| Shared spec, contract schema, prompt, 97-fixture corpus | done, gated in CI |
+| Swift parser (`OpenUILang`) | done — 97/97 fixtures |
+| Swift core (`GenOSCore`) | done — 203 tests |
+| Swift `AppLessCore` (tokens, icon map, chart/form/shell logic) | done — 220 tests |
+| SwiftUI app (30 renderers + shell) | **written, not yet verified** — SwiftUI cannot compile on Linux; the first real compile happens on macOS CI |
+| Kotlin parser (`openui-lang`) | done — 121 tests |
+| Kotlin core (`genos-core`) | done — 279 tests |
+| Kotlin `ui-core` (M3 tokens, icon map, renderer logic) | done — 95 tests |
+| Compose app (`android/app`) | **in flight — does not currently compile** |
+
+**Neither native app runs end to end yet.** No simulator or device has launched
+either one; no native build has talked to the model. What is done is the hard,
+testable half — two independent parser and runtime ports that byte-match the JS
+reference — and that half is genuinely done.
+
+Authoritative status, including everything that is *not* verified anywhere,
+lives in **[`docs/MIGRATION_STATUS.md`](docs/MIGRATION_STATUS.md)**. The design
+is in [`docs/NATIVE_MIGRATION_PLAN.md`](docs/NATIVE_MIGRATION_PLAN.md).
+
 ## Tests
+
+**The React Native app:**
 
 ```bash
 npm test    # renders exemplar generated screens through the full
             # parser -> Renderer -> native component pipeline (jest-expo,
             # headless), for both Cupertino and Material renderer sets
 ```
+
+**The shared spec** — regenerates the fixture corpus from the real parser and
+checks it is byte-identical to what is committed:
+
+```bash
+cd spec/fixtures/generator && npm ci && npm test
+```
+
+**The Swift side** — needs a Swift 6.1 toolchain; runs on Linux or macOS:
+
+```bash
+cd ios/Packages/OpenUILang && swift test    # parser, 97 fixtures
+cd ios/Packages/GenOSCore   && swift test   # store, stream, tool loop
+cd ios/AppLess              && swift test   # AppLessCore
+```
+
+On Linux, `AppLessUI` compiles to an **empty module** — every file is behind
+`#if canImport(SwiftUI)`. Only macOS CI (`.github/workflows/ios-app.yml`)
+actually compiles the SwiftUI.
+
+**The Kotlin side** — needs JDK 21; these three modules are pure JVM and need no
+Android SDK:
+
+```bash
+cd android && ./gradlew :openui-lang:test :genos-core:test :ui-core:test
+```
+
+`:app` needs the Android SDK and is mid-write.
+
+**Cross-port differential fuzzing** — feeds generated programs through both
+ports and the JS oracle and byte-compares the results:
+
+```bash
+cd spec/fixtures/generator && node probes/run-differential.mjs
+```
+
+CI runs all of the Linux-runnable gates above on every push via
+`.github/workflows/all-gates.yml`.
 
 ## Fork it and make it yours
 

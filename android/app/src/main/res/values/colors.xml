@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- MD_LIGHT.surface — src/genos/ui/material/theme.ts L43. -->
+    <color name="appless_window_background">#FBF8FF</color>
+</resources>

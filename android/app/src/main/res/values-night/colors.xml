@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- MD_DARK.surface — src/genos/ui/material/theme.ts L71. -->
+    <color name="appless_window_background">#131318</color>
+</resources>
