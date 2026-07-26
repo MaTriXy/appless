@@ -11,9 +11,11 @@
 #   2. `swift test` for the three packages: OpenUILang (parser), GenOSCore
 #      (store/controller/stream) and AppLess (AppLessCore + the macOS-only
 #      live conformance suite).
-#   3. The conformance gate line `renderers registered: 30/30` — on macOS this
-#      is the LIVE count, i.e. `registerCupertinoRenderers()` really wired all
-#      30 contract components.
+#   3. Proof that the SwiftUI-guarded `AppLessUITests` suite really compiled
+#      and ran here, and that it saw a LIVE `renderers registered: 30/30` —
+#      i.e. `registerCupertinoRenderers()` wired all 30 contract components.
+#      The gate LINE alone is not that proof; AppLessCore prints the same
+#      string on Linux, where nothing registers. See the step for details.
 #   4. THE POINT: `xcodebuild -scheme AppLessUI -destination generic/platform=iOS`
 #      compiles the SwiftUI for the device SDK. If a view does not build, this
 #      job is red.
@@ -94,15 +96,42 @@ jobs:
           set -euo pipefail
           swift test 2>&1 | tee "$RUNNER_TEMP/appless-tests.log"
 
-      - name: "Conformance gate — renderers registered: 30/30"
+      # The gate line ALONE proves nothing. `RendererWiringTests` and
+      # `RendererRegistryTests` live in AppLessCore and print the DECLARED
+      # count, so `renderers registered: 30/30` appears in the log on Linux
+      # too — where the SwiftUI target compiles to nothing and exactly ZERO
+      # renderers are registered. Verified:
+      #
+      #   $ swift test --filter 'RendererWiringTests|RendererRegistryTests'   # Linux
+      #   renderers registered: 30/30
+      #   renderers registered: 30/30
+      #
+      # So this step checks the thing that actually distinguishes macOS: that
+      # the SwiftUI-guarded AppLessUITests suite was COMPILED AND RUN. On
+      # Linux that target builds to an empty bundle and the test below does
+      # not exist, so its name is absent from the log. Without this check a
+      # silently-empty live suite would still show a green gate line.
+      - name: "Conformance gate — the LIVE suite ran, and registered 30/30"
         run: |
           set -euo pipefail
-          if ! grep -q "renderers registered: 30/30" "$RUNNER_TEMP/appless-tests.log"; then
-            echo "conformance gate line missing — a contract component is unwired"
-            grep -n "renderers registered" "$RUNNER_TEMP/appless-tests.log" || true
+          log="$RUNNER_TEMP/appless-tests.log"
+
+          if ! grep -q "everyContractComponentHasALiveRenderer" "$log"; then
+            echo "the live conformance suite (AppLessUITests) did not run."
+            echo "On macOS canImport(SwiftUI) must be true, so this suite is"
+            echo "expected to compile and execute. An empty bundle here means"
+            echo "the SwiftUI layer was never exercised, whatever the gate"
+            echo "line says."
             exit 1
           fi
-          echo "renderers registered: 30/30"
+
+          if ! grep -q "renderers registered: 30/30" "$log"; then
+            echo "conformance gate line missing — a contract component is unwired"
+            grep -n "renderers registered" "$log" || true
+            exit 1
+          fi
+
+          echo "live suite ran; renderers registered: 30/30"
 
       # ------------------------------------------------------- SwiftUI compile
 
