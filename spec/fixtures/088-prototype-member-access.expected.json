@@ -1,0 +1,64 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "function toString() { [native code] }|function Object() { [native code] }|function hasOwnProperty() { [native code] }"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "arr=function Number() { [native code] },function Number() { [native code] }"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "n=toString l=0"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "p=function Object() { [native code] } q="
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "el=TextContent/false/element"
+        }
+      },
+      {
+        "component": "KVList",
+        "props": {
+          "rows": [
+            {
+              "key": "fn"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {
+    "$arr": [
+      1,
+      2
+    ],
+    "$obj": {
+      "a": 1
+    }
+  },
+  "runtimeErrors": []
+}

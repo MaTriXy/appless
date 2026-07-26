@@ -1,0 +1,82 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "runtime object key order"
+        }
+      },
+      {
+        "component": "Button",
+        "props": {
+          "action": {
+            "$action": {
+              "steps": [
+                {
+                  "target": "$z",
+                  "type": "set",
+                  "valueAST": {
+                    "$ast": {
+                      "entries": [
+                        [
+                          "2",
+                          {
+                            "k": "Num",
+                            "v": 2
+                          }
+                        ],
+                        [
+                          "10",
+                          {
+                            "k": "Num",
+                            "v": 4
+                          }
+                        ],
+                        [
+                          "b",
+                          {
+                            "k": "Num",
+                            "v": 1
+                          }
+                        ],
+                        [
+                          "a",
+                          {
+                            "k": "Num",
+                            "v": 3
+                          }
+                        ],
+                        [
+                          "4294967295",
+                          {
+                            "k": "Num",
+                            "v": 5
+                          }
+                        ]
+                      ],
+                      "k": "Obj"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "label": "capture"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {
+    "$z": null
+  },
+  "runtimeErrors": []
+}

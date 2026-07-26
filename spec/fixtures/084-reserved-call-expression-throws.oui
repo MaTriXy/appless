@@ -1,0 +1,7 @@
+root = Card([
+  CardHeader("reserved call in expression position"),
+  TextContent("x" + @toString(1)),
+  TextContent("y" + @constructor(2)),
+  TextContent("z" + @hasOwnProperty(3)),
+  TextContent("ok" + @Sum([1, 2]))
+])

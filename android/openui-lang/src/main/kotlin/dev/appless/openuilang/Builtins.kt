@@ -36,37 +36,46 @@ internal object Builtins {
     fun isBuiltin(name: String): Boolean = allNames.contains(name)
 
     /**
-     * `Object.prototype`'s own property names, in V8's
-     * `Object.getOwnPropertyNames(Object.prototype)` order.
+     * `Object.prototype`'s own property names — a view onto the ONE table in
+     * [JsObjects], so the two can never drift apart.
      *
-     * lang-core writes `RESERVED_CALLS = { Query: "Query", Mutation: "Mutation" }`
-     * and tests membership with `name in RESERVED_CALLS` — the `in` operator,
-     * which walks the PROTOTYPE CHAIN. On a plain object literal that chain is
-     * `Object.prototype`, so all twelve of these names answer `true` as well.
-     * They are reachable from source: `@ident` lexes to a BUILTIN token with
-     * ANY name (fixture `078-reserved-call-prototype-names`).
+     * Every classification below is a JS property lookup on a plain object
+     * literal, and a plain object literal inherits these twelve names.
      */
-    val objectPrototypeNames: Set<String> = hashSetOf(
-        "constructor",
-        "__defineGetter__",
-        "__defineSetter__",
-        "hasOwnProperty",
-        "__lookupGetter__",
-        "__lookupSetter__",
-        "isPrototypeOf",
-        "propertyIsEnumerable",
-        "toString",
-        "valueOf",
-        "__proto__",
-        "toLocaleString",
+    val objectPrototypeNames: Set<String> get() = JsObjects.PROTOTYPE_OWN_NAMES.keys
+
+    /**
+     * `RESERVED_CALLS = { Query: "Query", Mutation: "Mutation" }` — modelled as
+     * a real JS object so that `in` and `[]` both behave.
+     */
+    private val reservedCalls: RtObject = RtObject.of(
+        "Query" to RtValue.Str("Query"),
+        "Mutation" to RtValue.Str("Mutation"),
     )
+
+    /**
+     * `BUILTINS` — the shared builtin registry, again modelled as a real JS
+     * object. Only membership and own-ness matter here; the port dispatches the
+     * actual implementations in `Evaluator.callDataBuiltin`.
+     */
+    private val builtinsRegistry: RtObject = RtObject().also { o ->
+        for (name in listOf(
+            "Count", "First", "Last", "Sum", "Avg", "Min", "Max",
+            "Sort", "Filter", "Round", "Abs", "Floor", "Ceil",
+        )) {
+            o[name] = RtValue.Str(name)
+        }
+    }
 
     /**
      * Reserved statement-level call names — not builtins, not components.
      *
      * Port of `isReservedCall(name) { return name in RESERVED_CALLS; }`. The
-     * `in` operator is prototype-chain aware, so this is `{Query, Mutation}`
-     * UNION [objectPrototypeNames] — NOT just the two declared keys.
+     * `in` operator is prototype-chain aware, so this routes through
+     * [JsObjects.hasProperty] and answers `true` for `{Query, Mutation}` UNION
+     * the twelve `Object.prototype` names — NOT just the two declared keys.
+     * They are reachable from source: `@ident` lexes to a BUILTIN token with
+     * ANY name (fixture `078-reserved-call-prototype-names`).
      *
      * Note `classifyStatement` and `reservedRefType` still compare the name
      * with `===` against the literal `"Query"` / `"Mutation"` (parser.js:45,
@@ -74,5 +83,30 @@ internal object Builtins {
      * classification purposes but always yields `refType: "query"`.
      */
     fun isReservedCall(name: String): Boolean =
-        name == "Query" || name == "Mutation" || objectPrototypeNames.contains(name)
+        JsObjects.hasProperty(RtValue.Obj(reservedCalls), name)
+
+    /** What `BUILTINS[name]` (evaluator.js:48) resolves to. */
+    enum class BuiltinLookup {
+        /** Miss — the registry has no such name, own or inherited. */
+        MISS,
+
+        /** One of the thirteen real data builtins: `builtin.fn` is callable. */
+        OWN,
+
+        /**
+         * An `Object.prototype` member reached through the registry's prototype
+         * chain. It is TRUTHY, so `evaluate` proceeds to `builtin.fn(...args)`
+         * — and `.fn` is `undefined`, so the call throws
+         * `TypeError: builtin.fn is not a function`, which `evaluate-tree.js`
+         * turns into a `runtimeErrors` entry (fixture
+         * `084-reserved-call-expression-throws`).
+         */
+        INHERITED,
+    }
+
+    fun lookupBuiltin(name: String): BuiltinLookup = when {
+        builtinsRegistry.has(name) -> BuiltinLookup.OWN
+        JsObjects.hasProperty(RtValue.Obj(builtinsRegistry), name) -> BuiltinLookup.INHERITED
+        else -> BuiltinLookup.MISS
+    }
 }

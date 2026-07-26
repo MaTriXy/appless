@@ -1,0 +1,8 @@
+labels = ["a-b", "ab", " s", "a b c", "a.b", "[object Object]", "co-op", "coop", "A", "a", "-x", "_x", "ab ", "a b"]
+root = Card([
+  CardHeader("ascii collation"),
+  TextContent("all=" + @Sort(labels)),
+  TextContent("p1=" + @Sort([" s", "1"])),
+  TextContent("p2=" + @Sort(["-0", "[object Object]"])),
+  TextContent("p3=" + @Sort(["a-b", "a.b"]))
+])

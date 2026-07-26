@@ -120,6 +120,24 @@ class ControllerDeepLinkTest {
         val id = h.controller.openDeepLink("𐐀abc", "x")
         assertEquals("𐐀abc", h.store.get(id)?.appName)
     }
+
+    /**
+     * FINDING 4, the audit's exact repro: a LOWERCASE astral first character,
+     * which JS cannot uppercase (charAt(0) yields a lone high surrogate) but
+     * Swift's grapheme-level prefix(1) DID uppercase, to U+10400.
+     */
+    @Test
+    fun `an astral first character is left alone in the fallback name`() {
+        val h = ControllerHarness()
+        // node: "\u{10428}eseret".charAt(0).toUpperCase() + slice(1)
+        //       === "\u{10428}eseret"
+        val id = h.controller.openDeepLink("\uD801\uDC28eseret", "show")
+        assertEquals("\uD801\uDC28eseret", h.store.get(id)?.appName)
+        assertEquals("\uD801\uDC28eseret", h.store.get(id)?.appId)
+        // The BMP path the fix must not break, including a combining mark.
+        val bmp = h.controller.openDeepLink("e\u0301cho", "show")
+        assertEquals("E\u0301cho", h.store.get(bmp)?.appName)
+    }
 }
 
 class ControllerResolveActionTest {
@@ -186,6 +204,41 @@ class ControllerResolveActionTest {
         assertEquals(
             "book it\n\nSubmitted form values: " +
                 "{\"guests\":2,\"note\":\"window \\\"seat\\\"\"}",
+            h.store.get(id)?.request,
+        )
+    }
+
+    /**
+     * FINDING 1 where it actually bites: real form state is THREE levels deep
+     * (`{formName: {fieldName: {value, componentType}}}`), and the request
+     * string built here is what the MODEL reads. The Swift port alphabetized
+     * the nested keys; the same case is pinned in its suite.
+     */
+    @Test
+    fun `form JSON preserves insertion order at every depth`() {
+        val h = ControllerHarness()
+        val parent = h.controller.openApp(sampleApp)
+        val id = h.controller.resolveAction(
+            parent,
+            "sign up",
+            listOf(
+                "signup" to JsonValue.obj(
+                    "email" to JsonValue.obj(
+                        "value" to JsonValue.Str("a@b.c"),
+                        "componentType" to JsonValue.Str("TextField"),
+                    ),
+                    "age" to JsonValue.obj(
+                        "value" to JsonValue.Num(30.0),
+                        "componentType" to JsonValue.Str("Slider"),
+                    ),
+                ),
+            ),
+        )
+        // node: "sign up\n\nSubmitted form values: " + JSON.stringify(formState)
+        assertEquals(
+            "sign up\n\nSubmitted form values: " +
+                "{\"signup\":{\"email\":{\"value\":\"a@b.c\",\"componentType\":\"TextField\"}," +
+                "\"age\":{\"value\":30,\"componentType\":\"Slider\"}}}",
             h.store.get(id)?.request,
         )
     }
@@ -355,6 +408,58 @@ class ControllerLifecycleTest {
         assertEquals(ScreenStatus.ERROR, h.store.get(id)?.status)
         assertEquals("needs live data", h.store.get(id)?.error)
         assertEquals(false, h.store.get(id)?.searching)
+    }
+
+    /**
+     * FINDING 6: RN patches the bare `err.message`. `error.toString()` leaked
+     * the fully-qualified JVM class name into `Screen.error`, which the user
+     * reads and which the Swift port spelled differently again.
+     */
+    @Test
+    fun `a non-StreamException degrades to the bare message`() {
+        val h = ControllerHarness()
+        val id = h.controller.openApp(sampleApp)
+        h.streamer.last!!.handlers.onError(IllegalStateException("network unreachable"))
+        assertEquals(ScreenStatus.ERROR, h.store.get(id)?.status)
+        assertEquals("network unreachable", h.store.get(id)?.error)
+        // No class decoration of any kind reached the screen.
+        assertTrue(!h.store.get(id)?.error!!.contains("IllegalStateException"))
+    }
+
+    /**
+     * FINDING 5: `genMs` uses JS `Math.round`, whose ties go toward +INFINITY,
+     * and must CLAMP rather than throw. `roundToInt()` threw
+     * IllegalArgumentException on NaN and saturated silently; the Swift port
+     * trapped and broke ties away from zero. The same cases are pinned in the
+     * Swift suite so the two ports cannot drift apart.
+     */
+    @Test
+    fun `genMs uses JS Math round and clamps`() {
+        // node: Math.round(1234.5) === 1235 (a positive tie rounds up).
+        val up = ControllerHarness()
+        val upId = up.controller.openApp(sampleApp)
+        up.clock.advance(1234.5)
+        up.streamer.last!!.handlers.onDone(StreamEndInfo(truncated = false, dropped = false))
+        assertEquals(1235, up.store.get(upId)?.genMs)
+
+        // node: Math.round(-0.5) === -0, Math.round(-2.5) === -2,
+        // Math.round(-1.5) === -1 - for a clock that went backwards (NTP step,
+        // monotonic-source swap).
+        for ((elapsed, expected) in listOf(-0.5 to 0, -2.5 to -2, -1.5 to -1)) {
+            val h = ControllerHarness()
+            val id = h.controller.openApp(sampleApp)
+            h.clock.advance(elapsed)
+            h.streamer.last!!.handlers.onDone(StreamEndInfo(truncated = false, dropped = false))
+            assertEquals(expected, h.store.get(id)?.genMs, "elapsed $elapsed")
+        }
+
+        // Out of Int range: clamped, not silently saturated by roundToInt and
+        // not a trap (which is what the Swift port used to do).
+        val huge = ControllerHarness()
+        val hugeId = huge.controller.openApp(sampleApp)
+        huge.clock.advance(1e30)
+        huge.streamer.last!!.handlers.onDone(StreamEndInfo(truncated = false, dropped = false))
+        assertEquals(Int.MAX_VALUE, huge.store.get(hugeId)?.genMs)
     }
 
     @Test

@@ -1,0 +1,58 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "__proto__ null"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": {
+            "$ast": {
+              "k": "BinOp",
+              "left": {
+                "k": "Str",
+                "v": "t"
+              },
+              "op": "+",
+              "right": {
+                "k": "StateRef",
+                "n": "$s"
+              }
+            }
+          }
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "u[object Object]"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {
+    "$s": {
+      "a": 1
+    }
+  },
+  "runtimeErrors": [
+    {
+      "source": "runtime",
+      "code": "runtime-error",
+      "message": "Evaluating prop \"text\" on TextContent failed: Cannot convert object to primitive value",
+      "component": "TextContent"
+    }
+  ]
+}

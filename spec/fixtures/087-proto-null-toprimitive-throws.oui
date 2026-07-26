@@ -1,0 +1,7 @@
+$s = { "__proto__": null, a: 1 }
+p = { "__proto__": null, b: 2 }
+root = Card([
+  CardHeader("__proto__ null"),
+  TextContent("t" + $s),
+  TextContent("u" + p)
+])

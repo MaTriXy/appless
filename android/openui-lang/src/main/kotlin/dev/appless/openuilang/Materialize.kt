@@ -202,12 +202,33 @@ private fun materializeExprInternal(
 internal fun materializeExpr(node: AstNode, ctx: MaterializeContext): AstNode =
     materializeExprInternal(node, ctx, emptySet())
 
-/** Port of `containsDynamicValue`. */
+/**
+ * Port of `containsDynamicValue`.
+ *
+ * Its three type tests (`isASTNode`, `Array.isArray`, `isElementNode`) all read
+ * through the PROTOTYPE CHAIN, so an object that inherited `k` or
+ * `type`/`typeName` from a `{"__proto__": …}` entry is classified as an AST
+ * node / element here — which is what decides `hasDynamicProps`, and therefore
+ * whether the element is evaluated at all. `typeof fn === "function"` fails the
+ * leading `typeof v !== "object"` guard, so functions are never dynamic.
+ */
 internal fun containsDynamicValue(v: RtValue): Boolean = when (v) {
     is RtValue.Ast -> true
     is RtValue.Arr -> v.items.any { containsDynamicValue(it) }
     is RtValue.Element -> v.element.props.values.any { containsDynamicValue(it) }
-    is RtValue.Obj -> v.obj.values.any { containsDynamicValue(it) }
+    is RtValue.Obj -> when {
+        JsObjects.astNodeView(v) != null -> true
+        else -> {
+            val el = JsObjects.elementView(v)
+            if (el != null) {
+                el.props.values.any { containsDynamicValue(it) }
+            } else {
+                v.obj.values.any { containsDynamicValue(it) }
+            }
+        }
+    }
+    // The intrinsic prototypes have no ENUMERABLE own properties.
+    is RtValue.Proto -> false
     else -> false
 }
 

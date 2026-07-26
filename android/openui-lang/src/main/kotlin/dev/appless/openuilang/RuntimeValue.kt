@@ -61,7 +61,7 @@ internal class RtObject() {
      * `o["__proto__"] = v` invokes that setter, and the setter does NOT merely
      * drop the key: for an object (or `null`) `v` it RE-POINTS the receiver's
      * `[[Prototype]]`, which the whole duck-typing layer then reads through
-     * (fixtures `080-proto-object-key`, `084`–`087`). For a primitive `v` it
+     * (fixtures `080-proto-object-key`, `085`–`087`). For a primitive `v` it
      * does nothing at all. Either way `"__proto__"` never becomes an own
      * property, so it never shows up in `Object.keys` / `JSON.stringify`.
      *
@@ -89,9 +89,6 @@ internal class RtObject() {
     companion object {
         /** The one key JS object ASSIGNMENT never turns into an own property. */
         const val PROTO_KEY: String = JsObjects.PROTO_KEY
-
-        /** Own key that shadows `Object.prototype.toString` (see [jsToString]). */
-        const val PROTO_KEY_TO_STRING: String = "toString"
 
         fun of(vararg pairs: Pair<String, RtValue>): RtObject = RtObject(pairs.toList())
     }
@@ -162,6 +159,15 @@ internal val RtValue.isObjectLike: Boolean
 /** `Type(v) is Object` — [isObjectLike] plus functions (ES "is an Object"). */
 internal val RtValue.isObjectOrFunction: Boolean
     get() = isObjectLike || this is RtValue.Func
+
+/**
+ * `JSON.stringify` omits an object property whose value is `undefined` OR a
+ * FUNCTION (ES 25.5.2 SerializeJSONProperty returns undefined for both, and
+ * SerializeJSONObject skips those). Inside an ARRAY both become `null`
+ * instead — which is what [Pipeline.convertValue] maps them to.
+ */
+internal val RtValue.isDroppedByJsonStringify: Boolean
+    get() = this is RtValue.Undefined || this is RtValue.Func
 
 /**
  * Convert a plain JSON value (e.g. a schema `default`) into the runtime value
@@ -285,14 +291,18 @@ internal class JsTypeError(message: String) : RuntimeException(message)
  *
  * `String(obj)` is `ToPrimitive(obj, string)`: call `obj.toString()` if
  * callable, else `obj.valueOf()` if callable, else throw
- * `TypeError: Cannot convert object to primitive value`. This value model has
- * no function values, so an own `toString` key (whatever it holds — a number,
- * a string, null) is never callable and the lookup falls through to
- * `Object.prototype.valueOf`, which returns the object itself and is rejected
- * as non-primitive. So a plain object with an own `"toString"` key ALWAYS
- * throws; without one, `Object.prototype.toString` answers `"[object Object]"`.
- * `"valueOf"` alone never matters at the string hint — `toString` is tried
- * first and succeeds. Fixture `081-tostring-shadow-throws`.
+ * `TypeError: Cannot convert object to primitive value`. BOTH lookups go
+ * through the prototype chain ([JsObjects.getMember]), so the answer depends on
+ * the receiver's `[[Prototype]]`, not just on its own keys:
+ *
+ * - a plain object inherits `Object.prototype.toString` → `"[object Object]"`;
+ * - an own `toString` key shadows it with a non-callable value (this model has
+ *   no user function values), so the lookup falls through to
+ *   `Object.prototype.valueOf`, which returns the object itself and is
+ *   rejected as non-primitive → THROWS (fixture `081-tostring-shadow-throws`);
+ * - a prototype-LESS object (`{"__proto__": null, …}`) has neither method, so
+ *   it throws as well (fixture `087-proto-null-toprimitive-throws`) — the case
+ *   an own-key check alone can never see.
  */
 internal fun jsToString(v: RtValue): String = when (v) {
     is RtValue.Undefined -> "undefined"
@@ -303,15 +313,40 @@ internal fun jsToString(v: RtValue): String = when (v) {
     // Array.prototype.toString → join(","); null/undefined → "". A member that
     // shadows `toString` makes the join itself throw.
     is RtValue.Arr -> v.items.joinToString(",") { if (it.isNullish) "" else jsToString(it) }
-    is RtValue.Obj ->
-        if (v.obj.has(RtObject.PROTO_KEY_TO_STRING)) {
-            throw JsTypeError("Cannot convert object to primitive value")
-        } else {
-            "[object Object]"
-        }
-    // ElementNodes and AST nodes are plain objects whose own keys are fixed
-    // (`type`/`typeName`/`props`/… and `k`/…), never `toString`.
-    is RtValue.Element, is RtValue.Ast -> "[object Object]"
+    is RtValue.Func -> "function ${v.name}() { [native code] }"
+    is RtValue.Proto -> when (v.kind) {
+        // The intrinsic prototypes are ordinary objects of their own type:
+        // Number.prototype is a Number object wrapping 0, String.prototype
+        // wraps "", Boolean.prototype wraps false, Array.prototype is an empty
+        // array and Function.prototype is an anonymous native function.
+        JsProtoKind.OBJECT -> "[object Object]"
+        JsProtoKind.ARRAY -> ""
+        JsProtoKind.NUMBER -> "0"
+        JsProtoKind.STRING -> ""
+        JsProtoKind.BOOLEAN -> "false"
+        JsProtoKind.FUNCTION -> "function () { [native code] }"
+    }
+
+    is RtValue.Obj, is RtValue.Element, is RtValue.Ast -> objectToPrimitiveString(v)
+}
+
+/**
+ * `ToPrimitive(v, string)` for the object-shaped runtime values: try
+ * `toString`, then `valueOf`, each only if it resolves to a callable.
+ */
+private fun objectToPrimitiveString(v: RtValue): String {
+    val resolved = JsObjects.getMemberWithOwner(v, "toString")
+    if (resolved != null && resolved.first is RtValue.Func) {
+        val owner = resolved.second
+        // `Array.prototype.toString` on a NON-array receiver reads `this.join`,
+        // whose `this.length` is undefined → joins zero elements → "". Every
+        // other reachable chain ends at `Object.prototype.toString`.
+        return if (owner is RtValue.Proto && owner.kind == JsProtoKind.ARRAY) "" else "[object Object]"
+    }
+    // `valueOf` either is missing (prototype-less object) or is
+    // `Object.prototype.valueOf`, which answers the object itself — never a
+    // primitive. Both end the same way.
+    throw JsTypeError("Cannot convert object to primitive value")
 }
 
 /** JS truthiness. */

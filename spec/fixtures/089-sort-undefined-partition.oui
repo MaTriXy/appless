@@ -1,0 +1,10 @@
+$obj = { a: 1 }
+$bad = { toString: 1 }
+plain = @Sort([3, $obj.nope, 1])
+suppressed = @Sort([$bad, $obj.nope])
+root = Card([
+  CardHeader("sort undefined partitioning"),
+  TextContent("asc=" + plain),
+  TextContent("desc=" + @Sort([3, $obj.nope, 1], "", "desc")),
+  KVList(suppressed)
+])

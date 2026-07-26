@@ -122,6 +122,10 @@ internal class Evaluator(store: Map<String, RtValue>) {
         is RtValue.Num, is RtValue.Str,
         -> value
 
+        // `typeof fn === "function"`, so evaluate-prop.js's
+        // `typeof value !== "object"` guard returns it untouched.
+        is RtValue.Func -> value
+
         is RtValue.Ast -> {
             // The schema context IS present on every evaluate-prop entry
             // (evaluate-tree.js builds `{ library: evalCtx.library }`).
@@ -141,7 +145,7 @@ internal class Evaluator(store: Map<String, RtValue>) {
                 )
                 // Strip a ReactiveAssign marker in a non-reactive context.
                 isReactiveAssign(result) -> {
-                    val target = ((result as RtValue.Obj).obj["target"] as? RtValue.Str)?.value
+                    val target = (JsObjects.getMember(result, "target") as? RtValue.Str)?.value
                     val v = if (target == null) RtValue.Undefined else ctx.getState(target)
                     if (v.isNullish) RtValue.Null else v
                 }
@@ -152,32 +156,50 @@ internal class Evaluator(store: Map<String, RtValue>) {
 
         is RtValue.Arr -> RtValue.Arr(value.items.map { evaluatePropValue(it, inline) })
         is RtValue.Element -> RtValue.Element(recurseElement(value.element, inline))
-        is RtValue.Obj -> {
-            val o = value.obj
-            // ActionPlan / ActionStep — preserve as-is (deferred click-time eval).
-            // KNOWN-DEVIATION (mirrors Swift #6): a LITERAL object whose `k` is
-            // a real AST kind ({k: "Str", v: "x"}) is indistinguishable from an
-            // AST node in JS and would be evaluated here; the typed port keeps
-            // it as plain data. (The SERIALIZER-level duck-typing IS
-            // replicated — see Pipeline.convertValue / fixture 070.)
-            when {
-                o["steps"] is RtValue.Arr -> value
-                o.has("type") && o.has("valueAST") -> value
-                o.values.any { it.isObjectLike } -> {
-                    // `result[k] = …` in evaluate-prop.js — ASSIGNMENT, so a
-                    // `__proto__` key is swallowed here too.
-                    val out = RtObject()
-                    for ((k, v) in o.entries) out.assign(k, evaluatePropValue(v, inline))
-                    RtValue.Obj(out)
-                }
 
-                else -> value
+        is RtValue.Obj, is RtValue.Proto -> {
+            // evaluate-prop.js runs its duck-typing in this exact order, and
+            // EVERY test is a prototype-chain-aware read, so an object that
+            // INHERITED `k` (via `{"__proto__": <ast node>}`) is evaluated as
+            // an AST node and one that inherited `type`/`typeName` is recursed
+            // into as an element (fixtures `085`–`086`).
+            val astView = JsObjects.astNodeView(value)
+            val elementView = JsObjects.elementView(value)
+            when {
+                astView != null -> evaluatePropValue(RtValue.Ast(astView), inline)
+                elementView != null -> RtValue.Element(recurseElement(elementView, inline))
+                // ActionPlan / ActionStep — preserve as-is (deferred eval).
+                JsObjects.getMember(value, "steps") is RtValue.Arr -> value
+                JsObjects.hasProperty(value, "type") &&
+                    JsObjects.hasProperty(value, "valueAST") -> value
+                // KNOWN-DEVIATION (mirrors Swift #6): a LITERAL object whose
+                // OWN `k` is a real AST kind ({k: "Str", v: "x"}) is
+                // indistinguishable from an AST node in JS and would be
+                // evaluated here; the typed port keeps it as plain data.
+                // (The SERIALIZER-level duck-typing IS replicated — see
+                // Pipeline.convertValue / fixture 070.)
+                else -> {
+                    val entries = if (value is RtValue.Obj) value.obj.entries else emptyList()
+                    if (entries.any { it.second.isObjectLike }) {
+                        // `result[k] = …` in evaluate-prop.js — ASSIGNMENT, so
+                        // a `__proto__` key re-points the rebuilt object's
+                        // prototype instead of becoming an own key.
+                        val out = RtObject()
+                        for ((k, v) in entries) out.assign(k, evaluatePropValue(v, inline))
+                        // The rebuild starts from a fresh `{}`, so it does NOT
+                        // inherit the source object's prototype.
+                        RtValue.Obj(out)
+                    } else {
+                        value
+                    }
+                }
             }
         }
     }
 
+    /** `value.__reactive === "assign"` — a chain-aware property read. */
     private fun isReactiveAssign(v: RtValue): Boolean =
-        v is RtValue.Obj && (v.obj["__reactive"] as? RtValue.Str)?.value == "assign"
+        v.isObjectLike && (JsObjects.getMember(v, "__reactive") as? RtValue.Str)?.value == "assign"
 
     // ── Core AST evaluation ────────────────────────────────────────────────
 
@@ -287,9 +309,19 @@ internal class Evaluator(store: Map<String, RtValue>) {
         if (Builtins.lazyBuiltins.contains(node.name)) {
             return evaluateLazyBuiltin(node.name, node.args, context, schemaCtx)
         }
-        if (Builtins.dataBuiltins.contains(node.name)) {
+        // evaluator.js:48 `const builtin = BUILTINS[node.name]` — a property GET
+        // on a plain object literal, so it also answers for the twelve
+        // `Object.prototype` names. Either way the args are evaluated FIRST
+        // (evaluator.js:50), then `builtin.fn(...)` is called — and for an
+        // inherited member `.fn` is `undefined`.
+        val lookup = Builtins.lookupBuiltin(node.name)
+        if (lookup != Builtins.BuiltinLookup.MISS) {
             // evaluator.js:50 — eager builtin args drop the schema context.
-            return callDataBuiltin(node.name, node.args.map { evaluate(it, context, null) })
+            val args = node.args.map { evaluate(it, context, null) }
+            if (lookup == Builtins.BuiltinLookup.INHERITED) {
+                throw JsTypeError(JsObjects.BUILTIN_FN_MESSAGE)
+            }
+            return callDataBuiltin(node.name, args)
         }
         if (Builtins.actionNames.contains(node.name)) {
             // evaluator.js:55 — evaluateActionCall takes no schemaCtx at all.
@@ -390,41 +422,17 @@ internal class Evaluator(store: Map<String, RtValue>) {
     private fun concatOperand(v: RtValue): String = if (v.isNullish) "" else jsToString(v)
 
     /**
-     * JS `obj[key]` property access for non-array receivers.
+     * JS `obj[key]` property access — own properties first, then the whole
+     * PROTOTYPE CHAIN, via the shared [JsObjects] model. So `$obj.toString`
+     * yields `Object.prototype.toString` (a native function value), `$obj
+     * .constructor` yields `Object`, `$num.constructor` yields `Number`, and
+     * `$obj.__proto__` yields `Object.prototype` itself.
      *
-     * KNOWN-DEVIATION (mirrors Swift #5): an element receiver yields
-     * `undefined`, whereas in JS an ElementNode is a plain object whose
-     * `typeName`/`props`/`partial`/`hasDynamicProps`/`type` fields are
-     * readable. Observable only for programs that member-access an element.
+     * Element receivers read their own fields (`typeName`, `props`, `partial`,
+     * `hasDynamicProps`, `type`, `statementId`) here too — in JS an
+     * ElementNode is just a plain object.
      */
-    private fun propertyGet(obj: RtValue, key: String): RtValue = when (obj) {
-        is RtValue.Obj -> obj.obj[key] ?: RtValue.Undefined
-        is RtValue.Arr -> when {
-            key == "length" -> RtValue.Num(obj.items.size.toDouble())
-            else -> {
-                val i = key.toIntOrNull()
-                if (i != null && i >= 0 && i < obj.items.size && i.toString() == key) {
-                    obj.items[i]
-                } else {
-                    RtValue.Undefined
-                }
-            }
-        }
-
-        is RtValue.Str -> when {
-            key == "length" -> RtValue.Num(obj.value.length.toDouble())
-            else -> {
-                val i = key.toIntOrNull()
-                if (i != null && i >= 0 && i < obj.value.length && i.toString() == key) {
-                    RtValue.Str(obj.value[i].toString())
-                } else {
-                    RtValue.Undefined
-                }
-            }
-        }
-
-        else -> RtValue.Undefined
-    }
+    private fun propertyGet(obj: RtValue, key: String): RtValue = JsObjects.getMember(obj, key)
 
     // ── Data builtins ──────────────────────────────────────────────────────
 
@@ -477,16 +485,26 @@ internal class Evaluator(store: Map<String, RtValue>) {
                 } else {
                     val f = if (arg(1).isNullish) "" else jsToString(arg(1))
                     val desc = (if (arg(2).isNullish) "asc" else jsToString(arg(2))) == "desc"
+                    // ES 23.1.3.30.1 SortIndexedProperties: `undefined`
+                    // elements are PARTITIONED OFF before sorting, appended
+                    // after every defined element, and the comparator is NEVER
+                    // invoked on them. So `@Sort([3, undefined, 1])` is
+                    // `[1, 3, undefined]` (not `[undefined, 1, 3]` — an
+                    // undefined coerced to "" would sort first), and a
+                    // comparator that would throw on an undefined operand
+                    // never runs (fixture `089-sort-undefined-partition`).
+                    //
                     // JS Array.prototype.sort is stable (V8 TimSort); so is
                     // Kotlin's sortedWith.
-                    RtValue.Arr(
-                        items.sortedWith { a, b ->
-                            val av = if (f.isEmpty()) a else resolveField(a, f)
-                            val bv = if (f.isEmpty()) b else resolveField(b, f)
-                            val cmp = sortCompare(av, bv)
-                            if (desc) -cmp else cmp
-                        }
-                    )
+                    val defined = items.filter { it !is RtValue.Undefined }
+                    val holes = items.size - defined.size
+                    val sorted = defined.sortedWith { a, b ->
+                        val av = if (f.isEmpty()) a else resolveField(a, f)
+                        val bv = if (f.isEmpty()) b else resolveField(b, f)
+                        val cmp = sortCompare(av, bv)
+                        if (desc) -cmp else cmp
+                    }
+                    RtValue.Arr(sorted + List(holes) { RtValue.Undefined })
                 }
             }
 
@@ -539,19 +557,23 @@ internal class Evaluator(store: Map<String, RtValue>) {
 
     /**
      * `Sort`'s numeric-aware comparator. The numeric branch is exact; the
-     * string branch approximates JS `String.prototype.localeCompare`.
+     * string branch is JS `String.prototype.localeCompare`.
      *
-     * KNOWN-DEVIATION #1 (see README) — and NOT limited to exotic locales.
-     * JS `localeCompare` is V8's ICU collation (default
-     * `alternate = non-ignorable`); `java.text.Collator.getInstance(Locale.US)`
-     * uses legacy en_US rules that treat **hyphen and space as ignorable at
-     * primary strength** and do not decompose **compatibility ligatures**
-     * (U+FB01 `ﬁ`, U+FB00 `ﬀ`, U+01C6 `ǆ`). So plain ASCII input diverges:
-     * `"a-b" > "ab"` and `"co-op" > "coop"` here, `<` in V8. A 47-word
-     * punctuation/ligature probe diverges on 172 of 2209 ordered pairs.
+     * ASCII — the whole range `@Sort` can reach from a `.oui` corpus without
+     * non-Latin text — goes through [jsAsciiLocaleCompare], a direct CLDR-root
+     * (`alternate = non-ignorable`) weight table verified against V8 over
+     * 235,233 pairs with zero mismatches, and shared verbatim with the Swift
+     * port.
      *
-     * Still deliberately NOT `String.compareTo`, which is raw code-unit order
-     * and would sort `"a" > "B"`.
+     * This deliberately REPLACES `java.text.Collator.getInstance(Locale.US)`,
+     * whose legacy en_US rules treat hyphen and space as ignorable at primary
+     * strength: it answered `"a-b" > "ab"` and `"co-op" > "coop"` where V8 and
+     * the Swift port say `<`. That was never "not observable in the corpus" —
+     * it is observable the moment a `@Sort` input contains a hyphen or a space
+     * (fixture `090-sort-ascii-collation`).
+     *
+     * KNOWN-DEVIATION #1 (see README) now covers ONLY the non-ASCII fallback
+     * below, where the two ports still lean on their platform collators.
      */
     private fun sortCompare(av: RtValue, bv: RtValue): Int {
         fun isNumeric(v: RtValue): Boolean = when (v) {
@@ -565,6 +587,8 @@ internal class Evaluator(store: Map<String, RtValue>) {
         }
         val a = if (av.isNullish) "" else jsToString(av)
         val b = if (bv.isNullish) "" else jsToString(bv)
+        jsAsciiLocaleCompare(a, b)?.let { return it }
+        // Outside ASCII: the platform collator (KNOWN-DEVIATION #1).
         val cmp = LOCALE_COLLATOR.compare(a, b)
         return if (cmp < 0) -1 else if (cmp > 0) 1 else 0
     }
@@ -639,13 +663,9 @@ internal class Evaluator(store: Map<String, RtValue>) {
             val rawSteps = (stepsArg as? RtValue.Arr)?.items ?: emptyList()
             // Non-object / null entries and entries without a `type` field are
             // filtered out. (JS ElementNodes carry a `type` field, so they pass.)
-            val steps = rawSteps.filter {
-                when (it) {
-                    is RtValue.Obj -> it.obj.has("type")
-                    is RtValue.Element -> true
-                    else -> false
-                }
-            }
+            // `s != null && typeof s === "object" && "type" in s` — the `in`
+            // walks the prototype chain. (JS ElementNodes carry `type`.)
+            val steps = rawSteps.filter { it.isObjectLike && JsObjects.hasProperty(it, "type") }
             RtValue.Obj(RtObject.of("steps" to RtValue.Arr(steps)))
         }
 
@@ -764,7 +784,16 @@ internal class Evaluator(store: Map<String, RtValue>) {
 
     /** Convert a resolved runtime value back to a literal AST node (`toLiteralAST`). */
     private fun toLiteralAst(value: RtValue): AstNode = when (value) {
-        is RtValue.Undefined, is RtValue.Null -> AstNode.Null
+        // `typeof fn === "function"` matches none of toLiteralAST's branches,
+        // so it falls through to the trailing `return { k: "Null" }`.
+        is RtValue.Undefined, is RtValue.Null, is RtValue.Func -> AstNode.Null
+        is RtValue.Proto ->
+            if (value.kind == JsProtoKind.ARRAY) {
+                AstNode.Arr(emptyList()) // Array.prototype is an empty array
+            } else {
+                AstNode.Obj(emptyList()) // no ENUMERABLE own properties
+            }
+
         is RtValue.Str -> AstNode.Str(value.value)
         is RtValue.Num -> AstNode.Num(value.value)
         is RtValue.Bool -> AstNode.Bool(value.value)

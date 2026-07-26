@@ -98,7 +98,10 @@ public class ExaSearchTool(
         } catch (e: kotlin.coroutines.cancellation.CancellationException) {
             throw e
         } catch (e: Throwable) {
-            "ERROR: web search failed (${(e as? StreamException)?.message ?: e.toString()})"
+            // RN emits the bare err.message here too — and this string goes
+            // to the MODEL, so a JVM class prefix would be noise the Swift
+            // port does not send.
+            "ERROR: web search failed (${jsErrorMessage(e)})"
         }
     }
 

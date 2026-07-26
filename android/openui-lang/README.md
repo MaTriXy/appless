@@ -3,7 +3,7 @@
 Kotlin port of the `@openuidev/lang-core` openui-lang parser + runtime
 evaluator, oracle-verified byte-for-byte against the JS reference
 implementation over the golden fixture corpus in `spec/fixtures/`
-(97 fixtures) plus differential probe sweeps.
+(105 fixtures) plus differential probe sweeps.
 
 - Normative spec: `spec/openui-lang.md`
 - JS reference: `spec/fixtures/generator/node_modules/@openuidev/lang-core/dist`
@@ -30,13 +30,14 @@ Dependency order, mirroring the Swift port file-for-file:
 |---|---|
 | `JsonValue.kt` | hand-rolled JSON reader for the contract schema only |
 | `LibrarySchema.kt` | `spec/contract/genos.schema.json` → root, components, `paramOrder`, per-param `default` |
-| `StringJs.kt` | the JVM-vs-JS trap list, `jsStringSplit`, and the `JSON.stringify` own-key order (`JS_OWN_KEY_ORDER`, incl. canonical-array-index hoisting) |
+| `StringJs.kt` | the JVM-vs-JS trap list, `jsStringSplit`, the `JSON.stringify` own-key order (`JS_OWN_KEY_ORDER`, incl. canonical-array-index hoisting) and the CLDR-root ASCII collation table (`jsAsciiLocaleCompare`) |
 | `Ast.kt` | `AstNode` sealed hierarchy, `walkAst`, `collectStateRefs` |
 | `Lexer.kt` | `tokenize`, double-quoted strings via strict JSON parsing with whole-string raw fallback, single-quoted escapes, numbers, `&`→`&&` / `|`→`||` |
 | `Preprocess.kt` | exact ECMAScript whitespace set, `jsTrim`/`jsTrimEnd`, `stripFences` (string-aware), `stripComments` |
 | `Statements.kt` | `autoClose` (§7), `splitStatements` (§6, ternary lookahead) |
 | `Expressions.kt` | Pratt parser (§5), the `isBuiltin` collision rule (only `Action` parses bare) |
-| `Builtins.kt` | builtin / lazy / action-step / reserved-call name registries |
+| `JsObject.kt` | **the JS plain-object model**: `Object.prototype`'s own-name table (+ the Array/Number/String/Boolean/Function intrinsics), every value's `[[Prototype]]`, and the single implementations of `.`/`[]` (`getMember`) and `in` (`hasProperty`) |
+| `Builtins.kt` | builtin / lazy / action-step / reserved-call name registries, all routed through `JsObject.kt` |
 | `RuntimeValue.kt` | `RtValue` JS value model, `RtObject`, `RtElement`, `toNumber`/`String()`/truthiness/loose-equality |
 | `Materialize.kt` | statement classification, ref resolution with per-path cycle guard, positional→named prop mapping, required-prop validation, array drop rules |
 | `Evaluator.kt` | runtime AST evaluation: operators, member/index/pluck, data builtins, `@Each`, action calls |
@@ -96,51 +97,47 @@ canonical equivalence. What did NOT come for free:
 ## KNOWN-DEVIATIONS
 
 The port aims for byte parity with the JS oracle. The following deviations are
-known and deliberate, and none is observable in the current fixture corpus
-(#3 is a residual SCOPE limit, not a live divergence — the throw the corpus
-does reach is reproduced) — but "not in the corpus" is not "not reachable":
-#1 in particular diverges on ordinary hyphenated ASCII input and is a live
-correctness risk for model-generated programs.
+known and deliberate — but "not in the corpus" is not "not reachable", so each
+entry says how far it reaches.
 
-1. **`localeCompare` approximation** (`Evaluator.sortCompare`) — the widest
-   deviation on this list, and it bites **plain ASCII data**. `@Sort`'s string
-   comparator in JS is `String.prototype.localeCompare` (V8 ICU collation, host
-   default locale, ICU's `alternate = non-ignorable` default). The port uses
-   `java.text.Collator.getInstance(Locale.US)`, whose legacy en_US rules differ
-   in ways that have nothing to do with exotic locales:
+1. **Collation outside ASCII** (`Evaluator.sortCompare`,
+   `StringJs.jsAsciiLocaleCompare`). `@Sort`'s string comparator in JS is
+   `String.prototype.localeCompare` — V8's ICU collation with the CLDR root
+   table and ICU's `alternate = non-ignorable` default.
 
-   - **Hyphen and space are IGNORABLE at primary strength** in
-     `java.text.Collator`, but are ordinary characters (sorting *before*
-     letters) in V8. So `"a-b" > "ab"` on the JVM and `"a-b" < "ab"` in V8;
-     likewise `"co-op"` vs `"coop"`, `"e-mail"` vs `"email"`, `"a b"` vs
-     `"ab"`. Any hyphenated or multi-word label — the common case for @Sort
-     input — can land on the wrong side.
-   - **Other ASCII punctuation is ordered differently** even where both treat
-     it as significant: `"a/b"` vs `"a*b"` and `"a.b"` vs `"a/b"` invert
-     between the two.
-   - **Compatibility ligatures are not decomposed.** `java.text.Collator`'s
-     rules are canonical (NFD)-based, so U+FB01 `ﬁ`, U+FB00 `ﬀ` and U+01C6 `ǆ`
-     sort as opaque units after every Latin letter, while V8 gives them the
-     primary weights of `f`+`i`, `f`+`f`, `d`+`z`. `"ﬁx" > "st"` on the JVM,
-     `"ﬁx" < "st"` in V8. (Canonical/singleton cases such as `æ`, `œ` and `ß`
-     DO agree — this is specifically the compatibility set.)
+   **ASCII is no longer an approximation.** The port carries the CLDR-root
+   PRIMARY weight table for U+0000–U+007F and runs the Unicode Collation
+   Algorithm over it directly (primary weights, ignorables removed, then the
+   tertiary case level; lowercase before uppercase). The same table, generated
+   from the same V8 dump, is compiled into the Swift port, so the two ports are
+   byte-identical here by construction rather than by luck.
 
-   Measured: a 47-word probe of ASCII-punctuation, ligature and hyphenated
-   strings run through both engines diverges on **172 of 2209 ordered pairs**
-   (86 distinct unordered pairs). The earlier
-   `"" < "_zed" < "10" < "apple" < "Apple" < "Ápple" < "banana" < "cherry"`
-   probe still agrees, but it happens to contain none of the affected
-   characters and should not be read as evidence of parity.
+   This REPLACES `java.text.Collator.getInstance(Locale.US)`, whose legacy
+   en_US rules treat **hyphen and space as ignorable at primary strength**:
+   it answered `"a-b" > "ab"` and `"co-op" > "coop"` where V8 says `<`, and
+   ordered `"a/b"`/`"a*b"` and `"a.b"`/`"a/b"` the other way round. The
+   previous edition of this entry called that "not observable in the current
+   fixture corpus"; that framing was wrong. It is observable the moment a
+   `@Sort` input contains a hyphen or an embedded space, which is the common
+   case for model-generated labels. Fixture `090-sort-ascii-collation` now
+   pins exactly those inputs (`"a-b"`/`"ab"`, `" s"`, `"a b c"`, `"a.b"`,
+   `"[object Object]"`, leading-space strings).
 
-   Not observable in the current fixture corpus (fixtures 030, 032 and 064 are
-   the only `@Sort` users and none sorts hyphenated, space-containing or
-   ligature-bearing strings) — but it is a live correctness risk for real
-   model-generated programs, not a theoretical one. Closing it means either
-   pulling in ICU4J and configuring `alternate = non-ignorable`, or
-   hand-porting the DUCET weights.
+   Verified: 235,233 ordered pairs drawn from the full 0x00–0x7F alphabet
+   (random strings up to length 8 plus a pinned adversarial set) compared
+   against V8 — **zero mismatches**; and a 40-program × ~80-string `@Sort`
+   sweep is byte-identical across the oracle, this port and the Swift port.
+
+   What remains a deviation: a string containing any code unit **above
+   U+007F** falls back to `java.text.Collator.getInstance(Locale.US)` (Swift
+   falls back to Foundation's `en_US` compare). Those two disagree with each
+   other and with V8 on compatibility ligatures (U+FB01 `ﬁ`, U+FB00 `ﬀ`,
+   U+01C6 `ǆ`, which V8 decomposes to `f`+`i` / `f`+`f` / `d`+`z`) and on some
+   non-Latin scripts. Closing that means extending the weight table beyond
+   ASCII (or vendoring ICU4J with `alternate = non-ignorable`).
 
    Still deliberately NOT `String.compareTo`, which is raw code-unit order and
-   would sort `"a" > "B"` — a much larger and more visible error.
+   would sort `"a" > "B"`.
 2. **Object-identity loose equality is always false**
    (`RuntimeValue.jsLooseEquals`). JS `==` between two objects compares
    references; this port has value semantics and no stable identities. The
@@ -156,28 +153,51 @@ correctness risk for model-generated programs.
    because the caught prop also keeps its RAW `$ast` value instead of an
    evaluated one (fixtures `081-tostring-shadow-throws`,
    `082-runtime-error-outer-prop`). The port now models exactly that throw and
-   records the entry with the reference's message text. What it does NOT model
-   is any OTHER JS runtime throw inside prop evaluation — there is no other
-   reachable one in this value model (there are no callable values, `toNumber`
-   never throws, and lang-core's own pushes into `errors` come from
-   QueryManager/tool-provider paths AppLess never reaches). A future contract
-   that adds throwing paths must extend the catch.
-4. **Property access on an element returns `undefined`**
-   (`Evaluator.propertyGet`). In JS an `ElementNode` is a plain object, so
-   `someElement.typeName` / `.props` / `.partial` / `.hasDynamicProps` /
-   `.type` are readable from expressions. Observable only for programs that
-   member-access an element value. (Where elements are *spread into plain
-   objects* by the reference — `@Each` substitution via `toLiteralAST`, `$ast`
-   serialization — the spread IS replicated: `Evaluator.toLiteralAst`,
-   `Pipeline.convertAstPlain`.)
-5. **Literal objects whose `k` is a real AST kind are not runtime-evaluated**
-   (`Evaluator.evaluatePropValue`). JS AST nodes are plain objects, so the
-   runtime duck-types any object with `k ∈ AST_KINDS` as an AST node. The
-   port's typed values keep it as plain data. The *serializer-level*
-   duck-typing (any plain object with a string `k` serializes as `{"$ast": …}`,
-   regardless of whether `k` is a real kind — fixture `070-kvlist-k-key-astnode`)
-   IS replicated in `Pipeline.convertValue`; only the runtime-evaluation
-   collision for the 18 exact kind strings is not.
+   records the entry with the reference's message text — including the case an
+   own-key check can never see, an object with NO prototype at all
+   (`{"__proto__": null, a: 1}` has neither `toString` nor `valueOf`, so
+   `"t" + $s` throws; fixture `087-proto-null-toprimitive-throws`).
+
+   Two further reachable throws are modelled as well, both discovered by
+   taking the JS object model seriously:
+   `TypeError: builtin.fn is not a function`, raised when `BUILTINS[name]`
+   resolves through `Object.prototype` (`"x" + @toString(1)`; fixture
+   `084-reserved-call-expression-throws`), and V8's `'caller', 'callee', and
+   'arguments' ...` poison-pill message when `Function.prototype.arguments` /
+   `.caller` is read off an inherited native function
+   (`$obj.toString.arguments`). What is still NOT modelled is any other JS
+   runtime throw inside prop evaluation — there is no other reachable one in
+   this value model (there are no *callable* values, `toNumber` never throws,
+   and lang-core's own pushes into `errors` come from QueryManager /
+   tool-provider paths AppLess never reaches). A future contract that adds
+   throwing paths must extend the catch.
+4. **Synthetic AST-shaped objects are not runtime-evaluated**
+   (`Evaluator.evaluatePropValue`, `JsObjects.astNodeView`). JS AST nodes are
+   plain objects, so the runtime duck-types any object whose `k` is in
+   `AST_KINDS` as an AST node. The port's typed values only recognise a real
+   `RtValue.Ast` — reached either directly or **through the prototype chain**,
+   which is the reachable case and IS now modelled (fixture
+   `085-proto-object-valued`: a row that inherits `k: "StateRef"` from a
+   `{"__proto__": $x}` entry is evaluated, not copied). What is still not
+   modelled is a literal `{k: "Str", v: "x"}` written by hand, and an object
+   whose OWN keys SHADOW an inherited AST field (`{"__proto__": $x, n: "$y"}`
+   reads `n` off the prototype here, off the own key in JS).
+
+   The *serializer-level* duck-typing (any object with a string `k` —
+   inherited or own — serializes as `{"$ast": …}`, regardless of whether `k` is
+   a real kind — fixtures `070-kvlist-k-key-astnode`, `085-proto-object-valued`)
+   IS replicated in `Pipeline.convertValue`.
+5. **`@Sort` on an array that mixes numeric-parsable and non-numeric strings**
+   (`Evaluator.callDataBuiltin`). lang-core's comparator switches to a NUMERIC
+   comparison when *both* operands parse as numbers and to collation otherwise,
+   which is not a strict weak ordering: `" "` (→ 0) beats `"-0"` numerically
+   while `"_x"` beats both by collation, and transitivity fails. The result
+   then depends on which pairs the sort algorithm happens to compare, and V8's
+   TimSort, Kotlin's `sortedWith` and Swift's `sorted(by:)` visit different
+   pairs. Both ports agree with the oracle and with each other on any array
+   where the comparator IS consistent (all-numeric or all-non-numeric), which
+   is every corpus fixture; a mixed array of ~80 strings diverges in roughly
+   5% of programs. Closing it means porting V8's TimSort verbatim.
 
 ### Deliberate improvement over the Swift port
 

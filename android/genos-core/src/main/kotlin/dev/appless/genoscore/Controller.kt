@@ -1,7 +1,5 @@
 package dev.appless.genoscore
 
-import kotlin.math.roundToInt
-
 /**
  * Generation, navigation cache and speculative prefetch controller
  * (src/genos/store.ts module-level controller functions).
@@ -102,7 +100,11 @@ public class GenOSController(
                             )
                         }
                     } else {
-                        val genMs = s?.let { (clock.now - it.startedAt).roundToInt() }
+                        // RN: Math.round(performance.now() - s.startedAt).
+                        // roundToInt() THREW on NaN and saturated silently at
+                        // Int.MAX_VALUE; jsRoundToInt runs the same JS
+                        // Math.round + clamp the Swift port runs.
+                        val genMs = s?.let { jsRoundToInt(clock.now - it.startedAt) }
                         val osCommand = s?.let { Lang.parseOsCommand(it.content) }
                         store.patch(id) {
                             it.copy(
@@ -120,7 +122,9 @@ public class GenOSController(
             onError = { error ->
                 if (!stale()) {
                     inflight.remove(id)
-                    val message = (error as? StreamException)?.message ?: error.toString()
+                    // RN emits the bare err.message; toString() would prefix
+                    // the fully-qualified class name.
+                    val message = jsErrorMessage(error)
                     store.patch(id) {
                         it.copy(status = ScreenStatus.ERROR, error = message, searching = false)
                     }
@@ -234,16 +238,11 @@ public class GenOSController(
             }
         }
         val app = apps.firstOrNull { it.id == appId.lowercase() }
-        // RN: appId.charAt(0).toUpperCase() + appId.slice(1). Kotlin String is
-        // UTF-16 like JS, so substring(0, 1) takes the same single code UNIT —
-        // including a lone high surrogate for a non-BMP first character, which
-        // uppercases to itself in both languages. (Swift's grapheme-level
-        // prefix(1) diverges there.)
-        val fallbackName = if (appId.isEmpty()) {
-            ""
-        } else {
-            appId.substring(0, 1).uppercase() + appId.substring(1)
-        }
+        // RN: appId.charAt(0).toUpperCase() + appId.slice(1) — a UTF-16 CODE
+        // UNIT split, so an astral first character (a lone high surrogate) has
+        // no case mapping and is left alone. Swift's grapheme-level prefix(1)
+        // used to uppercase it; both ports now call the same named helper.
+        val fallbackName = jsCapitalizeFirst(appId)
         val id = launchScreen(
             appId = app?.id ?: appId.lowercase(),
             appName = app?.name ?: fallbackName,

@@ -1,0 +1,49 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "__proto__ with an object value"
+        }
+      },
+      {
+        "component": "KVList",
+        "props": {
+          "rows": [
+            7
+          ]
+        }
+      },
+      {
+        "component": "KVList",
+        "props": {
+          "rows": [
+            {
+              "key": "n",
+              "value": 7
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {
+    "$q": null,
+    "$s": {
+      "$ast": {
+        "a": 1
+      }
+    },
+    "$x": 7
+  },
+  "runtimeErrors": []
+}

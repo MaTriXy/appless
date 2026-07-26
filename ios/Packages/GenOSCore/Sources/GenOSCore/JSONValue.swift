@@ -125,6 +125,24 @@ public enum JSONValue: Sendable, Equatable {
         }
     }
 
+    /// Source-compatible bridge for callers that still hold an UNORDERED
+    /// `Dictionary` (`AppLessCore.FormState.payloadObject`). A `Dictionary`
+    /// has no order to preserve, so the keys are materialized SORTED -
+    /// byte-identical to what the old, hint-less `stringified()` emitted for
+    /// such a value, so no existing wire output moves. Prefer `JSONObject`
+    /// anywhere the key order is observable.
+    ///
+    /// `@_disfavoredOverload` is load-bearing: a dictionary LITERAL satisfies
+    /// both this and `case object(JSONObject)`, and Swift otherwise prefers
+    /// the `Dictionary` default literal type - which would silently re-sort
+    /// every `.object([...])` literal in the package and reintroduce exactly
+    /// the bug this ordered representation fixes. Pinned by
+    /// `JSParityTests.stringifiedEmitsExactBytes`.
+    @_disfavoredOverload
+    public static func object(_ dictionary: [String: JSONValue]) -> JSONValue {
+        .object(JSONObject(dictionary.keys.sorted().map { ($0, dictionary[$0]!) }))
+    }
+
     /// Largest canonical array index: 2^32 - 2.
     private static let maxArrayIndex: UInt64 = 4_294_967_294
 

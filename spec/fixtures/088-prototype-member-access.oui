@@ -1,0 +1,11 @@
+$obj = { a: 1 }
+$arr = [1, 2]
+card = TextContent("hi")
+root = Card([
+  TextContent($obj.toString + "|" + $obj.constructor + "|" + $obj.hasOwnProperty),
+  TextContent("arr=" + $arr.constructor),
+  TextContent("n=" + $obj.toString.name + " l=" + $obj.toString.length),
+  TextContent("p=" + $obj.__proto__.constructor + " q=" + $obj.__proto__.__proto__),
+  TextContent("el=" + card.typeName + "/" + card.partial + "/" + card.type),
+  KVList([{ key: "fn", value: $obj.toString }])
+])

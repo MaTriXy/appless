@@ -40,7 +40,7 @@ enum Pipeline {
         var props: [String: PropValue] = [:]
         var children: PropValue? = nil
         for (key, value) in el.props.entries {
-            if case .undefined = value { continue }
+            if value.isDroppedByJSONStringify { continue }
             if key == "children" {
                 children = convertValue(value)
             } else {
@@ -57,7 +57,10 @@ enum Pipeline {
 
     static func convertValue(_ v: RTValue) -> PropValue {
         switch v {
-        case .undefined, .null:
+        // `JSON.stringify` drops a function-valued property exactly like an
+        // `undefined` one (and writes `null` for one inside an array), so a
+        // native function inherited from a prototype serializes as nothing.
+        case .undefined, .null, .function:
             return .null
         case .bool(let b):
             return .bool(b)
@@ -69,22 +72,34 @@ enum Pipeline {
             return .array(items.map { convertValue($0) })
         case .element(let el):
             return .element(convertElement(el))
+        // Array.prototype is an empty array; every other intrinsic prototype
+        // is an object with no enumerable own keys.
+        case .proto(let kind):
+            return kind == .array ? .array([]) : .object(PropObject())
         case .object(let o):
+            // serialize.mjs tests in this order, and every test reads through
+            // the PROTOTYPE CHAIN (`v.type`, `v.steps`, `"type" in v`, `v.k`)
+            // while the plain-object fallback enumerates OWN keys only. So a
+            // `{"__proto__": TextContent(…), …}` row serializes as the
+            // inherited ELEMENT (fixture `086-proto-component-valued`), and a row whose prototype is
+            // an AST node serializes as `{"$ast": <own keys>}` (fixture `085-proto-object-valued`).
+            if let el = JSObjects.elementView(v) {
+                return .element(convertElement(el))
+            }
             // ActionPlan: { steps: [...] }
-            if case .array(let steps)? = o["steps"] {
+            if case .array(let steps) = (try? JSObjects.getMember(v, "steps")) ?? .undefined {
                 return .action(ActionPlan(steps: steps.map { convertStep($0) }))
             }
             // Bare ActionStep with deferred AST: { type, valueAST }
-            if o.has("type") && o.has("valueAST") {
+            if JSObjects.hasProperty(v, "type") && JSObjects.hasProperty(v, "valueAST") {
                 return .action(ActionPlan(steps: [convertStep(v)]))
             }
-            // serialize.mjs `isAstNode` duck-types ANY plain object whose `k`
-            // entry is a string as an AST node and wraps it as {"$ast": ...}
-            // — including data objects the author happened to shape that way,
-            // e.g. a KVList row `{k: "a", v: 1}`. Replicate the quirk (the
-            // sibling steps-array → ActionPlan quirk above is replicated the
-            // same way).
-            if case .string? = o["k"] {
+            // serialize.mjs `isAstNode` duck-types ANY object whose `k` is a
+            // string as an AST node and wraps it as {"$ast": ...} — including
+            // data objects the author happened to shape that way, e.g. a
+            // KVList row `{k: "a", v: 1}`. Replicate the quirk (the sibling
+            // steps-array → ActionPlan quirk above is replicated the same way).
+            if JSObjects.serializerIsAstNode(v) {
                 return .ast(convertAstPlain(v))
             }
             return .object(convertPlainObject(o))
@@ -101,8 +116,10 @@ enum Pipeline {
     /// non-finite numbers still become `{"$number": ...}` (sanitizeNumber).
     private static func convertAstPlain(_ v: RTValue) -> PropValue {
         switch v {
-        case .undefined, .null:
+        case .undefined, .null, .function:
             return .null
+        case .proto(let kind):
+            return kind == .array ? .array([]) : .object(PropObject())
         case .bool(let b):
             return .bool(b)
         case .number(let n):
@@ -114,7 +131,7 @@ enum Pipeline {
         case .object(let o):
             var out = PropObject()
             for (key, value) in o.entries {
-                if case .undefined = value { continue }
+                if value.isDroppedByJSONStringify { continue }
                 jsAssign(&out, key, convertAstPlain(value))
             }
             return .object(out)
@@ -139,7 +156,7 @@ enum Pipeline {
     private static func convertPlainObject(_ o: RTObject) -> PropObject {
         var out = PropObject()
         for (key, value) in o.entries {
-            if case .undefined = value { continue }
+            if value.isDroppedByJSONStringify { continue }
             jsAssign(&out, key, convertValue(value))
         }
         return out

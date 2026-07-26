@@ -1,0 +1,9 @@
+$x = 7
+$s = { "__proto__": $q, a: 1 }
+rows = [{ "__proto__": $x, key: "k", value: 1 }]
+nested = [{ key: "n", value: { "__proto__": $x, a: 1 } }]
+root = Card([
+  CardHeader("__proto__ with an object value"),
+  KVList(rows),
+  KVList(nested)
+])

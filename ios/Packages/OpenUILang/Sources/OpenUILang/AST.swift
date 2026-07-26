@@ -24,6 +24,30 @@ indirect enum ASTNode {
     case assign(target: String, value: ASTNode)
     case ph(String)
 
+    /// The node's `k` discriminant — the own property lang-core's duck-typing
+    /// reads (`isASTNode`, `evaluate`'s switch, the serializer's `isAstNode`).
+    var kindTag: String {
+        switch self {
+        case .str: return "Str"
+        case .num: return "Num"
+        case .bool: return "Bool"
+        case .null: return "Null"
+        case .arr: return "Arr"
+        case .obj: return "Obj"
+        case .comp: return "Comp"
+        case .ref: return "Ref"
+        case .stateRef: return "StateRef"
+        case .runtimeRef: return "RuntimeRef"
+        case .binOp: return "BinOp"
+        case .unaryOp: return "UnaryOp"
+        case .ternary: return "Ternary"
+        case .member: return "Member"
+        case .index: return "Index"
+        case .assign: return "Assign"
+        case .ph: return "Ph"
+        }
+    }
+
     /// Runtime expression nodes that survive parser lowering.
     var isRuntimeExpr: Bool {
         switch self {

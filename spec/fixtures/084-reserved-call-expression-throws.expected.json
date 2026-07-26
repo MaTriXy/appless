@@ -1,0 +1,122 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "reserved call in expression position"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": {
+            "$ast": {
+              "k": "BinOp",
+              "left": {
+                "k": "Str",
+                "v": "x"
+              },
+              "op": "+",
+              "right": {
+                "args": [
+                  {
+                    "k": "Num",
+                    "v": 1
+                  }
+                ],
+                "k": "Comp",
+                "name": "toString"
+              }
+            }
+          }
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": {
+            "$ast": {
+              "k": "BinOp",
+              "left": {
+                "k": "Str",
+                "v": "y"
+              },
+              "op": "+",
+              "right": {
+                "args": [
+                  {
+                    "k": "Num",
+                    "v": 2
+                  }
+                ],
+                "k": "Comp",
+                "name": "constructor"
+              }
+            }
+          }
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": {
+            "$ast": {
+              "k": "BinOp",
+              "left": {
+                "k": "Str",
+                "v": "z"
+              },
+              "op": "+",
+              "right": {
+                "args": [
+                  {
+                    "k": "Num",
+                    "v": 3
+                  }
+                ],
+                "k": "Comp",
+                "name": "hasOwnProperty"
+              }
+            }
+          }
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "ok3"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": [
+    {
+      "source": "runtime",
+      "code": "runtime-error",
+      "message": "Evaluating prop \"text\" on TextContent failed: builtin.fn is not a function",
+      "component": "TextContent"
+    },
+    {
+      "source": "runtime",
+      "code": "runtime-error",
+      "message": "Evaluating prop \"text\" on TextContent failed: builtin.fn is not a function",
+      "component": "TextContent"
+    },
+    {
+      "source": "runtime",
+      "code": "runtime-error",
+      "message": "Evaluating prop \"text\" on TextContent failed: builtin.fn is not a function",
+      "component": "TextContent"
+    }
+  ]
+}

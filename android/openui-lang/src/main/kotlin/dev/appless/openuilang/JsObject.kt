@@ -301,12 +301,20 @@ internal object JsObjects {
      * Throws [JsTypeError] for the `Function.prototype.arguments`/`.caller`
      * poison pills, exactly like V8.
      */
-    fun getMember(receiver: RtValue, key: String): RtValue {
+    fun getMember(receiver: RtValue, key: String): RtValue =
+        getMemberWithOwner(receiver, key)?.first ?: RtValue.Undefined
+
+    /**
+     * [getMember] plus the chain link the property was found on — needed by
+     * `ToPrimitive`, which behaves differently depending on WHICH intrinsic
+     * `toString` it ended up resolving.
+     */
+    fun getMemberWithOwner(receiver: RtValue, key: String): Pair<RtValue, RtValue>? {
         var cur: RtValue = receiver
         while (true) {
             val own = ownMember(cur, key)
             if (own != null) {
-                return when (own) {
+                val value = when (own) {
                     is JsMember.Data -> own.value
                     is JsMember.Fn -> RtValue.Func(own.name, own.arity)
                     // The getter answers the RECEIVER's prototype, not the
@@ -314,9 +322,10 @@ internal object JsObjects {
                     is JsMember.ProtoAccessor -> prototypeOf(receiver) ?: RtValue.Undefined
                     is JsMember.PoisonPill -> throw JsTypeError(POISON_PILL_MESSAGE)
                 }
+                return value to cur
             }
-            val proto = prototypeOf(cur) ?: return RtValue.Undefined
-            if (proto is RtValue.Null) return RtValue.Undefined
+            val proto = prototypeOf(cur) ?: return null
+            if (proto is RtValue.Null) return null
             cur = proto
         }
     }

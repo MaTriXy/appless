@@ -1,5 +1,7 @@
 package dev.appless.genoscore
 
+import kotlin.math.floor
+
 /**
  * ECMAScript regex + string-primitive semantics on `java.util.regex`.
  *
@@ -261,4 +263,75 @@ internal fun jsStringCoerce(value: JsonValue?): String = when (value) {
     is JsonValue.Num -> JsonValue.numberString(value.value)
     is JsonValue.Bool -> if (value.value) "true" else "false"
     is JsonValue.Arr, is JsonValue.Obj -> value.stringified()
+}
+
+/**
+ * JS `Math.round(x)`: the integral Number closest to [x], ties going toward
+ * +INFINITY (so `Math.round(-0.5)` is -0 and `Math.round(-2.5)` is -2).
+ *
+ * Written out rather than delegating to `roundToInt()` so BOTH ports run the
+ * identical algorithm — `roundToInt()` also throws on NaN and saturates
+ * silently, which is exactly the drift this replaces. Implemented as floor +
+ * an exact fractional-part comparison, not the textbook `floor(x + 0.5)`: the
+ * addition itself rounds, so `floor(x + 0.5)` answers 1 for
+ * 0.49999999999999994 where `Math.round` answers 0. `x - floor(x)` is exact
+ * for every finite double, so the comparison below is not.
+ */
+internal fun jsMathRound(x: Double): Double {
+    if (x.isNaN() || x.isInfinite() || x == 0.0) return x
+    val floored = floor(x)
+    val fraction = x - floored
+    if (fraction < 0.5) return floored
+    // fraction > 0.5 rounds up; fraction == 0.5 is a tie, also toward +inf.
+    val result = floored + 1
+    // JS Math.round(-0.5) is -0; keep the sign so downstream formatting agrees.
+    return if (result == 0.0 && x < 0) -0.0 else result
+}
+
+/**
+ * `Math.round` narrowed to `Int` for the fields the ports store as integers
+ * (`genMs`).
+ *
+ * RN keeps a JS Number, which is unbounded and admits NaN; neither port can.
+ * Both ports now CLAMP identically instead of diverging: `roundToInt()` THREW
+ * `IllegalArgumentException` on NaN and saturated silently at `Int.MAX_VALUE`,
+ * while Swift's `Int(_:)` trapped outright. NaN maps to 0 — the only total,
+ * sign-free choice, and the same one the Swift port makes.
+ */
+internal fun jsRoundToInt(x: Double): Int {
+    val rounded = jsMathRound(x)
+    if (rounded.isNaN()) return 0
+    if (rounded >= Int.MAX_VALUE.toDouble()) return Int.MAX_VALUE
+    if (rounded <= Int.MIN_VALUE.toDouble()) return Int.MIN_VALUE
+    return rounded.toInt()
+}
+
+/**
+ * JS `appId.charAt(0).toUpperCase() + appId.slice(1)`.
+ *
+ * `charAt(0)` is a single UTF-16 CODE UNIT, so an astral first character is
+ * split into its lone high surrogate, which has no case mapping and comes back
+ * unchanged. Kotlin `String` is UTF-16 like JS, so `substring(0, 1)` takes the
+ * same unit — this only names the operation so both ports point at one spelling
+ * (Swift's grapheme-level `prefix(1)` used to diverge here).
+ */
+internal fun jsCapitalizeFirst(s: String): String =
+    if (s.isEmpty()) "" else s.substring(0, 1).uppercase() + s.substring(1)
+
+/**
+ * RN degrades a non-`StreamException` to the BARE `err.message`. Kotlin's
+ * `toString()` instead prefixes the fully-qualified class
+ * ("java.lang.IllegalStateException: boom") and Swift's `String(describing:)`
+ * yielded a type-and-case description, so the two ports and the reference all
+ * showed different text — to the model (tool ERROR string) AND to the user
+ * (`Screen.error`).
+ *
+ * The shared rule both ports now run: the package error's message, else any
+ * message the error carries, else the error type's SIMPLE name (never a
+ * package/module qualification).
+ */
+internal fun jsErrorMessage(error: Throwable): String {
+    val message = error.message
+    if (!message.isNullOrEmpty()) return message
+    return error::class.simpleName ?: error::class.java.name
 }

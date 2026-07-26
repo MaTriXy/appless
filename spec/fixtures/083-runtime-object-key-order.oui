@@ -1,0 +1,5 @@
+rows = [{ b: 1, "2": 2, a: 3, "10": 4, "4294967295": 5 }]
+root = Card([
+  CardHeader("runtime object key order"),
+  Button("capture", Action(@Each(rows, r, @Set($z, r))))
+])

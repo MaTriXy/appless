@@ -44,7 +44,7 @@ internal object Pipeline {
         val props = LinkedHashMap<String, PropValue>()
         var children: PropValue? = null
         for ((key, value) in el.props.entries) {
-            if (value is RtValue.Undefined) continue
+            if (value.isDroppedByJsonStringify) continue
             if (key == "children") children = convertValue(value) else props[key] = convertValue(value)
         }
         return ElementNode(
@@ -56,30 +56,49 @@ internal object Pipeline {
     }
 
     fun convertValue(v: RtValue): PropValue = when (v) {
-        is RtValue.Undefined, is RtValue.Null -> PropValue.Null
+        // `JSON.stringify` drops a function-valued property exactly like an
+        // `undefined` one (and writes `null` for one inside an array), so a
+        // native function inherited from a prototype serializes as nothing.
+        is RtValue.Undefined, is RtValue.Null, is RtValue.Func -> PropValue.Null
         is RtValue.Bool -> PropValue.Bool(v.value)
         is RtValue.Num -> PropValue.Num(v.value)
         is RtValue.Str -> PropValue.Str(v.value)
         is RtValue.Arr -> PropValue.Arr(v.items.map { convertValue(it) })
         is RtValue.Element -> PropValue.Element(convertElement(v.element))
         is RtValue.Ast -> PropValue.Ast(convertAst(v.node))
+        // Array.prototype is an empty array; every other intrinsic prototype
+        // is an object with no enumerable own keys.
+        is RtValue.Proto ->
+            if (v.kind == JsProtoKind.ARRAY) {
+                PropValue.Arr(emptyList())
+            } else {
+                PropValue.Obj(PropObject())
+            }
+
         is RtValue.Obj -> {
-            val o = v.obj
-            val steps = o["steps"]
+            // serialize.mjs tests in this order, and every test reads through
+            // the PROTOTYPE CHAIN (`v.type`, `v.steps`, `"type" in v`, `v.k`)
+            // while the plain-object fallback enumerates OWN keys only. So a
+            // `{"__proto__": TextContent(…), …}` row serializes as the
+            // inherited ELEMENT (fixture `086-proto-component-valued`), and a row whose prototype is
+            // an AST node serializes as `{"$ast": <own keys>}` (fixture `085-proto-object-valued`).
+            val element = JsObjects.elementView(v)
+            val steps = JsObjects.getMember(v, "steps")
             when {
+                element != null -> PropValue.Element(convertElement(element))
                 // ActionPlan: { steps: [...] }
                 steps is RtValue.Arr ->
                     PropValue.Action(ActionPlan(steps.items.map { convertStep(it) }))
                 // Bare ActionStep with a deferred AST: { type, valueAST }
-                o.has("type") && o.has("valueAST") ->
+                JsObjects.hasProperty(v, "type") && JsObjects.hasProperty(v, "valueAST") ->
                     PropValue.Action(ActionPlan(listOf(convertStep(v))))
-                // serialize.mjs `isAstNode` duck-types ANY plain object whose
-                // `k` entry is a string as an AST node and wraps it in
-                // {"$ast": ...} — including data objects an author happened to
-                // shape that way, e.g. a KVList row {k: "a", v: 1} (fixture
-                // 070). The quirk is deliberate parity, not an accident.
-                o["k"] is RtValue.Str -> PropValue.Ast(convertAstPlain(v))
-                else -> PropValue.Obj(convertPlainObject(o))
+                // serialize.mjs `isAstNode` duck-types ANY object whose `k` is
+                // a string as an AST node and wraps it in {"$ast": ...} —
+                // including data objects an author happened to shape that way,
+                // e.g. a KVList row {k: "a", v: 1} (fixture 070). The quirk is
+                // deliberate parity, not an accident.
+                JsObjects.serializerIsAstNode(v) -> PropValue.Ast(convertAstPlain(v))
+                else -> PropValue.Obj(convertPlainObject(v.obj))
             }
         }
     }
@@ -92,7 +111,14 @@ internal object Pipeline {
      * fields, and non-finite numbers still become `{"$number": ...}`.
      */
     private fun convertAstPlain(v: RtValue): PropValue = when (v) {
-        is RtValue.Undefined, is RtValue.Null -> PropValue.Null
+        is RtValue.Undefined, is RtValue.Null, is RtValue.Func -> PropValue.Null
+        is RtValue.Proto ->
+            if (v.kind == JsProtoKind.ARRAY) {
+                PropValue.Arr(emptyList())
+            } else {
+                PropValue.Obj(PropObject())
+            }
+
         is RtValue.Bool -> PropValue.Bool(v.value)
         is RtValue.Num -> PropValue.Num(v.value)
         is RtValue.Str -> PropValue.Str(v.value)
@@ -100,7 +126,7 @@ internal object Pipeline {
         is RtValue.Obj -> {
             val out = PropObject()
             for ((key, value) in v.obj.entries) {
-                if (value is RtValue.Undefined) continue
+                if (value.isDroppedByJsonStringify) continue
                 jsAssign(out, key, convertAstPlain(value))
             }
             PropValue.Obj(out)
@@ -124,7 +150,7 @@ internal object Pipeline {
     private fun convertPlainObject(o: RtObject): PropObject {
         val out = PropObject()
         for ((key, value) in o.entries) {
-            if (value is RtValue.Undefined) continue
+            if (value.isDroppedByJsonStringify) continue
             jsAssign(out, key, convertValue(value))
         }
         return out

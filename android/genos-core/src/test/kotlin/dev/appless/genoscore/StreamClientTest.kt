@@ -161,6 +161,62 @@ class StreamClientTest {
         assertTrue(rec.errors.isEmpty())
     }
 
+    /**
+     * FINDING 2, the audit's exact repro. A lone-surrogate `\u` escape is NOT
+     * a JSON.parse error: node ACCEPTS it and the unpaired surrogate degrades
+     * to U+FFFD only when the string is UTF-8-encoded. The Swift port used to
+     * REJECT the document, so its SSE layer skipped the whole chunk and the
+     * entire delta vanished; this port keeps it, and now both do.
+     */
+    @Test
+    fun `a lone-surrogate delta is delivered, not dropped`() = runTest {
+        val http = ScriptedHttp()
+        http.enqueue(
+            ScriptedResponse.sse(
+                listOf(
+                    "data: {\"choices\":[{\"delta\":{\"content\":\"a\\ud800b\"}}]}\n",
+                    sseContent("after"),
+                    SSE_DONE,
+                ),
+            ),
+        )
+        val rec = StreamRecorder()
+        makeStreamClient(http, appScope())
+            .streamScreen(userTurn, rec.handlers(), StreamCancelToken())
+        // A Kotlin String holds the unpaired surrogate verbatim, exactly like
+        // the JS string RN forwards.
+        assertEquals(listOf("a\uD800b", "after"), rec.deltas)
+        assertTrue(rec.errors.isEmpty())
+        // The middle unit really is the unpaired high surrogate, held verbatim
+        // the way the JS string does. (The Swift port cannot hold one, so it
+        // materializes U+FFFD at parse time instead - node reaches the same
+        // U+FFFD as soon as the string is UTF-8-encoded. Note the JVM's own
+        // encoder substitutes '?' rather than U+FFFD for an unpaired surrogate,
+        // so a re-encode here is NOT the reference's answer; see the package
+        // README's KNOWN-DEVIATIONS.)
+        assertEquals('\uD800', rec.deltas[0][1])
+        assertEquals(3, rec.deltas[0].length)
+
+        // The path the fix must NOT break: a surrogate PAIR still decodes to
+        // the astral scalar, and a genuinely malformed chunk is still skipped.
+        val http2 = ScriptedHttp()
+        http2.enqueue(
+            ScriptedResponse.sse(
+                listOf(
+                    "data: {\"choices\":[{\"delta\":{\"content\":\"x\\ud83d\\ude00y\"}}]}\n",
+                    "data: {\"choices\":[{\"delta\":{\"content\":\"unterminated}}]}\n",
+                    sseContent("tail"),
+                    SSE_DONE,
+                ),
+            ),
+        )
+        val rec2 = StreamRecorder()
+        makeStreamClient(http2, appScope())
+            .streamScreen(userTurn, rec2.handlers(), StreamCancelToken())
+        assertEquals(listOf("x\uD83D\uDE00y", "tail"), rec2.deltas)
+        assertTrue(rec2.errors.isEmpty())
+    }
+
     @Test
     fun `finish_reason length sets truncated`() = runTest {
         val http = ScriptedHttp()

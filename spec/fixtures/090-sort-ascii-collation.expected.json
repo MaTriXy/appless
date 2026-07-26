@@ -1,0 +1,46 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "ascii collation"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "all= s,_x,-x,[object Object],a,A,a b,a b c,a-b,a.b,ab,ab ,co-op,coop"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "p1= s,1"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "p2=-0,[object Object]"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "p3=a-b,a.b"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {},
+  "runtimeErrors": []
+}

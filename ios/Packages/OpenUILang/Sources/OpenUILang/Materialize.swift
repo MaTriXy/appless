@@ -204,6 +204,13 @@ func materializeExpr(_ node: ASTNode, _ ctx: MaterializeContext) -> ASTNode {
 
 /// Recursively check if a value contains any AST nodes needing runtime
 /// evaluation (port of `containsDynamicValue`).
+///
+/// Its three type tests (`isASTNode`, `Array.isArray`, `isElementNode`) all
+/// read through the PROTOTYPE CHAIN, so an object that inherited `k` or
+/// `type`/`typeName` from a `{"__proto__": …}` entry is classified as an AST
+/// node / element here — which is what decides `hasDynamicProps`, and therefore
+/// whether the element is evaluated at all. `typeof fn === "function"` fails
+/// the leading `typeof v !== "object"` guard, so functions are never dynamic.
 func containsDynamicValue(_ v: RTValue) -> Bool {
     switch v {
     case .ast:
@@ -213,7 +220,12 @@ func containsDynamicValue(_ v: RTValue) -> Bool {
     case .element(let el):
         return el.props.values.contains(where: containsDynamicValue)
     case .object(let o):
+        if JSObjects.astNodeView(v) != nil { return true }
+        if let el = JSObjects.elementView(v) {
+            return el.props.values.contains(where: containsDynamicValue)
+        }
         return o.values.contains(where: containsDynamicValue)
+    // The intrinsic prototypes have no ENUMERABLE own properties.
     default:
         return false
     }

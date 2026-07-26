@@ -1,0 +1,4 @@
+root = Card([
+  CardHeader("__proto__ with a component value"),
+  KVList([{ "__proto__": TextContent("inherited"), key: "k", value: 1 }])
+])

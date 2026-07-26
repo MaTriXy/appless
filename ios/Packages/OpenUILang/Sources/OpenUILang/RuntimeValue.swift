@@ -3,12 +3,23 @@ import Foundation
 /// A plain object with JS-like insertion-ordered keys (last-write keeps the
 /// original key position, like JS object assignment).
 struct RTObject {
-    private(set) var keys: [String] = []
+    /// Own keys in INSERTION order — the raw slot list, before
+    /// `OrdinaryOwnPropertyKeys` hoists the canonical array indices.
+    private(set) var insertionKeys: [String] = []
     /// Keyed on `JSKey` (UTF-16 code-unit identity): JS object properties are
     /// code-unit exact, and program text can produce canonically-equal but
     /// code-unit-different keys (string-literal object keys, e.g. NFC vs NFD
     /// "café") that must stay distinct.
     private var storage: [JSKey: RTValue] = [:]
+
+    /// The object's `[[Prototype]]`. A plain object literal starts at
+    /// `Object.prototype`; `assign`ing `"__proto__"` re-points it, and `.null`
+    /// means a genuinely prototype-less object.
+    ///
+    /// This slot is what makes lang-core's duck-typing (`isASTNode`,
+    /// `isElementNode`, `containsDynamicValue`, the serializer's `isAstNode`)
+    /// see through a `{"__proto__": …}` entry — see `JSObjects`.
+    var prototype: RTValue = .proto(.object)
 
     init() {}
     init(_ pairs: [(String, RTValue)]) {
@@ -21,42 +32,66 @@ struct RTObject {
             let k = JSKey(key)
             guard let newValue else {
                 if storage.removeValue(forKey: k) != nil {
-                    keys.removeAll { jsStringEquals($0, key) }
+                    insertionKeys.removeAll { jsStringEquals($0, key) }
                 }
                 return
             }
-            if storage[k] == nil { keys.append(key) }
+            if storage[k] == nil { insertionKeys.append(key) }
             storage[k] = newValue
         }
     }
+
+    /// Own keys in `Object.keys(o)` / `OrdinaryOwnPropertyKeys` order — every
+    /// canonical array index FIRST in ascending numeric order, then the rest in
+    /// insertion order.
+    ///
+    /// This is the runtime object, and its key order IS tree-observable: an
+    /// `@Each` template that captures a row object runs it through
+    /// `toLiteralAST` → `Obj.entries` → the `$ast` entries ARRAY, which the
+    /// serializer emits verbatim (arrays are never sorted). Fixture
+    /// `083-runtime-object-key-order`.
+    var keys: [String] { jsOwnPropertyKeys(insertionKeys) }
 
     var entries: [(key: String, value: RTValue)] {
         keys.map { ($0, storage[JSKey($0)]!) }
     }
     var values: [RTValue] { keys.map { storage[JSKey($0)]! } }
     func has(_ key: String) -> Bool { storage[JSKey(key)] != nil }
-    var isEmpty: Bool { keys.isEmpty }
+    var isEmpty: Bool { insertionKeys.isEmpty }
 
-    /// The one key JS object ASSIGNMENT silently swallows.
-    static let protoKey = "__proto__"
-    /// Own key that shadows `Object.prototype.toString` (see `jsToString`).
-    static let toStringKey = "toString"
+    /// The one key JS object ASSIGNMENT never turns into an own property.
+    static let protoKey = JSObjects.protoKey
 
     /// JS plain-object ASSIGNMENT (`o[key] = value`), which is NOT the same as
     /// defining an own property.
     ///
     /// A fresh `{}` inherits `Object.prototype`'s `__proto__` ACCESSOR, so
-    /// `o["__proto__"] = v` invokes that setter: it either re-points `o`'s
-    /// prototype (object/null `v`) or does nothing at all (primitive `v`).
-    /// Either way `"__proto__"` never becomes an own property and never shows
-    /// up in `Object.keys` / `JSON.stringify` (fixture `080-proto-object-key`).
+    /// `o["__proto__"] = v` invokes that setter, and the setter does NOT merely
+    /// drop the key: for an object (or `null`) `v` it RE-POINTS the receiver's
+    /// `[[Prototype]]`, which the whole duck-typing layer then reads through
+    /// (fixtures `080-proto-object-key`, `085`–`087`). For a primitive `v` it
+    /// does nothing at all. Either way `"__proto__"` never becomes an own
+    /// property, so it never shows up in `Object.keys` / `JSON.stringify`.
+    ///
+    /// When the receiver no longer inherits that accessor (its chain was cut
+    /// with `"__proto__": null`), assignment falls back to creating an ordinary
+    /// own property.
     ///
     /// Use this at every site whose JS original is an assignment. Sites whose
     /// original is `Object.fromEntries` / `CreateDataPropertyOrThrow` keep
     /// using the subscript — those DO create an own `__proto__`
     /// (evaluator.js:40).
     mutating func assign(_ key: String, _ value: RTValue) {
-        if key == RTObject.protoKey { return }
+        if key == RTObject.protoKey, JSObjects.inheritsProtoAccessor(.object(self)) {
+            // ES 20.1.2.11 set Object.prototype.__proto__: object or null
+            // re-points the prototype, anything else is a silent no-op.
+            if value.isObjectOrFunction {
+                prototype = value
+            } else if case .null = value {
+                prototype = .null
+            }
+            return
+        }
         self[key] = value
     }
 }
@@ -86,6 +121,13 @@ indirect enum RTValue {
     case element(RTElement)
     /// A leftover AST node (builtin call, runtime expression, deferred slot).
     case ast(ASTNode)
+    /// A native function value, reachable by inheriting one from a prototype
+    /// (`$obj.toString`, `$obj.constructor`). `typeof` is `"function"`, not
+    /// `"object"`, and `JSON.stringify` drops it exactly like `undefined`.
+    case function(name: String, arity: Int)
+    /// One of the intrinsic prototype objects, reachable through the
+    /// `Object.prototype.__proto__` GETTER (`$obj.__proto__`).
+    case proto(JSProtoKind)
 
     var isNullish: Bool {
         switch self {
@@ -95,10 +137,30 @@ indirect enum RTValue {
     }
 
     /// `typeof v === "object" && v !== null` in JS terms (AST nodes, arrays,
-    /// elements and plain objects are all objects there).
+    /// elements, intrinsic prototypes and plain objects are all objects there).
+    ///
+    /// `.function` is deliberately EXCLUDED: `typeof fn` is `"function"`, which
+    /// is what gates `containsDynamicValue`, `evaluatePropCore`'s early return
+    /// and its plain-object `needsEval` scan.
     var isObjectLike: Bool {
         switch self {
-        case .array, .object, .element, .ast: return true
+        case .array, .object, .element, .ast, .proto: return true
+        default: return false
+        }
+    }
+
+    /// `Type(v) is Object` — `isObjectLike` plus functions.
+    var isObjectOrFunction: Bool {
+        if case .function = self { return true }
+        return isObjectLike
+    }
+
+    /// `JSON.stringify` omits an object property whose value is `undefined` OR
+    /// a FUNCTION (ES 25.5.2 SerializeJSONProperty returns undefined for both).
+    /// Inside an ARRAY both become `null` instead.
+    var isDroppedByJSONStringify: Bool {
+        switch self {
+        case .undefined, .function: return true
         default: return false
         }
     }
@@ -147,16 +209,12 @@ func jsonToRTValue(_ v: JSONValue) -> RTValue {
 /// `Evaluator.evaluateElementProps` catches this per prop, keeps the RAW prop
 /// value and records a `runtimeErrors` entry, exactly like `evaluate-tree.js`'s
 /// try/catch. Fixture `081-tostring-shadow-throws`.
-enum JSTypeError: Error {
-    case cannotConvertObjectToPrimitive
-
+struct JSTypeError: Error {
     /// The V8 message text, reproduced verbatim in the `runtimeErrors` entry.
-    var message: String {
-        switch self {
-        case .cannotConvertObjectToPrimitive:
-            return "Cannot convert object to primitive value"
-        }
-    }
+    let message: String
+
+    static let cannotConvertObjectToPrimitive =
+        JSTypeError(message: "Cannot convert object to primitive value")
 }
 
 /// ECMAScript Number-to-String (shortest round-trip); reuses the serializer's
@@ -240,7 +298,20 @@ func dslToNumber(_ v: RTValue) -> Double {
     }
 }
 
-/// JS `String(value)` semantics.
+/// JS `String(value)` semantics — including the case where it THROWS.
+///
+/// `String(obj)` is `ToPrimitive(obj, string)`: `toString` then `valueOf`, and
+/// BOTH lookups go through the prototype chain (`JSObjects.getMember`), so the
+/// answer depends on the receiver's `[[Prototype]]`, not just on its own keys:
+///
+/// - a plain object inherits `Object.prototype.toString` → `"[object Object]"`;
+/// - an own `toString` key shadows it with a non-callable value (this model has
+///   no user function values), so the lookup falls through to
+///   `Object.prototype.valueOf`, which returns the object itself and is
+///   rejected as non-primitive → THROWS (fixture `081-tostring-shadow-throws`);
+/// - a prototype-LESS object (`{"__proto__": null, …}`) has neither method, so
+///   it throws as well (fixture `087-proto-null-toprimitive-throws`) — the case
+///   an own-key check alone can never see.
 func jsToString(_ v: RTValue) throws -> String {
     switch v {
     case .undefined: return "undefined"
@@ -252,16 +323,42 @@ func jsToString(_ v: RTValue) throws -> String {
         // Array.prototype.toString → join(","); null/undefined → "". A member
         // that shadows `toString` makes the join itself throw.
         return try items.map { $0.isNullish ? "" : try jsToString($0) }.joined(separator: ",")
-    case .object(let o):
-        if o.has(RTObject.toStringKey) {
-            throw JSTypeError.cannotConvertObjectToPrimitive
+    case .function(let name, _):
+        return "function \(name)() { [native code] }"
+    case .proto(let kind):
+        // The intrinsic prototypes are ordinary objects of their own type:
+        // Number.prototype is a Number object wrapping 0, String.prototype
+        // wraps "", Boolean.prototype wraps false, Array.prototype is an empty
+        // array and Function.prototype is an anonymous native function.
+        switch kind {
+        case .object: return "[object Object]"
+        case .array: return ""
+        case .number: return "0"
+        case .string: return ""
+        case .boolean: return "false"
+        case .function: return "function () { [native code] }"
         }
-        return "[object Object]"
-    // ElementNodes and AST nodes are plain objects whose own keys are fixed
-    // (`type`/`typeName`/`props`/… and `k`/…), never `toString`.
-    case .element, .ast:
+    case .object, .element, .ast:
+        return try objectToPrimitiveString(v)
+    }
+}
+
+/// `ToPrimitive(v, string)` for the object-shaped runtime values: try
+/// `toString`, then `valueOf`, each only if it resolves to a callable.
+private func objectToPrimitiveString(_ v: RTValue) throws -> String {
+    if let resolved = try JSObjects.getMemberWithOwner(v, "toString"),
+        case .function = resolved.value
+    {
+        // `Array.prototype.toString` on a NON-array receiver reads `this.join`,
+        // whose `this.length` is undefined → joins zero elements → "". Every
+        // other reachable chain ends at `Object.prototype.toString`.
+        if case .proto(.array) = resolved.owner { return "" }
         return "[object Object]"
     }
+    // `valueOf` either is missing (prototype-less object) or is
+    // `Object.prototype.valueOf`, which answers the object itself — never a
+    // primitive. Both end the same way.
+    throw JSTypeError.cannotConvertObjectToPrimitive
 }
 
 /// JS truthiness.
@@ -271,7 +368,7 @@ func jsTruthy(_ v: RTValue) -> Bool {
     case .bool(let b): return b
     case .number(let n): return !(n == 0 || n.isNaN)
     case .string(let s): return !s.isEmpty
-    case .array, .object, .element, .ast: return true
+    case .array, .object, .element, .ast, .function, .proto: return true
     }
 }
 
@@ -284,7 +381,7 @@ private func jsToNumberStrict(_ v: RTValue) throws -> Double {
     case .bool(let b): return b ? 1 : 0
     case .number(let n): return n
     case .string(let s): return jsStringToNumber(s)
-    case .array, .object, .element, .ast:
+    case .array, .object, .element, .ast, .function, .proto:
         return jsStringToNumber(try jsToString(v))
     }
 }

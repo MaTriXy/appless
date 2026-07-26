@@ -67,6 +67,51 @@ import Testing
         )
     }
 
+    /// FINDING 7: the tool-defs subtree used to serialize correctly only
+    /// because those names happened to sort the way RN inserts them - the one
+    /// flat `keyOrder` hint sorted every key it did not name, so ADDING a key
+    /// anywhere would have silently reordered the wire bytes. Per-object
+    /// ordering removes the coincidence; this byte-pins it, including a
+    /// deliberately reverse-alphabetical extra key inside `function`.
+    @Test func toolDefsSubtreeKeepsLiteralOrderIncludingAddedKeys() async throws {
+        struct ExtraKeyTool: ToolExecuting, Sendable {
+            var available: Bool { true }
+            var promptSection: String { "" }
+            // "a_added" sorts FIRST and "zzz_added" LAST, so a sorted fallback
+            // anywhere in this subtree is visible in the bytes.
+            var toolDefs: JSONValue {
+                .array([.object([
+                    "type": .string("function"),
+                    "zzz_added": .string("tail"),
+                    "function": .object([
+                        "name": .string("web_search"),
+                        "a_added": .string("head"),
+                        "description": .string("d"),
+                    ]),
+                ])])
+            }
+            func execute(name: String, args: [String: JSONValue]) async -> String { "" }
+        }
+
+        let http = ScriptedHTTP()
+        await http.enqueue(.sse([sseContent("x"), sseDone]))
+        let client = makeStreamClient(http: http, tools: ExtraKeyTool(), systemPrompt: "S")
+        await client.streamScreen(
+            messages: [ChatMessage(role: .user, content: "hi")],
+            handlers: StreamRecorder().handlers(),
+            token: StreamCancelToken()
+        )
+        let bodyData = try #require((await http.requests())[0].body)
+        let raw = try #require(String(data: bodyData, encoding: .utf8))
+        #expect(raw.contains(
+            #""tools":[{"type":"function","zzz_added":"tail","function":{"name":"web_search","a_added":"head","description":"d"}}]"#
+        ))
+        // `tools` is spread in after `messages` and before `stream`, exactly
+        // where RN's object literal puts it.
+        #expect(raw.contains(#"}],"tools":[{"#))
+        #expect(raw.hasSuffix(#"}}],"stream":true,"temperature":0.8,"max_completion_tokens":3072}"#))
+    }
+
     @Test func dataLinesSplitAcrossChunkBoundaries() async {
         let http = ScriptedHTTP()
         let full = sseContent("hello world") + sseFinish("stop") + sseDone
@@ -473,6 +518,34 @@ import Testing
         #expect(recorder.content == "\u{FFFD}ok")
         #expect(recorder.errors.isEmpty)
         #expect(recorder.doneInfos == [StreamEndInfo(truncated: false, dropped: false)])
+    }
+
+    /// FINDING 2, the exact audit repro: a lone-surrogate escape inside a
+    /// delta used to make `JSONValue.parse` reject the document, so the SSE
+    /// layer skipped the ENTIRE chunk and the whole delta vanished - RN
+    /// delivered `["a\ud800b", "after"]` where Swift delivered `["after"]`.
+    /// Now the delta arrives with only that scalar degraded, which is exactly
+    /// what RN's string produces once it is UTF-8-encoded.
+    @Test func loneSurrogateDeltaIsDeliveredNotDropped() async {
+        let recorder = await run(.sse([
+            "data: {\"choices\":[{\"delta\":{\"content\":\"a\\ud800b\"}}]}\n",
+            sseContent("after"),
+            sseDone,
+        ]))
+        // node: Buffer.from("a\ud800b").toString() === "a�b"
+        #expect(recorder.deltas == ["a\u{FFFD}b", "after"])
+        #expect(recorder.errors.isEmpty)
+
+        // The path the fix must NOT break: a SURROGATE PAIR still decodes to
+        // the astral scalar, and a genuinely malformed chunk is still skipped.
+        let pairs = await run(.sse([
+            "data: {\"choices\":[{\"delta\":{\"content\":\"x\\ud83d\\ude00y\"}}]}\n",
+            "data: {\"choices\":[{\"delta\":{\"content\":\"unterminated}}]}\n",
+            sseContent("tail"),
+            sseDone,
+        ]))
+        #expect(pairs.deltas == ["x😀y", "tail"])
+        #expect(pairs.errors.isEmpty)
     }
 
     @Test func httpErrorDetailTruncatedAtUtf16Units() async {

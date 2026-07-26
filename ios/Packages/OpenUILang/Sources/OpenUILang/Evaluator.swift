@@ -118,6 +118,10 @@ final class Evaluator {
         switch value {
         case .undefined, .null, .bool, .number, .string:
             return value
+        // `typeof fn === "function"`, so evaluate-prop.js's
+        // `typeof value !== "object"` guard returns it untouched.
+        case .function:
+            return value
         case .ast(let node):
             // The schema context IS present on every evaluate-prop entry
             // (evaluate-tree.js builds `{ library: evalCtx.library }`).
@@ -135,8 +139,8 @@ final class Evaluator {
                     })
             }
             // Strip ReactiveAssign in a non-reactive context.
-            if isReactiveAssign(result), case .object(let o) = result,
-                case .string(let target)? = o["target"]
+            if isReactiveAssign(result),
+                case .string(let target) = try JSObjects.getMember(result, "target")
             {
                 let v = ctx.getState(target)
                 return v.isNullish ? .null : v
@@ -146,20 +150,38 @@ final class Evaluator {
             return .array(try items.map { try evaluatePropValue($0, inline: inline) })
         case .element(let el):
             return .element(try recurseElement(el, inline: inline))
-        case .object(let o):
-            // KNOWN-DEVIATION (README.md #6): a LITERAL object whose `k` is a
-            // real AST kind string ({k: "Str", v: "x"}) is indistinguishable
+        case .object, .proto:
+            // evaluate-prop.js runs its duck-typing in this exact order, and
+            // EVERY test is a prototype-chain-aware read, so an object that
+            // INHERITED `k` (via `{"__proto__": <ast node>}`) is evaluated as
+            // an AST node and one that inherited `type`/`typeName` is recursed
+            // into as an element (fixtures `085`–`086`).
+            if let astView = JSObjects.astNodeView(value) {
+                return try evaluatePropValue(.ast(astView), inline: inline)
+            }
+            if let elementView = JSObjects.elementView(value) {
+                return .element(try recurseElement(elementView, inline: inline))
+            }
+            // ActionPlan / ActionStep — preserve as-is (deferred evaluation)
+            if case .array = try JSObjects.getMember(value, "steps") { return value }
+            if JSObjects.hasProperty(value, "type"),
+                JSObjects.hasProperty(value, "valueAST")
+            {
+                return value
+            }
+            // KNOWN-DEVIATION (README.md #6): a LITERAL object whose OWN `k` is
+            // a real AST kind string ({k: "Str", v: "x"}) is indistinguishable
             // from an AST node in JS and would be evaluated here; the typed
             // port keeps it as plain data.
-            // ActionPlan / ActionStep — preserve as-is (deferred evaluation)
-            if case .array? = o["steps"] { return value }
-            if o.has("type") && o.has("valueAST") { return value }
-            let needsEval = o.values.contains { $0.isObjectLike }
-            if needsEval {
+            let entries: [(key: String, value: RTValue)]
+            if case .object(let o) = value { entries = o.entries } else { entries = [] }
+            if entries.contains(where: { $0.value.isObjectLike }) {
                 // `result[k] = …` in evaluate-prop.js — ASSIGNMENT, so a
-                // `__proto__` key is swallowed here too.
+                // `__proto__` key re-points the rebuilt object's prototype
+                // instead of becoming an own key. The rebuild starts from a
+                // fresh `{}`, so it does NOT inherit the source's prototype.
                 var out = RTObject()
-                for (k, v) in o.entries {
+                for (k, v) in entries {
                     out.assign(k, try evaluatePropValue(v, inline: inline))
                 }
                 return .object(out)
@@ -168,9 +190,11 @@ final class Evaluator {
         }
     }
 
+    /// `value.__reactive === "assign"` — a chain-aware property read.
     private func isReactiveAssign(_ v: RTValue) -> Bool {
-        if case .object(let o) = v, case .string("assign")? = o["__reactive"] {
-            return true
+        guard v.isObjectLike else { return false }
+        if case .string(let s)? = try? JSObjects.getMember(v, "__reactive") {
+            return jsStringEquals(s, "assign")
         }
         return false
     }
@@ -213,9 +237,18 @@ final class Evaluator {
                 return try evaluateLazyBuiltin(
                     name: name, args: args, context: context, schemaCtx: schemaCtx)
             }
-            if Builtins.dataBuiltins.contains(name) {
+            // evaluator.js:48 `const builtin = BUILTINS[node.name]` — a
+            // property GET on a plain object literal, so it also answers for
+            // the twelve `Object.prototype` names. Either way the args are
+            // evaluated FIRST (evaluator.js:50), then `builtin.fn(...)` is
+            // called — and for an inherited member `.fn` is `undefined`.
+            let lookup = Builtins.lookupBuiltin(name)
+            if lookup != .miss {
                 // evaluator.js:50 — eager builtin args drop the schema context.
                 let evaluated = try args.map { try evaluate($0, context, nil) }
+                if lookup == .inherited {
+                    throw JSTypeError(message: JSObjects.builtinFnMessage)
+                }
                 return try callDataBuiltin(name: name, args: evaluated)
             }
             if Builtins.actionNames.contains(name) {
@@ -325,13 +358,14 @@ final class Evaluator {
             if case .array(let items) = obj {
                 if field == "length" { return .number(Double(items.count)) }
                 // Array pluck: extract field from every element
-                return .array(items.map { item in
-                    if item.isNullish { return .null }
-                    let v = propertyGet(item, field)
-                    return v.isNullish ? .null : v
-                })
+                return .array(
+                    try items.map { item in
+                        if item.isNullish { return .null }
+                        let v = try propertyGet(item, field)
+                        return v.isNullish ? .null : v
+                    })
             }
-            return propertyGet(obj, field)
+            return try propertyGet(obj, field)
         case .index(let objNode, let indexNode):
             let obj = try evaluate(objNode, context, nil)
             let idx = try evaluate(indexNode, context, nil)
@@ -343,7 +377,7 @@ final class Evaluator {
                 else { return .undefined }
                 return items[Int(n)]
             }
-            return propertyGet(obj, try jsToString(idx))
+            return try propertyGet(obj, try jsToString(idx))
         case .assign(let target, let value):
             var o = RTObject()
             o["__reactive"] = .string("assign")
@@ -358,34 +392,17 @@ final class Evaluator {
         v.isNullish ? "" : try jsToString(v)
     }
 
-    /// JS `obj[key]` property access for non-array receivers.
+    /// JS `obj[key]` property access — own properties first, then the whole
+    /// PROTOTYPE CHAIN, via the shared `JSObjects` model. So `$obj.toString`
+    /// yields `Object.prototype.toString` (a native function value),
+    /// `$obj.constructor` yields `Object`, `$num.constructor` yields `Number`,
+    /// and `$obj.__proto__` yields `Object.prototype` itself.
     ///
-    /// KNOWN-DEVIATION (README.md #5): `.element` receivers fall into the
-    /// `default` branch and yield `undefined`, whereas in JS an ElementNode is
-    /// a plain object whose fields (`typeName`, `props`, `partial`,
-    /// `hasDynamicProps`, `type`, `statementId`) are readable from
-    /// expressions. Observable only for programs that member-access an
-    /// element value.
-    private func propertyGet(_ obj: RTValue, _ key: String) -> RTValue {
-        switch obj {
-        case .object(let o):
-            return o[key] ?? .undefined
-        case .array(let items):
-            if key == "length" { return .number(Double(items.count)) }
-            if let i = Int(key), i >= 0, i < items.count, String(i) == key {
-                return items[i]
-            }
-            return .undefined
-        case .string(let s):
-            let units = Array(s.utf16)
-            if key == "length" { return .number(Double(units.count)) }
-            if let i = Int(key), i >= 0, i < units.count, String(i) == key {
-                return .string(String(utf16CodeUnits: [units[i]], count: 1))
-            }
-            return .undefined
-        default:
-            return .undefined
-        }
+    /// Element receivers read their own fields (`typeName`, `props`,
+    /// `partial`, `hasDynamicProps`, `type`, `statementId`) here too — in JS an
+    /// ElementNode is just a plain object.
+    private func propertyGet(_ obj: RTValue, _ key: String) throws -> RTValue {
+        try JSObjects.getMember(obj, key)
     }
 
     // MARK: - Data builtins
@@ -436,23 +453,36 @@ final class Evaluator {
             guard case .array(let items) = arg(0) else { return arg(0) }
             let f = arg(1).isNullish ? "" : try jsToString(arg(1))
             let desc = (arg(2).isNullish ? "asc" : try jsToString(arg(2))) == "desc"
+            // ES 23.1.3.30.1 SortIndexedProperties: `undefined` elements are
+            // PARTITIONED OFF before sorting, appended after every defined
+            // element, and the comparator is NEVER invoked on them. So
+            // `@Sort([3, undefined, 1])` is `[1, 3, undefined]` (not
+            // `[undefined, 1, 3]` — an undefined coerced to "" would sort
+            // first), and a comparator that would throw on an undefined
+            // operand never runs (fixture `089-sort-undefined-partition`).
+            //
             // `sorted(by:)` is `rethrows`, so a comparator that hits a
             // `toString`-shadowing member propagates the TypeError just like
             // `Array.prototype.sort` does in JS.
-            let sorted = try items.sorted { a, b in
-                let av = f.isEmpty ? a : resolveField(a, f)
-                let bv = f.isEmpty ? b : resolveField(b, f)
+            var defined: [RTValue] = []
+            var holes = 0
+            for item in items {
+                if case .undefined = item { holes += 1 } else { defined.append(item) }
+            }
+            let sorted = try defined.sorted { a, b in
+                let av = f.isEmpty ? a : try resolveField(a, f)
+                let bv = f.isEmpty ? b : try resolveField(b, f)
                 let cmp = try sortCompare(av, bv)
                 return desc ? cmp > 0 : cmp < 0
             }
-            return .array(sorted)
+            return .array(sorted + Array(repeating: .undefined, count: holes))
         case "Filter":
             guard case .array(let items) = arg(0) else { return .array([]) }
             let f = arg(1).isNullish ? "" : try jsToString(arg(1))
             let o = arg(2).isNullish ? "==" : try jsToString(arg(2))
             let value = arg(3)
             let filtered = try items.filter { item in
-                let v = f.isEmpty ? item : resolveField(item, f)
+                let v = f.isEmpty ? item : try resolveField(item, f)
                 switch o {
                 case "==": return try jsLooseEquals(v, value)
                 case "!=": return !(try jsLooseEquals(v, value))
@@ -505,9 +535,15 @@ final class Evaluator {
         }
         let a = av.isNullish ? "" : try jsToString(av)
         let b = bv.isNullish ? "" : try jsToString(bv)
-        // KNOWN-DEVIATION (README.md #1): approximates JS `localeCompare`
-        // (V8 ICU collation) with Foundation's en_US comparison; agrees for
-        // ASCII, may differ for locale-sensitive orderings.
+        // ASCII — the whole range `@Sort` can reach from a `.oui` corpus
+        // without non-Latin text — goes through the shared CLDR-root
+        // (`alternate = non-ignorable`) weight table, verified against V8 over
+        // 235,233 pairs with zero mismatches and byte-identical to the Kotlin
+        // port's twin table. That removes the dependency on whichever ICU
+        // version Foundation happens to be linked against (which differs
+        // between Linux CI and iOS devices) for the range that matters.
+        if let ascii = jsASCIILocaleCompare(a, b) { return ascii }
+        // Outside ASCII: Foundation's en_US comparison (KNOWN-DEVIATION #1).
         // Canonical equivalence is NOT a hazard here: `localeCompare` itself
         // normalizes, so NFC/NFD variants compare equal (return 0) in BOTH
         // implementations — unlike `==`, which is code-unit exact in JS.
@@ -522,16 +558,16 @@ final class Evaluator {
     /// Dot-path field resolution (port of `resolveField`). Splitting happens
     /// over UTF-16 code units like JS `path.split(".")` — Character-based
     /// splitting would let a combining mark glue onto the "." and hide it.
-    private func resolveField(_ obj: RTValue, _ path: String) -> RTValue {
+    private func resolveField(_ obj: RTValue, _ path: String) throws -> RTValue {
         if path.isEmpty || obj.isNullish { return .undefined }
         let parts = jsStringSplit(path, separator: ".")
         if parts.count == 1 {
-            return propertyGet(obj, path)
+            return try propertyGet(obj, path)
         }
         var cur = obj
         for p in parts {
             if cur.isNullish { return .undefined }
-            cur = propertyGet(cur, p)
+            cur = try propertyGet(cur, p)
         }
         return cur
     }
@@ -583,13 +619,9 @@ final class Evaluator {
             let stepsArg: RTValue = args.isEmpty ? .array([]) : try evaluate(args[0], context, nil)
             var rawSteps: [RTValue] = []
             if case .array(let items) = stepsArg { rawSteps = items }
-            let steps = rawSteps.filter { s in
-                switch s {
-                case .object(let o): return o.has("type")
-                case .element: return true // JS elements carry a `type` field
-                default: return false
-                }
-            }
+            // `s != null && typeof s === "object" && "type" in s` — the `in`
+            // walks the prototype chain. (JS ElementNodes carry `type`.)
+            let steps = rawSteps.filter { $0.isObjectLike && JSObjects.hasProperty($0, "type") }
             var plan = RTObject()
             plan["steps"] = .array(steps)
             return .object(plan)
@@ -686,8 +718,14 @@ final class Evaluator {
     /// (port of `toLiteralAST`).
     private func toLiteralAST(_ value: RTValue) -> ASTNode {
         switch value {
-        case .undefined, .null:
+        // `typeof fn === "function"` matches none of toLiteralAST's branches,
+        // so it falls through to the trailing `return { k: "Null" }`.
+        case .undefined, .null, .function:
             return .null
+        case .proto(let kind):
+            // Array.prototype is an empty array; every other intrinsic
+            // prototype has no ENUMERABLE own properties.
+            return kind == .array ? .arr([]) : .obj([])
         case .string(let s):
             return .str(s)
         case .number(let n):

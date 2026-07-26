@@ -78,6 +78,24 @@ import Testing
         #expect(h.store.get(id)?.appName == "Stocks")
     }
 
+    /// FINDING 4: RN's `appId.charAt(0).toUpperCase()` takes one UTF-16 CODE
+    /// UNIT, so an astral first character (a lone high surrogate) has no case
+    /// mapping and comes back unchanged. Swift's grapheme-level
+    /// `prefix(1).uppercased()` uppercased it instead ("𐐨eseret" → "𐐀eseret").
+    /// The port now matches RN and Kotlin.
+    @Test func deepLinkFallbackNameLeavesAnAstralFirstCharacterAlone() {
+        let h = ControllerHarness(apps: [sampleApp])
+        // node: "\u{10428}eseret".charAt(0).toUpperCase() + "\u{10428}eseret".slice(1)
+        //       === "\u{10428}eseret"
+        let id = h.controller.openDeepLink(appId: "\u{10428}eseret", request: "show")
+        #expect(h.store.get(id)?.appName == "\u{10428}eseret")
+        // The appId itself is lowercased as before (no case mapping either).
+        #expect(h.store.get(id)?.appId == "\u{10428}eseret")
+        // The BMP path the fix must not break, including a combining mark.
+        let bmp = h.controller.openDeepLink(appId: "e\u{301}cho", request: "show")
+        #expect(h.store.get(bmp)?.appName == "E\u{301}cho")
+    }
+
     @Test func resolveActionLaunchesChildInheritingParentIdentity() {
         let h = ControllerHarness()
         let parentId = h.controller.openApp(sampleApp)
@@ -162,6 +180,37 @@ import Testing
         #expect(
             h.store.get(id)?.request
                 == "submit\n\nSubmitted form values: {\"zeta\":\"z\",\"alpha\":1,\"mid\":true}"
+        )
+    }
+
+    /// FINDING 1 where it actually bites: real form state is THREE levels deep
+    /// (`{formName: {fieldName: {value, componentType}}}`), and the request
+    /// string built here is what the MODEL reads. Nested keys used to be
+    /// alphabetized.
+    @Test func formSubmissionJsonPreservesInsertionOrderAtEveryDepth() {
+        let h = ControllerHarness()
+        let parentId = h.controller.openApp(sampleApp)
+        h.finishLast(content: "root = Card()")
+        let id = h.controller.resolveAction(
+            parentId: parentId,
+            message: "sign up",
+            formState: [
+                ("signup", .object([
+                    "email": .object([
+                        "value": .string("a@b.c"),
+                        "componentType": .string("TextField"),
+                    ]),
+                    "age": .object([
+                        "value": .number(30),
+                        "componentType": .string("Slider"),
+                    ]),
+                ])),
+            ]
+        )
+        // node: "sign up\n\nSubmitted form values: " + JSON.stringify(formState)
+        #expect(
+            h.store.get(id)?.request == "sign up\n\nSubmitted form values: "
+                + #"{"signup":{"email":{"value":"a@b.c","componentType":"TextField"},"age":{"value":30,"componentType":"Slider"}}}"#
         )
     }
 
@@ -313,6 +362,54 @@ import Testing
         h.streamer.last?.handlers.onError(StreamError("boom"))
         #expect(h.store.get(id)?.status == .error)
         #expect(h.store.get(id)?.error == "boom")
+    }
+
+    /// FINDING 6: RN patches `err.message`. `String(describing:)` leaked the
+    /// Swift type/case spelling into `Screen.error`, which the user reads and
+    /// which Kotlin spelled differently again.
+    @Test func nonStreamErrorDegradesToBareMessage() {
+        struct Carrier: LocalizedError {
+            var errorDescription: String? { "network unreachable" }
+        }
+        let h = ControllerHarness()
+        let id = h.controller.openApp(sampleApp)
+        h.streamer.last?.handlers.onError(Carrier())
+        #expect(h.store.get(id)?.status == .error)
+        #expect(h.store.get(id)?.error == "network unreachable")
+        // No type decoration of any kind reached the screen.
+        #expect(h.store.get(id)?.error?.contains("Carrier") == false)
+    }
+
+    /// FINDING 5: `genMs` uses JS `Math.round`, whose ties go toward
+    /// +INFINITY. `.rounded()` broke the tie away from zero, and `Int(_:)`
+    /// TRAPPED on NaN / out-of-Int64 elapsed times. The same cases are pinned
+    /// in the Kotlin suite so the two ports cannot drift apart.
+    @Test func genMsUsesJsMathRoundAndClamps() {
+        // node: Math.round(1234.5) === 1235 (a positive tie rounds up).
+        let up = ControllerHarness()
+        let upId = up.controller.openApp(sampleApp)
+        up.clock.advance(by: 1234.5)
+        up.streamer.last?.handlers.onDone(StreamEndInfo(truncated: false, dropped: false))
+        #expect(up.store.get(upId)?.genMs == 1235)
+
+        // node: Math.round(-0.5) === -0 and Math.round(-2.5) === -2. Swift's
+        // .rounded() would have answered -1 and -3 for a clock that went
+        // backwards (NTP step, monotonic-source swap).
+        for (elapsed, expected) in [(-0.5, 0), (-2.5, -2), (-1.5, -1)] as [(Double, Int)] {
+            let h = ControllerHarness()
+            let id = h.controller.openApp(sampleApp)
+            h.clock.advance(by: elapsed)
+            h.streamer.last?.handlers.onDone(StreamEndInfo(truncated: false, dropped: false))
+            #expect(h.store.get(id)?.genMs == expected, "elapsed \(elapsed)")
+        }
+
+        // Out of Int range: clamped, NOT a trap. Int(1e30) used to crash the
+        // process here.
+        let huge = ControllerHarness()
+        let hugeId = huge.controller.openApp(sampleApp)
+        huge.clock.advance(by: 1e30)
+        huge.streamer.last?.handlers.onDone(StreamEndInfo(truncated: false, dropped: false))
+        #expect(huge.store.get(hugeId)?.genMs == Int.max)
     }
 
     @Test func osCommandParsedOnDone() {
