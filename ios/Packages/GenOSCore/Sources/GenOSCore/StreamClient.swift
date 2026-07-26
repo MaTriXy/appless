@@ -298,7 +298,7 @@ public final class StreamClient: ScreenStreaming {
                 "Content-Type": "application/json",
                 "Authorization": "Bearer \(apiKey)",
             ],
-            body: Data(JSONValue.object(body).stringified(keyOrder: keyOrder).utf8)
+            body: Data(JSONValue.object(body).stringified().utf8)
         )
 
         let (head, byteStream) = try await http.stream(request)
@@ -403,11 +403,18 @@ public final class StreamClient: ScreenStreaming {
         )
     }
 
+    /// RN's object literals, key for key (stream.ts): `{role, content}` for
+    /// user/assistant (plus `tool_calls`), `{role, tool_call_id, content}` for
+    /// tool messages. One insertion-ordered builder reproduces both because
+    /// the shapes are disjoint - a tool message never carries `tool_calls` and
+    /// an assistant message never carries `tool_call_id`.
     private func messageJSON(_ message: ChatMessage) -> JSONValue {
-        var obj: [String: JSONValue] = [
-            "role": .string(message.role.rawValue),
-            "content": message.content.map { .string($0) } ?? .null,
-        ]
+        var obj = JSONObject()
+        obj["role"] = .string(message.role.rawValue)
+        if let toolCallID = message.toolCallID {
+            obj["tool_call_id"] = .string(toolCallID)
+        }
+        obj["content"] = message.content.map { .string($0) } ?? .null
         if let toolCalls = message.toolCalls {
             obj["tool_calls"] = .array(toolCalls.map { tc in
                 .object([
@@ -419,9 +426,6 @@ public final class StreamClient: ScreenStreaming {
                     ]),
                 ])
             })
-        }
-        if let toolCallID = message.toolCallID {
-            obj["tool_call_id"] = .string(toolCallID)
         }
         return .object(obj)
     }
