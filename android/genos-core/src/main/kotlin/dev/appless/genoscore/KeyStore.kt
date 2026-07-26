@@ -27,6 +27,9 @@ public class KeyStore(
         public const val STORAGE_KEY: String = "genos.cerebras-key"
     }
 
+    /** FINDING 8: the single-threaded contract, actually enforced. */
+    private val confinement = ConfinementCheck("KeyStore")
+
     private var key: String?
     private val statusFlowInternal: MutableStateFlow<KeyStatus>
     private var hydrationJob: Job? = null
@@ -62,7 +65,10 @@ public class KeyStore(
      * [set] of a whitespace-only key (RN parity); callers must treat empty as
      * missing, mirroring JS falsy checks.
      */
-    public fun get(): String? = key
+    public fun get(): String? {
+        confinement.check()
+        return key
+    }
 
     /**
      * Kick off the persisted-key read. Idempotent. Await to know hydration
@@ -101,6 +107,7 @@ public class KeyStore(
      * blank Authorization header.
      */
     public fun set(newKey: String) {
+        confinement.check()
         val trimmed = jsTrim(newKey)
         key = trimmed
         setStatus(KeyStatus.PRESENT)
@@ -113,6 +120,7 @@ public class KeyStore(
      * not wipe a newly entered valid key).
      */
     public fun markRejected(rejectedKey: String) {
+        confinement.check()
         if (key != rejectedKey) return
         key = null
         setStatus(KeyStatus.REJECTED)
@@ -131,6 +139,7 @@ public class KeyStore(
 
     /** Subscribe to status changes; returns an unsubscribe function. */
     public fun subscribe(fn: () -> Unit): () -> Unit {
+        confinement.check()
         val id = nextListenerId++
         listeners[id] = fn
         return { listeners.remove(id) }

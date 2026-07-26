@@ -22,6 +22,9 @@ import kotlinx.coroutines.flow.callbackFlow
  */
 public class ScreenStore(internal val clock: GenOSClock) {
 
+    /** FINDING 8: the single-threaded contract, actually enforced. */
+    private val confinement = ConfinementCheck("ScreenStore")
+
     /** Insertion-ordered listeners — JS `Set` iteration order. */
     private val listeners = LinkedHashMap<Int, () -> Unit>()
     private var nextListenerId = 0
@@ -40,6 +43,7 @@ public class ScreenStore(internal val clock: GenOSClock) {
     public val versionFlow: StateFlow<Int> = versionState.asStateFlow()
 
     public fun subscribe(fn: () -> Unit): () -> Unit {
+        confinement.check()
         val id = nextListenerId++
         listeners[id] = fn
         return { listeners.remove(id) }
@@ -64,12 +68,19 @@ public class ScreenStore(internal val clock: GenOSClock) {
     internal val listenerCount: Int
         get() = listeners.size
 
-    public fun get(id: String): Screen? = screens[id]
+    public fun get(id: String): Screen? {
+        confinement.check()
+        return screens[id]
+    }
 
-    public fun all(): List<Screen> = screens.values.toList()
+    public fun all(): List<Screen> {
+        confinement.check()
+        return screens.values.toList()
+    }
 
     /** Insert/replace a screen; notifies immediately. */
     public fun upsert(screen: Screen) {
+        confinement.check()
         screens[screen.id] = screen
         bump()
     }
@@ -79,6 +90,7 @@ public class ScreenStore(internal val clock: GenOSClock) {
      * flushing any buffered streaming notify with it.
      */
     public fun patch(id: String, mutate: (Screen) -> Screen) {
+        confinement.check()
         val screen = screens[id] ?: return
         screens[id] = mutate(screen)
         // A status/metadata change (done, error, prefetch flip) is meaningful —
@@ -91,6 +103,7 @@ public class ScreenStore(internal val clock: GenOSClock) {
      * STREAMING and `searching` to false; schedules a coalesced notify.
      */
     public fun append(id: String, delta: String) {
+        confinement.check()
         val screen = screens[id] ?: return
         // Content is updated synchronously so get()/onDone always see the
         // latest; only the subscriber notification is throttled. Content flowing

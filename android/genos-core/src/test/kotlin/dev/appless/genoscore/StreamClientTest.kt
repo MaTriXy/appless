@@ -766,6 +766,53 @@ class Utf8StreamDecoderTest {
         assertEquals(corpus, perByte)
         assertEquals(corpus, Utf8StreamDecoder().decode(bytes))
     }
+
+    /**
+     * FINDING 7. Everything above is either a hand-written spec case or a
+     * SELF-consistency check (byte-at-a-time vs whole-buffer) — and neither can
+     * detect a mis-reading of the spec that this port and its tests share,
+     * because both sides of a self-consistency check run the same code.
+     *
+     * This loads the SAME node-generated corpus the Swift sibling pins against
+     * (`utf8-fuzz-corpus.json`, 220 cases, seed 1592594996, a byte-identical
+     * copy of the one under
+     * `ios/Packages/GenOSCore/Tests/GenOSCoreTests/Resources/`, produced by
+     * `spec/fixtures/generator/probes/gen-utf8-fuzz.mjs` from real node
+     * `TextDecoder`). The expectations come from OUTSIDE this codebase, and the
+     * two ports are now pinned to the identical bytes.
+     *
+     * Compared per CODE UNIT rather than with `String ==` so a divergence
+     * cannot hide behind any equality normalization.
+     */
+    @Test
+    fun `the node TextDecoder fuzz corpus matches per chunk`() {
+        val text = checkNotNull(javaClass.getResourceAsStream("/utf8-fuzz-corpus.json")) {
+            "utf8-fuzz-corpus.json missing from test resources"
+        }.use { it.readBytes().toString(Charsets.UTF_8) }
+        val corpus = checkNotNull(JsonValue.parse(text)) { "corpus is not valid JSON" }
+        val cases = checkNotNull(corpus["cases"]?.arr) { "corpus has no cases" }
+        assertTrue(cases.size >= 200, "corpus shrank to ${cases.size} cases")
+
+        fun units(list: List<String>): List<List<Int>> = list.map { s -> s.map { it.code } }
+
+        val mismatches = mutableListOf<String>()
+        for ((index, case) in cases.withIndex()) {
+            val chunks = case["chunks"]?.arr!!.map { chunk ->
+                val values = chunk.arr!!
+                ByteArray(values.size) { i -> values[i].num!!.toInt().toByte() }
+            }
+            val expected = case["perChunk"]?.arr!!.map { it.str!! }
+            val decoder = Utf8StreamDecoder()
+            val actual = chunks.map { decoder.decode(it) }
+            if (units(actual) != units(expected)) {
+                mismatches.add("case $index: expected ${units(expected)} actual ${units(actual)}")
+            }
+        }
+        assertTrue(
+            mismatches.isEmpty(),
+            "${mismatches.size} fuzz divergences:\n${mismatches.take(5).joinToString("\n")}",
+        )
+    }
 }
 
 /** The production date formatter must produce the RN en-US long-date shape. */

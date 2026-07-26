@@ -14,6 +14,9 @@ public class GenOSController(
     /** App catalog used by [openDeepLink] lookups (`Apps.all` in production). */
     private val apps: List<AppDef>,
 ) {
+    /** FINDING 8: the single-threaded contract, actually enforced. */
+    private val confinement = ConfinementCheck("GenOSController")
+
     private var idCounter = 0
 
     /** `${parentId} ${actionMessage}` → child screen id. */
@@ -47,6 +50,7 @@ public class GenOSController(
      * final turn is the screen's own request. Text-only.
      */
     public fun buildMessages(screen: Screen): List<ChatMessage> {
+        confinement.check()
         val chain = ArrayList<Screen>()
         chain.add(screen)
         var cur = screen
@@ -203,6 +207,7 @@ public class GenOSController(
      * when reusable; retries in place when stuck/errored.
      */
     public fun openApp(app: AppDef): String {
+        confinement.check()
         appHomeIndex[app.id]?.let { existing ->
             val screen = store.get(existing)
             if (reusable(screen)) return existing
@@ -228,6 +233,7 @@ public class GenOSController(
      * fallback name.
      */
     public fun openDeepLink(appId: String, request: String): String {
+        confinement.check()
         val key = "${appId.lowercase()} $request"
         deepLinkIndex[key]?.let { existing ->
             val screen = store.get(existing)
@@ -313,6 +319,7 @@ public class GenOSController(
      * resets `startedAt`, sets `speculative` false (which re-enables tools).
      */
     public fun retryScreen(id: String) {
+        confinement.check()
         if (store.get(id) == null) return
         val now = clock.now
         store.patch(id) {
@@ -340,6 +347,7 @@ public class GenOSController(
      * or (b) finishes generating while visible.
      */
     public fun setActiveScreen(id: String?) {
+        confinement.check()
         activeScreenId = id
         if (id != null && store.get(id)?.status == ScreenStatus.DONE) maybePrefetch(id)
     }

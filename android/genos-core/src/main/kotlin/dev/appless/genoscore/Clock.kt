@@ -17,6 +17,14 @@ public interface GenOSCancellable {
  * Implementations are single-threaded by contract: the store, controller and
  * key store are confined to one dispatcher (`Dispatchers.Main` in the app, the
  * test dispatcher here), so no internal locking is needed anywhere.
+ *
+ * That contract used to be documentation only. [ScreenStore], [KeyStore] and
+ * [GenOSController] now each hold a `ConfinementCheck` that throws when a
+ * second thread touches them, enabled whenever JVM assertions are (see
+ * [GenOSDebug]). It is a RUNTIME check: the Swift sibling gets the same
+ * guarantee at COMPILE time from `@MainActor`, and that asymmetry — plus the
+ * fact that [StreamClient] still invokes handlers on whatever `CoroutineScope`
+ * it is handed — is recorded in the README.
  */
 public interface GenOSClock {
     /** Monotonic now in milliseconds (`performance.now()` analog). */

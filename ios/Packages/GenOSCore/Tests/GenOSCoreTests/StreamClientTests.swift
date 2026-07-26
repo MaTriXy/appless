@@ -96,11 +96,12 @@ import Testing
         #expect(body?["messages"]?[1]?["role"]?.stringValue == "user")
         #expect(body?["messages"]?[1]?["content"]?.stringValue == "hi")
 
-        // Byte-pin the ACTUAL wire bytes, not the re-parsed body: key order
-        // (hinted keys first, unhinted sorted after) and number formatting are
-        // otherwise protected only by coincidence, since a re-parse discards
-        // both. RN's JSON.stringify emits object keys in insertion order; this
-        // assertion is what would catch a divergence.
+        // Byte-pin the ACTUAL wire bytes, not the re-parsed body: object key
+        // order and number formatting are otherwise protected only by
+        // coincidence, since a re-parse discards both. RN's JSON.stringify
+        // emits keys in INSERTION order (modulo canonical array indices), which
+        // is what `JSONObject` reproduces at every depth; this assertion is
+        // what would catch a divergence.
         let raw = try #require(requests[0].body)
         #expect(
             raw == Data(#"{"model":"gemma-4-31b","messages":[{"role":"system","content":"SYS\n\nToday is Friday, July 25, 2026."},{"role":"user","content":"hi"}],"stream":true,"temperature":0.8,"max_completion_tokens":3072}"#.utf8)
