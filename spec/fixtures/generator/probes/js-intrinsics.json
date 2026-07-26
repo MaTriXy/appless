@@ -1,0 +1,745 @@
+{
+  "node": "v22.22.2",
+  "intrinsics": {
+    "Object": [
+      {
+        "key": "constructor",
+        "kind": "function",
+        "name": "Object",
+        "arity": 1
+      },
+      {
+        "key": "__defineGetter__",
+        "kind": "function",
+        "name": "__defineGetter__",
+        "arity": 2
+      },
+      {
+        "key": "__defineSetter__",
+        "kind": "function",
+        "name": "__defineSetter__",
+        "arity": 2
+      },
+      {
+        "key": "hasOwnProperty",
+        "kind": "function",
+        "name": "hasOwnProperty",
+        "arity": 1
+      },
+      {
+        "key": "__lookupGetter__",
+        "kind": "function",
+        "name": "__lookupGetter__",
+        "arity": 1
+      },
+      {
+        "key": "__lookupSetter__",
+        "kind": "function",
+        "name": "__lookupSetter__",
+        "arity": 1
+      },
+      {
+        "key": "isPrototypeOf",
+        "kind": "function",
+        "name": "isPrototypeOf",
+        "arity": 1
+      },
+      {
+        "key": "propertyIsEnumerable",
+        "kind": "function",
+        "name": "propertyIsEnumerable",
+        "arity": 1
+      },
+      {
+        "key": "toString",
+        "kind": "function",
+        "name": "toString",
+        "arity": 0
+      },
+      {
+        "key": "valueOf",
+        "kind": "function",
+        "name": "valueOf",
+        "arity": 0
+      },
+      {
+        "key": "__proto__",
+        "kind": "accessor"
+      },
+      {
+        "key": "toLocaleString",
+        "kind": "function",
+        "name": "toLocaleString",
+        "arity": 0
+      }
+    ],
+    "Array": [
+      {
+        "key": "length",
+        "kind": "data",
+        "value": 0
+      },
+      {
+        "key": "constructor",
+        "kind": "function",
+        "name": "Array",
+        "arity": 1
+      },
+      {
+        "key": "at",
+        "kind": "function",
+        "name": "at",
+        "arity": 1
+      },
+      {
+        "key": "concat",
+        "kind": "function",
+        "name": "concat",
+        "arity": 1
+      },
+      {
+        "key": "copyWithin",
+        "kind": "function",
+        "name": "copyWithin",
+        "arity": 2
+      },
+      {
+        "key": "fill",
+        "kind": "function",
+        "name": "fill",
+        "arity": 1
+      },
+      {
+        "key": "find",
+        "kind": "function",
+        "name": "find",
+        "arity": 1
+      },
+      {
+        "key": "findIndex",
+        "kind": "function",
+        "name": "findIndex",
+        "arity": 1
+      },
+      {
+        "key": "findLast",
+        "kind": "function",
+        "name": "findLast",
+        "arity": 1
+      },
+      {
+        "key": "findLastIndex",
+        "kind": "function",
+        "name": "findLastIndex",
+        "arity": 1
+      },
+      {
+        "key": "lastIndexOf",
+        "kind": "function",
+        "name": "lastIndexOf",
+        "arity": 1
+      },
+      {
+        "key": "pop",
+        "kind": "function",
+        "name": "pop",
+        "arity": 0
+      },
+      {
+        "key": "push",
+        "kind": "function",
+        "name": "push",
+        "arity": 1
+      },
+      {
+        "key": "reverse",
+        "kind": "function",
+        "name": "reverse",
+        "arity": 0
+      },
+      {
+        "key": "shift",
+        "kind": "function",
+        "name": "shift",
+        "arity": 0
+      },
+      {
+        "key": "unshift",
+        "kind": "function",
+        "name": "unshift",
+        "arity": 1
+      },
+      {
+        "key": "slice",
+        "kind": "function",
+        "name": "slice",
+        "arity": 2
+      },
+      {
+        "key": "sort",
+        "kind": "function",
+        "name": "sort",
+        "arity": 1
+      },
+      {
+        "key": "splice",
+        "kind": "function",
+        "name": "splice",
+        "arity": 2
+      },
+      {
+        "key": "includes",
+        "kind": "function",
+        "name": "includes",
+        "arity": 1
+      },
+      {
+        "key": "indexOf",
+        "kind": "function",
+        "name": "indexOf",
+        "arity": 1
+      },
+      {
+        "key": "join",
+        "kind": "function",
+        "name": "join",
+        "arity": 1
+      },
+      {
+        "key": "keys",
+        "kind": "function",
+        "name": "keys",
+        "arity": 0
+      },
+      {
+        "key": "entries",
+        "kind": "function",
+        "name": "entries",
+        "arity": 0
+      },
+      {
+        "key": "values",
+        "kind": "function",
+        "name": "values",
+        "arity": 0
+      },
+      {
+        "key": "forEach",
+        "kind": "function",
+        "name": "forEach",
+        "arity": 1
+      },
+      {
+        "key": "filter",
+        "kind": "function",
+        "name": "filter",
+        "arity": 1
+      },
+      {
+        "key": "flat",
+        "kind": "function",
+        "name": "flat",
+        "arity": 0
+      },
+      {
+        "key": "flatMap",
+        "kind": "function",
+        "name": "flatMap",
+        "arity": 1
+      },
+      {
+        "key": "map",
+        "kind": "function",
+        "name": "map",
+        "arity": 1
+      },
+      {
+        "key": "every",
+        "kind": "function",
+        "name": "every",
+        "arity": 1
+      },
+      {
+        "key": "some",
+        "kind": "function",
+        "name": "some",
+        "arity": 1
+      },
+      {
+        "key": "reduce",
+        "kind": "function",
+        "name": "reduce",
+        "arity": 1
+      },
+      {
+        "key": "reduceRight",
+        "kind": "function",
+        "name": "reduceRight",
+        "arity": 1
+      },
+      {
+        "key": "toReversed",
+        "kind": "function",
+        "name": "toReversed",
+        "arity": 0
+      },
+      {
+        "key": "toSorted",
+        "kind": "function",
+        "name": "toSorted",
+        "arity": 1
+      },
+      {
+        "key": "toSpliced",
+        "kind": "function",
+        "name": "toSpliced",
+        "arity": 2
+      },
+      {
+        "key": "with",
+        "kind": "function",
+        "name": "with",
+        "arity": 2
+      },
+      {
+        "key": "toLocaleString",
+        "kind": "function",
+        "name": "toLocaleString",
+        "arity": 0
+      },
+      {
+        "key": "toString",
+        "kind": "function",
+        "name": "toString",
+        "arity": 0
+      }
+    ],
+    "Number": [
+      {
+        "key": "constructor",
+        "kind": "function",
+        "name": "Number",
+        "arity": 1
+      },
+      {
+        "key": "toExponential",
+        "kind": "function",
+        "name": "toExponential",
+        "arity": 1
+      },
+      {
+        "key": "toFixed",
+        "kind": "function",
+        "name": "toFixed",
+        "arity": 1
+      },
+      {
+        "key": "toPrecision",
+        "kind": "function",
+        "name": "toPrecision",
+        "arity": 1
+      },
+      {
+        "key": "toString",
+        "kind": "function",
+        "name": "toString",
+        "arity": 1
+      },
+      {
+        "key": "valueOf",
+        "kind": "function",
+        "name": "valueOf",
+        "arity": 0
+      },
+      {
+        "key": "toLocaleString",
+        "kind": "function",
+        "name": "toLocaleString",
+        "arity": 0
+      }
+    ],
+    "String": [
+      {
+        "key": "length",
+        "kind": "data",
+        "value": 0
+      },
+      {
+        "key": "constructor",
+        "kind": "function",
+        "name": "String",
+        "arity": 1
+      },
+      {
+        "key": "anchor",
+        "kind": "function",
+        "name": "anchor",
+        "arity": 1
+      },
+      {
+        "key": "at",
+        "kind": "function",
+        "name": "at",
+        "arity": 1
+      },
+      {
+        "key": "big",
+        "kind": "function",
+        "name": "big",
+        "arity": 0
+      },
+      {
+        "key": "blink",
+        "kind": "function",
+        "name": "blink",
+        "arity": 0
+      },
+      {
+        "key": "bold",
+        "kind": "function",
+        "name": "bold",
+        "arity": 0
+      },
+      {
+        "key": "charAt",
+        "kind": "function",
+        "name": "charAt",
+        "arity": 1
+      },
+      {
+        "key": "charCodeAt",
+        "kind": "function",
+        "name": "charCodeAt",
+        "arity": 1
+      },
+      {
+        "key": "codePointAt",
+        "kind": "function",
+        "name": "codePointAt",
+        "arity": 1
+      },
+      {
+        "key": "concat",
+        "kind": "function",
+        "name": "concat",
+        "arity": 1
+      },
+      {
+        "key": "endsWith",
+        "kind": "function",
+        "name": "endsWith",
+        "arity": 1
+      },
+      {
+        "key": "fontcolor",
+        "kind": "function",
+        "name": "fontcolor",
+        "arity": 1
+      },
+      {
+        "key": "fontsize",
+        "kind": "function",
+        "name": "fontsize",
+        "arity": 1
+      },
+      {
+        "key": "fixed",
+        "kind": "function",
+        "name": "fixed",
+        "arity": 0
+      },
+      {
+        "key": "includes",
+        "kind": "function",
+        "name": "includes",
+        "arity": 1
+      },
+      {
+        "key": "indexOf",
+        "kind": "function",
+        "name": "indexOf",
+        "arity": 1
+      },
+      {
+        "key": "isWellFormed",
+        "kind": "function",
+        "name": "isWellFormed",
+        "arity": 0
+      },
+      {
+        "key": "italics",
+        "kind": "function",
+        "name": "italics",
+        "arity": 0
+      },
+      {
+        "key": "lastIndexOf",
+        "kind": "function",
+        "name": "lastIndexOf",
+        "arity": 1
+      },
+      {
+        "key": "link",
+        "kind": "function",
+        "name": "link",
+        "arity": 1
+      },
+      {
+        "key": "localeCompare",
+        "kind": "function",
+        "name": "localeCompare",
+        "arity": 1
+      },
+      {
+        "key": "match",
+        "kind": "function",
+        "name": "match",
+        "arity": 1
+      },
+      {
+        "key": "matchAll",
+        "kind": "function",
+        "name": "matchAll",
+        "arity": 1
+      },
+      {
+        "key": "normalize",
+        "kind": "function",
+        "name": "normalize",
+        "arity": 0
+      },
+      {
+        "key": "padEnd",
+        "kind": "function",
+        "name": "padEnd",
+        "arity": 1
+      },
+      {
+        "key": "padStart",
+        "kind": "function",
+        "name": "padStart",
+        "arity": 1
+      },
+      {
+        "key": "repeat",
+        "kind": "function",
+        "name": "repeat",
+        "arity": 1
+      },
+      {
+        "key": "replace",
+        "kind": "function",
+        "name": "replace",
+        "arity": 2
+      },
+      {
+        "key": "replaceAll",
+        "kind": "function",
+        "name": "replaceAll",
+        "arity": 2
+      },
+      {
+        "key": "search",
+        "kind": "function",
+        "name": "search",
+        "arity": 1
+      },
+      {
+        "key": "slice",
+        "kind": "function",
+        "name": "slice",
+        "arity": 2
+      },
+      {
+        "key": "small",
+        "kind": "function",
+        "name": "small",
+        "arity": 0
+      },
+      {
+        "key": "split",
+        "kind": "function",
+        "name": "split",
+        "arity": 2
+      },
+      {
+        "key": "strike",
+        "kind": "function",
+        "name": "strike",
+        "arity": 0
+      },
+      {
+        "key": "sub",
+        "kind": "function",
+        "name": "sub",
+        "arity": 0
+      },
+      {
+        "key": "substr",
+        "kind": "function",
+        "name": "substr",
+        "arity": 2
+      },
+      {
+        "key": "substring",
+        "kind": "function",
+        "name": "substring",
+        "arity": 2
+      },
+      {
+        "key": "sup",
+        "kind": "function",
+        "name": "sup",
+        "arity": 0
+      },
+      {
+        "key": "startsWith",
+        "kind": "function",
+        "name": "startsWith",
+        "arity": 1
+      },
+      {
+        "key": "toString",
+        "kind": "function",
+        "name": "toString",
+        "arity": 0
+      },
+      {
+        "key": "toWellFormed",
+        "kind": "function",
+        "name": "toWellFormed",
+        "arity": 0
+      },
+      {
+        "key": "trim",
+        "kind": "function",
+        "name": "trim",
+        "arity": 0
+      },
+      {
+        "key": "trimStart",
+        "kind": "function",
+        "name": "trimStart",
+        "arity": 0
+      },
+      {
+        "key": "trimLeft",
+        "kind": "function",
+        "name": "trimStart",
+        "arity": 0
+      },
+      {
+        "key": "trimEnd",
+        "kind": "function",
+        "name": "trimEnd",
+        "arity": 0
+      },
+      {
+        "key": "trimRight",
+        "kind": "function",
+        "name": "trimEnd",
+        "arity": 0
+      },
+      {
+        "key": "toLocaleLowerCase",
+        "kind": "function",
+        "name": "toLocaleLowerCase",
+        "arity": 0
+      },
+      {
+        "key": "toLocaleUpperCase",
+        "kind": "function",
+        "name": "toLocaleUpperCase",
+        "arity": 0
+      },
+      {
+        "key": "toLowerCase",
+        "kind": "function",
+        "name": "toLowerCase",
+        "arity": 0
+      },
+      {
+        "key": "toUpperCase",
+        "kind": "function",
+        "name": "toUpperCase",
+        "arity": 0
+      },
+      {
+        "key": "valueOf",
+        "kind": "function",
+        "name": "valueOf",
+        "arity": 0
+      }
+    ],
+    "Boolean": [
+      {
+        "key": "constructor",
+        "kind": "function",
+        "name": "Boolean",
+        "arity": 1
+      },
+      {
+        "key": "toString",
+        "kind": "function",
+        "name": "toString",
+        "arity": 0
+      },
+      {
+        "key": "valueOf",
+        "kind": "function",
+        "name": "valueOf",
+        "arity": 0
+      }
+    ],
+    "Function": [
+      {
+        "key": "length",
+        "kind": "data",
+        "value": 0
+      },
+      {
+        "key": "name",
+        "kind": "data",
+        "value": ""
+      },
+      {
+        "key": "arguments",
+        "kind": "accessor"
+      },
+      {
+        "key": "caller",
+        "kind": "accessor"
+      },
+      {
+        "key": "constructor",
+        "kind": "function",
+        "name": "Function",
+        "arity": 1
+      },
+      {
+        "key": "apply",
+        "kind": "function",
+        "name": "apply",
+        "arity": 2
+      },
+      {
+        "key": "bind",
+        "kind": "function",
+        "name": "bind",
+        "arity": 1
+      },
+      {
+        "key": "call",
+        "kind": "function",
+        "name": "call",
+        "arity": 1
+      },
+      {
+        "key": "toString",
+        "kind": "function",
+        "name": "toString",
+        "arity": 0
+      }
+    ]
+  }
+}

@@ -1,0 +1,14 @@
+# `Function.prototype.arguments` / `.caller` are ACCESSORS that always throw in
+# strict mode (all lang-core module code is strict). `$o.toString` inherits a
+# real native function from Object.prototype, so reading `.arguments` off it
+# raises V8's poison-pill TypeError — caught by evaluate-tree.js's per-prop
+# try/catch, which keeps the RAW prop value and records a runtimeErrors entry.
+$o = { a: 1 }
+root = Card([
+  CardHeader("Function.prototype poison pills"),
+  TextContent($o.toString.arguments),
+  TextContent($o.toString.caller),
+  TextContent($o.constructor.name),
+  TextContent("len=" + $o.toString.length),
+  KVList([{ k: "proto-name", v: $o.valueOf.name }])
+])

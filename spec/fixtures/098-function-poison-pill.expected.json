@@ -1,0 +1,102 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "Function.prototype poison pills"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": {
+            "$ast": {
+              "field": "arguments",
+              "k": "Member",
+              "obj": {
+                "field": "toString",
+                "k": "Member",
+                "obj": {
+                  "k": "StateRef",
+                  "n": "$o"
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": {
+            "$ast": {
+              "field": "caller",
+              "k": "Member",
+              "obj": {
+                "field": "toString",
+                "k": "Member",
+                "obj": {
+                  "k": "StateRef",
+                  "n": "$o"
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "Object"
+        }
+      },
+      {
+        "component": "TextContent",
+        "props": {
+          "text": "len=0"
+        }
+      },
+      {
+        "component": "KVList",
+        "props": {
+          "rows": [
+            {
+              "$ast": {
+                "k": "proto-name",
+                "v": "valueOf"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {
+    "$o": {
+      "a": 1
+    }
+  },
+  "runtimeErrors": [
+    {
+      "source": "runtime",
+      "code": "runtime-error",
+      "message": "Evaluating prop \"text\" on TextContent failed: 'caller', 'callee', and 'arguments' properties may not be accessed on strict mode functions or the arguments objects for calls to them",
+      "component": "TextContent"
+    },
+    {
+      "source": "runtime",
+      "code": "runtime-error",
+      "message": "Evaluating prop \"text\" on TextContent failed: 'caller', 'callee', and 'arguments' properties may not be accessed on strict mode functions or the arguments objects for calls to them",
+      "component": "TextContent"
+    }
+  ]
+}

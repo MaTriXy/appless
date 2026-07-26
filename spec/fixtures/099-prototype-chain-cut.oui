@@ -1,0 +1,22 @@
+# `{"__proto__": null, …}` cuts the chain: the object inherits NOTHING, so the
+# twelve Object.prototype names read `undefined` there while an ordinary object
+# still resolves them to real native functions. `$o.__proto__` goes through
+# Object.prototype's GETTER, which answers the RECEIVER's [[Prototype]] — an
+# array answers Array.prototype (an empty array to JSON), a number answers
+# Number.prototype (an object with no enumerable own keys).
+$cut = { "__proto__": null, a: 1 }
+$plain = { a: 1 }
+$arr = [1, 2]
+root = Card([
+  CardHeader("Chain cut and the __proto__ getter"),
+  KVList([
+    { label: "cut.toString", value: $cut.toString },
+    { label: "cut.hasOwnProperty", value: $cut.hasOwnProperty },
+    { label: "cut.__proto__", value: $cut.__proto__ },
+    { label: "plain.toString.name", value: $plain.toString.name },
+    { label: "plain.__proto__", value: $plain.__proto__ },
+    { label: "arr.__proto__", value: $arr.__proto__ },
+    { label: "arr.length", value: $arr.length },
+    { label: "num.__proto__", value: (1).__proto__ }
+  ])
+])

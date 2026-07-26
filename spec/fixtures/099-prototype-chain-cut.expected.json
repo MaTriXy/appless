@@ -1,0 +1,72 @@
+{
+  "root": {
+    "component": "Card",
+    "statementId": "root",
+    "props": {},
+    "children": [
+      {
+        "component": "CardHeader",
+        "props": {
+          "title": "Chain cut and the __proto__ getter"
+        }
+      },
+      {
+        "component": "KVList",
+        "props": {
+          "rows": [
+            {
+              "label": "cut.toString"
+            },
+            {
+              "label": "cut.hasOwnProperty"
+            },
+            {
+              "label": "cut.__proto__"
+            },
+            {
+              "label": "plain.toString.name",
+              "value": "toString"
+            },
+            {
+              "label": "plain.__proto__",
+              "value": {}
+            },
+            {
+              "label": "arr.__proto__",
+              "value": [
+                {},
+                {}
+              ]
+            },
+            {
+              "label": "arr.length",
+              "value": 2
+            },
+            {
+              "label": "num.__proto__",
+              "value": {}
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "meta": {
+    "incomplete": false,
+    "unresolved": [],
+    "errors": []
+  },
+  "state": {
+    "$arr": [
+      1,
+      2
+    ],
+    "$cut": {
+      "a": 1
+    },
+    "$plain": {
+      "a": 1
+    }
+  },
+  "runtimeErrors": []
+}
