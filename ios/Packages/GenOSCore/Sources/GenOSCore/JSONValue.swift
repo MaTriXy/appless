@@ -94,8 +94,18 @@ public enum JSONValue: Sendable, Equatable {
     }
 
     /// Serialize like `JSON.stringify` (no pretty printing, `/` unescaped).
-    /// Object key order follows the `keyOrder` hint when provided, else sorted.
-    public func stringified(keyOrder: [String]? = nil) -> String {
+    ///
+    /// Object keys follow `OrdinaryOwnPropertyKeys` (ES 10.1.11.1) at EVERY
+    /// depth: canonical array-index keys first in ascending NUMERIC order,
+    /// then the remaining keys in insertion order. So `{"b":1,"10":2,"2":3}`
+    /// emits `{"2":3,"10":2,"b":1}`, exactly like node.
+    ///
+    /// There is no `keyOrder` hint any more. A single flat hint could only
+    /// order keys it named and fell back to `.sorted()` everywhere else, so a
+    /// nested object (form state is three levels deep) was alphabetized, and
+    /// adding one unhinted key anywhere silently reordered the wire bytes.
+    /// `JSONObject` carries per-object order instead.
+    public func stringified() -> String {
         switch self {
         case .string(let s):
             return JSONValue.encodeJSONString(s)
@@ -106,21 +116,49 @@ public enum JSONValue: Sendable, Equatable {
         case .null:
             return "null"
         case .array(let a):
-            return "[" + a.map { $0.stringified(keyOrder: keyOrder) }.joined(separator: ",") + "]"
+            return "[" + a.map { $0.stringified() }.joined(separator: ",") + "]"
         case .object(let o):
-            var keys: [String]
-            if let keyOrder {
-                let hinted = keyOrder.filter { o[$0] != nil }
-                let rest = o.keys.filter { !keyOrder.contains($0) }.sorted()
-                keys = hinted + rest
-            } else {
-                keys = o.keys.sorted()
-            }
-            let parts = keys.map { key -> String in
-                JSONValue.encodeJSONString(key) + ":" + (o[key] ?? .null).stringified(keyOrder: keyOrder)
+            let parts = JSONValue.jsOwnKeyOrder(o.insertionOrderedKeys).map { key -> String in
+                JSONValue.encodeJSONString(key) + ":" + (o[key] ?? .null).stringified()
             }
             return "{" + parts.joined(separator: ",") + "}"
         }
+    }
+
+    /// Largest canonical array index: 2^32 - 2.
+    private static let maxArrayIndex: UInt64 = 4_294_967_294
+
+    /// The numeric value of `key` when it is a canonical array index (the
+    /// canonical decimal spelling of an integer in 0...2^32-2, so no "+1", no
+    /// "01", no "1.0"), else nil. Mirrors Kotlin's `canonicalArrayIndex`.
+    static func canonicalArrayIndex(_ key: String) -> UInt64? {
+        let n = key.utf8.count
+        if n == 0 || n > 10 { return nil }
+        if key.utf8.first == UInt8(ascii: "0") && n > 1 { return nil }
+        var value: UInt64 = 0
+        for byte in key.utf8 {
+            guard byte >= UInt8(ascii: "0"), byte <= UInt8(ascii: "9") else { return nil }
+            value = value * 10 + UInt64(byte - UInt8(ascii: "0"))
+        }
+        return value > maxArrayIndex ? nil : value
+    }
+
+    /// `OrdinaryOwnPropertyKeys`: canonical array indices ascending
+    /// numerically, then the rest in insertion order.
+    static func jsOwnKeyOrder(_ keys: [String]) -> [String] {
+        var indices: [(UInt64, String)] = []
+        var rest: [String] = []
+        for key in keys {
+            if let index = canonicalArrayIndex(key) {
+                indices.append((index, key))
+            } else {
+                rest.append(key)
+            }
+        }
+        if indices.isEmpty { return rest }
+        // Sort by numeric value only; canonical spellings are unique, so the
+        // comparison is a total order and sort stability is irrelevant.
+        return indices.sorted { $0.0 < $1.0 }.map(\.1) + rest
     }
 
     /// ECMAScript `Number::toString` (what `JSON.stringify` emits for numbers),
@@ -216,14 +254,13 @@ public enum JSONValue: Sendable, Equatable {
         return out
     }
 
-    /// `JSON.stringify` of an object with caller-provided (insertion) key
-    /// order - RN's JSON.stringify(formState) emits keys in insertion order,
-    /// which a Swift Dictionary cannot represent. Nested values fall back to
-    /// `stringified()` (sorted keys).
+    /// `JSON.stringify` of an object built from an ORDERED key/value list -
+    /// RN's `JSON.stringify(formState)` emits keys in insertion order, and the
+    /// shell passes form values in UI insertion order. Nested `.object`
+    /// values keep their own insertion order too (form state is three levels
+    /// deep: `{formName: {fieldName: {value, componentType}}}`).
     public static func stringifyOrdered(_ pairs: [(String, JSONValue)]) -> String {
-        "{" + pairs
-            .map { encodeJSONString($0.0) + ":" + $0.1.stringified() }
-            .joined(separator: ",") + "}"
+        JSONValue.object(JSONObject(pairs)).stringified()
     }
 
     /// JS truthiness (`if (value)`): "" / 0 / NaN / false / null are falsy;
@@ -263,7 +300,14 @@ public enum JSONValue: Sendable, Equatable {
         return nil
     }
 
+    /// Unordered dictionary view of an object (lookups / structural asserts).
     public var objectValue: [String: JSONValue]? {
+        if case .object(let o) = self { return o.dictionary }
+        return nil
+    }
+
+    /// The ordered object itself, when this value is one.
+    public var orderedObjectValue: JSONObject? {
         if case .object(let o) = self { return o }
         return nil
     }
@@ -321,7 +365,9 @@ private struct JSONParser {
 
     private mutating func parseObject() -> JSONValue? {
         index += 1 // {
-        var object: [String: JSONValue] = [:]
+        // Ordered: keys parsed out of a document keep DOCUMENT order, like
+        // JS's own `JSON.parse` (and Kotlin's LinkedHashMap-backed parser).
+        var object = JSONObject()
         skipWhitespace()
         if current == "}" {
             index += 1
