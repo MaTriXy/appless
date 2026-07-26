@@ -322,8 +322,25 @@ public final class StreamClient: ScreenStreaming {
         var buffer = ""
         var sawDone = false
         var finishReason: String?
+        // RN stores whatever truthy `finish_reason` arrived, string or not, and
+        // `dropped` tests that raw value for truthiness. A NON-STRING truthy
+        // finish_reason (`"finish_reason":42`) therefore makes RN's stream
+        // NOT-dropped while `finishReason` above stays nil, so this flag carries
+        // the truthiness separately. Without it a chunk carrying only
+        // `finish_reason:42` and no [DONE] threw "stream dropped before any
+        // content arrived" here while RN called onDone({dropped:false}).
+        var sawTruthyFinishReason = false
         var content = ""
-        var toolCalls: [Int: ToolCall] = [:]
+        // Keyed by the RAW Double, not a narrowed Int. RN keys a JS Map by the
+        // Number, so `3.2` and `3.7` are TWO calls; flooring merged them into
+        // one, concatenating both `arguments` blobs into
+        // `{"query":"x"}{"query":"y"}`, which fails JSON.parse and degrades to
+        // args={} - one tool round instead of two, and a round-2 body that
+        // differs from RN's bytes. -0 is normalized to +0 below because a JS
+        // Map key uses SameValueZero, under which -0 and 0 are the SAME key
+        // (verified against node). NaN cannot arise: JSON has no NaN literal
+        // and the overflow case `1e999` parses to +Infinity, which keys fine.
+        var toolCalls: [Double: ToolCall] = [:]
 
         for try await chunkData in byteStream {
             // Stop pulling chunks the moment the token is cancelled, even if
@@ -362,40 +379,66 @@ public final class StreamClient: ScreenStreaming {
                 // RN: `if (chunk.error)` - a TRUTHY guard. Falsy error values
                 // ("", 0, false, null) are skipped, not thrown.
                 if let errorValue = chunk["error"], errorValue.isJSTruthy {
-                    let msg = errorValue.stringValue ?? errorValue["message"]?.stringValue
-                    throw StreamError((msg?.isEmpty == false) ? msg! : "stream error")
+                    // RN: `typeof chunk.error === "string" ? chunk.error :
+                    // chunk.error.message`, then `new Error(msg || "stream
+                    // error")`. `new Error` runs ToString on a non-string
+                    // argument, so `{"error":{"message":42}}` surfaces "42" and
+                    // `{"message":[1,2]}` surfaces "1,2"; reading only
+                    // `stringValue` collapsed every one of those to the generic
+                    // "stream error", hiding the provider's actual complaint.
+                    let raw: JSONValue?
+                    if case .string = errorValue { raw = errorValue } else { raw = errorValue["message"] }
+                    // `msg || "stream error"`: JS truthiness, so 0/false/""/null
+                    // still fall through to the generic text.
+                    let msg = (raw?.isJSTruthy == true) ? jsStringCoerce(raw) : "stream error"
+                    throw StreamError(msg)
                 }
                 let choice = chunk["choices"]?[0]
-                // RN: `if (choice?.finish_reason)` - truthy, so a NON-STRING
-                // truthy finish_reason (number/object) would land there but is
-                // dropped by stringValue here; unreachable with real providers.
-                if let fr = choice?["finish_reason"]?.stringValue, !fr.isEmpty {
-                    finishReason = fr
+                // RN: `if (choice?.finish_reason)` - a TRUTHY guard over the RAW
+                // value. Only a string can ever equal "tool_calls"/"length", so
+                // `finishReason` stays string-typed, but the truthiness itself
+                // is what `dropped` consults - hence the separate flag.
+                if let fr = choice?["finish_reason"], fr.isJSTruthy {
+                    sawTruthyFinishReason = true
+                    if let s = fr.stringValue { finishReason = s }
                 }
                 let delta = choice?["delta"]
-                if let text = delta?["content"]?.stringValue, !text.isEmpty {
+                // RN: `if (delta?.content)` - truthy, then `content +=` and
+                // `onDelta(...)` on the RAW value, which string-concatenation
+                // coerces. `"content":5` forwards "5" and accumulates "5" into
+                // the assistant replay message; requiring a string dropped it
+                // entirely and silently shortened the next round's body.
+                if let raw = delta?["content"], raw.isJSTruthy {
+                    let text = jsStringCoerce(raw)
                     content += text
                     if !token.isCancelled { onDelta(text) }
                 }
                 for tc in delta?["tool_calls"]?.arrayValue ?? [] {
-                    // `index` is PROVIDER-CONTROLLED, so it must not reach the
-                    // trapping `Int(_: Double)` initializer: that aborts the
-                    // process for |x| >= 2^63 and for +/-Infinity, and
-                    // `{"index":1e999}` parses to Infinity. `jsRoundToInt`
-                    // clamps instead - it exists for exactly this reason.
-                    let idx = tc["index"]?.numberValue.map { jsRoundToInt($0) } ?? 0
+                    // `index` is PROVIDER-CONTROLLED. Kept as the raw Double RN
+                    // keys its Map by (see the `toolCalls` declaration); `+0` on
+                    // a zero normalizes -0 to +0 to match SameValueZero. No
+                    // narrowing happens here at all any more, so the trapping
+                    // `Int(_: Double)` initializer is out of reach by
+                    // construction rather than by clamping.
+                    let rawIdx = tc["index"]?.numberValue ?? 0
+                    let idx = rawIdx == 0 ? 0 : rawIdx
                     var cur = toolCalls[idx] ?? ToolCall()
                     if let id = tc["id"]?.stringValue, !id.isEmpty { cur.id = id }
                     if let name = tc["function"]?["name"]?.stringValue, !name.isEmpty { cur.name = name }
-                    if let args = tc["function"]?["arguments"]?.stringValue, !args.isEmpty {
-                        cur.arguments += args
+                    // RN: `cur.function.arguments += tc.function.arguments`
+                    // under a truthy guard - a string CONCAT, so a non-string
+                    // fragment coerces (`"arguments":9` appends "9").
+                    if let args = tc["function"]?["arguments"], args.isJSTruthy {
+                        cur.arguments += jsStringCoerce(args)
                     }
                     toolCalls[idx] = cur
                 }
             }
         }
 
-        let dropped = !sawDone && finishReason == nil
+        // RN: `!sawDone && !finishReason` over the raw value - see
+        // `sawTruthyFinishReason`.
+        let dropped = !sawDone && !sawTruthyFinishReason
         if dropped && content.isEmpty && toolCalls.isEmpty {
             throw StreamError("stream dropped before any content arrived")
         }

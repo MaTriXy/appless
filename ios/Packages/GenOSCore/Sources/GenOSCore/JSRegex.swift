@@ -57,16 +57,58 @@ enum JSRegex {
     }
 
     /// `text.replace(re, replacement)` for a NON-global regex: first match only.
+    ///
+    /// The splice runs on UTF-16 CODE UNITS - the same units the `NSRange` the
+    /// regex engine hands back is expressed in, and the same units JS's
+    /// `String.prototype.replace` operates on.
+    ///
+    /// It must NOT go through `NSString.replacingCharacters(in:with:)`:
+    /// swift-corelibs-foundation rounds the `NSRange` to GRAPHEME-CLUSTER
+    /// boundaries first, so any match that ENDS inside a grapheme cluster
+    /// under-deletes. Two reproduced consequences, both on strings a model can
+    /// emit (a combining mark straight after a delimiter is ONE grapheme with
+    /// it, and the mark is not part of the match):
+    ///
+    /// - `cleanLang("```" + U+0301 + "\nx")` returned "`" + U+0301 + "\nx" -
+    ///   one backtick of the opening fence SURVIVED - where RN and Kotlin both
+    ///   return U+0301 + "\nx". The fence is stripped on every model-generated
+    ///   screen, so this corrupted real output.
+    /// - `replace(/b/, "X")` on "ab" + U+0301 + "c" returned "aXb" + U+0301 +
+    ///   "c": the range collapsed to EMPTY, so the template was INSERTED and
+    ///   nothing was deleted. RN gives "aX" + U+0301 + "c".
+    ///
+    /// Same technique as `jsSlice` / `jsUTF16Index` below. The result is
+    /// decoded from one combined unit array rather than concatenating three
+    /// decoded pieces, so a splice landing between the halves of a surrogate
+    /// pair recombines exactly as JS concatenation does instead of minting a
+    /// pair of U+FFFDs.
+    ///
+    /// `replacingAll` is NOT affected - see its note.
     static func replacingFirst(_ pattern: String, in text: String, with template: String) -> String {
         let re = compile(pattern)
         let ns = text as NSString
         let range = NSRange(location: 0, length: ns.length)
         guard let m = re.firstMatch(in: text, range: range) else { return text }
         let replaced = re.replacementString(for: m, in: text, offset: 0, template: template)
-        return ns.replacingCharacters(in: m.range, with: replaced)
+        let units = Array(text.utf16)
+        let lo = min(max(0, m.range.location), units.count)
+        let hi = min(lo + max(0, m.range.length), units.count)
+        var out: [UInt16] = []
+        out.reserveCapacity(units.count + replaced.utf16.count)
+        out.append(contentsOf: units[..<lo])
+        out.append(contentsOf: replaced.utf16)
+        out.append(contentsOf: units[hi...])
+        return String(decoding: out, as: UTF16.self)
     }
 
     /// `text.replace(re, replacement)` for a GLOBAL regex.
+    ///
+    /// `stringByReplacingMatches` splices at the UTF-16 level itself, so it does
+    /// NOT have `replacingCharacters`' grapheme-rounding hazard: verified in
+    /// `JSRegexSpliceTests` against node for matches ending inside a grapheme
+    /// cluster (`replace(/b/g, "X")` on "ab" + U+0301 + "c" → "aX" + U+0301 +
+    /// "c" in both). It is left delegating rather than re-spelled by hand so the
+    /// two paths cannot drift apart in different directions.
     static func replacingAll(_ pattern: String, in text: String, with template: String) -> String {
         let re = compile(pattern)
         let range = NSRange(text.startIndex..., in: text)
@@ -290,15 +332,64 @@ func jsParseInt(_ s: String) -> Double {
     return negative ? -magnitude : magnitude
 }
 
-/// JS `String(value)` for tool-call argument coercion (`args.query ?? ""`).
+/// JS `Number::toString` - what `String(n)` and `"" + n` produce.
+///
+/// NOT `JSONValue.numberString`, which is `JSON.stringify`'s number rule and
+/// renders every non-finite value as `null`. `String(Infinity)` is "Infinity"
+/// and `String(NaN)` is "NaN", and Infinity is REACHABLE from a provider
+/// document: `JSON.parse("1e999")` is Infinity. Finite values (including -0 →
+/// "0" and 1e21 → "1e+21") share `numberString`, which is pinned against node.
+func jsNumberToString(_ n: Double) -> String {
+    if n.isNaN { return "NaN" }
+    if n.isInfinite { return n > 0 ? "Infinity" : "-Infinity" }
+    return JSONValue.numberString(n)
+}
+
+/// JS `String(value)` / `"" + value` - the ECMAScript ToString abstract
+/// operation, NOT `JSON.stringify`.
+///
+/// This used to return `stringified()` for arrays and objects, which is JSON
+/// text: `[1,2]` came back as "[1,2]" where JS gives "1,2", and `{"a":1}` as
+/// `{"a":1}` where JS gives "[object Object]". Both READMEs listed that as a
+/// permanent deviation justified by "a non-string never survives the non-empty
+/// check" - which is false: `String([1,2])` is "1,2", non-empty, so a
+/// model-supplied array `query` reached the Exa request body with different
+/// bytes in each runtime. Now ported properly, so the deviation is gone.
+///
+/// Array ToString is `Array.prototype.join(",")`: null and undefined elements
+/// contribute the EMPTY string (so `String([null])` is ""), nested arrays
+/// recurse, and any other object contributes "[object Object]". A plain object
+/// has no `toString` override, so it is always "[object Object]".
+///
+/// `nil` and `.null` both map to "" rather than "undefined"/"null": every call
+/// site fuses the JS `?? ""` / truthiness guard that precedes the coercion
+/// (`String(args.query ?? "")`, `if (delta.content)`, `msg || "stream error"`),
+/// so neither value can reach a bare `String()` in the reference.
 func jsStringCoerce(_ value: JSONValue?) -> String {
     switch value {
     case .none, .some(.null): return ""
     case .some(.string(let s)): return s
-    case .some(.number(let n)): return JSONValue.numberString(n)
+    case .some(.number(let n)): return jsNumberToString(n)
     case .some(.bool(let b)): return b ? "true" : "false"
-    case .some(.array), .some(.object): return value!.stringified()
+    case .some(.object): return "[object Object]"
+    case .some(.array(let items)): return jsArrayJoin(items)
     }
+}
+
+/// `Array.prototype.join(",")` under ToString (see `jsStringCoerce`).
+private func jsArrayJoin(_ items: [JSONValue]) -> String {
+    items.map { item -> String in
+        switch item {
+        // JS: a null/undefined ELEMENT joins as "", unlike a null ARGUMENT to
+        // String(), which is "null". `String([null])` is "".
+        case .null: return ""
+        case .array(let inner): return jsArrayJoin(inner)
+        case .object: return "[object Object]"
+        case .string(let s): return s
+        case .number(let n): return jsNumberToString(n)
+        case .bool(let b): return b ? "true" : "false"
+        }
+    }.joined(separator: ",")
 }
 
 /// JS `Math.round(x)`: the integral Number closest to `x`, ties going toward

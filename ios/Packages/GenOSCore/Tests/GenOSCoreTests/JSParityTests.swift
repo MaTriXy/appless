@@ -437,7 +437,8 @@ import Testing
         )
 
         // node: JSON.stringify(JSON.parse('{"z":1,"a":{"y":2,"b":3}}')) round-trips verbatim.
-        let parsed = try? #require(JSONValue.parse(#"{"z":1,"a":{"y":2,"b":3}}"#))
+        let parsed = JSONValue.parse(#"{"z":1,"a":{"y":2,"b":3}}"#)
+        #expect(parsed != nil)
         #expect(Data((parsed?.stringified() ?? "").utf8) == Data(#"{"z":1,"a":{"y":2,"b":3}}"#.utf8))
 
         #expect(JSONValue.object(["a": .number(1), "b": .number(2)])

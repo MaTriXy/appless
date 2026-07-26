@@ -256,13 +256,63 @@ internal fun jsDecodeURIComponent(s: String): String? {
     return out.toString()
 }
 
-/** JS `String(value)` for tool-call argument coercion (`args.query ?? ""`). */
+/**
+ * JS `String(value)` / `"" + value` — the ECMAScript ToString abstract
+ * operation, NOT `JSON.stringify`.
+ *
+ * This used to return `stringified()` for arrays and objects, which is JSON
+ * text: `[1,2]` came back as "[1,2]" where JS gives "1,2", and `{"a":1}` as
+ * `{"a":1}` where JS gives "[object Object]". Both READMEs listed that as a
+ * permanent deviation justified by "a non-string never survives the non-empty
+ * check" — which is false: `String([1,2])` is "1,2", non-empty, so a
+ * model-supplied array `query` reached the Exa request body with different
+ * bytes in each runtime. Now ported properly, so the deviation is gone.
+ *
+ * `null` maps to "" rather than "null": every call site fuses the JS `?? ""` /
+ * truthiness guard that precedes the coercion (`String(args.query ?? "")`,
+ * `if (delta.content)`, `msg || "stream error"`), so a null can never reach a
+ * bare `String()` in the reference.
+ */
 internal fun jsStringCoerce(value: JsonValue?): String = when (value) {
     null, JsonValue.Null -> ""
     is JsonValue.Str -> value.value
-    is JsonValue.Num -> JsonValue.numberString(value.value)
+    is JsonValue.Num -> jsNumberToString(value.value)
     is JsonValue.Bool -> if (value.value) "true" else "false"
-    is JsonValue.Arr, is JsonValue.Obj -> value.stringified()
+    is JsonValue.Obj -> "[object Object]"
+    is JsonValue.Arr -> jsArrayJoin(value.values)
+}
+
+/**
+ * JS `Number::toString` — what `String(n)` and `"" + n` produce.
+ *
+ * NOT [JsonValue.numberString], which is `JSON.stringify`'s number rule and
+ * renders every non-finite value as `null`. `String(Infinity)` is "Infinity"
+ * and `String(NaN)` is "NaN", and Infinity is REACHABLE from a provider
+ * document: `JSON.parse("1e999")` is Infinity. Finite values (including -0 →
+ * "0" and 1e21 → "1e+21") share `numberString`, which is pinned against node.
+ */
+internal fun jsNumberToString(n: Double): String = when {
+    n.isNaN() -> "NaN"
+    n == Double.POSITIVE_INFINITY -> "Infinity"
+    n == Double.NEGATIVE_INFINITY -> "-Infinity"
+    else -> JsonValue.numberString(n)
+}
+
+/**
+ * `Array.prototype.join(",")` under ToString (see [jsStringCoerce]): a
+ * null/undefined ELEMENT joins as the EMPTY string — unlike a null ARGUMENT to
+ * `String()`, which is "null" — so `String([null])` is "". Nested arrays
+ * recurse; any other object contributes "[object Object]".
+ */
+private fun jsArrayJoin(items: List<JsonValue>): String = items.joinToString(",") { item ->
+    when (item) {
+        JsonValue.Null -> ""
+        is JsonValue.Arr -> jsArrayJoin(item.values)
+        is JsonValue.Obj -> "[object Object]"
+        is JsonValue.Str -> item.value
+        is JsonValue.Num -> jsNumberToString(item.value)
+        is JsonValue.Bool -> if (item.value) "true" else "false"
+    }
 }
 
 /**

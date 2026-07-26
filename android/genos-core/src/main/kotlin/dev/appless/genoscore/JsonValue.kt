@@ -10,9 +10,10 @@ import kotlin.math.floor
  *
  * [Obj] holds a `LinkedHashMap`, so key order is INSERTION order — which is
  * exactly what `JSON.stringify` emits (modulo canonical array indices, handled
- * in [stringified]). The Swift port needed an explicit `keyOrder` hint here
- * because `Dictionary` is unordered; on the JVM the parity is free, and object
- * keys parsed out of a document keep document order too.
+ * in [stringified]). On the JVM that parity is free, and object keys parsed out
+ * of a document keep document order too. The Swift sibling had to build a
+ * purpose-made insertion-ordered `JSONObject` to reach the same place, because
+ * its `Dictionary` is unordered; neither port has a `keyOrder` hint any more.
  */
 public sealed interface JsonValue {
     public data class Str(val value: String) : JsonValue
@@ -129,10 +130,32 @@ public sealed interface JsonValue {
             return indices + rest
         }
 
+        /**
+         * `JSON.stringify` of a string, including ES2019 **well-formed**
+         * quoting: an UNPAIRED surrogate is emitted as a `\udXXX` ESCAPE, not
+         * as a raw code unit.
+         *
+         * This is observable on the wire. A JVM `String` can hold a lone
+         * surrogate (which is why this port keeps RN's parse behavior verbatim
+         * where the Swift sibling cannot), and `StreamClient` UTF-8-encodes the
+         * accumulated content as the assistant replay message on every tool
+         * round. Emitting the raw unit made `String.toByteArray(UTF_8)`
+         * substitute `?` (0x3F), so a round-2 body diverged from RN's bytes.
+         * node:
+         *
+         *     Buffer.from(JSON.stringify("pre\ud83dpost")).toString("hex")
+         *     // 227072655c7564383364706f737422  ->  "pre\ud83dpost"
+         *
+         * A well-formed PAIR is passed through as the astral character it
+         * encodes, exactly as `JSON.stringify` does. Lowercase hex, matching
+         * node's output byte for byte.
+         */
         public fun encodeJsonString(s: String): String {
             val out = StringBuilder(s.length + 2)
             out.append('"')
-            for (c in s) {
+            var i = 0
+            while (i < s.length) {
+                val c = s[i]
                 when {
                     c == '"' -> out.append("\\\"")
                     c == '\\' -> out.append("\\\\")
@@ -142,8 +165,19 @@ public sealed interface JsonValue {
                     c == '\u0008' -> out.append("\\b")
                     c == '\u000C' -> out.append("\\f")
                     c.code < 0x20 -> out.append(String.format("\\u%04x", c.code))
+                    // A high surrogate followed by a low surrogate is a real
+                    // astral character: emit both units verbatim.
+                    Character.isHighSurrogate(c) &&
+                        i + 1 < s.length &&
+                        Character.isLowSurrogate(s[i + 1]) -> {
+                        out.append(c).append(s[i + 1])
+                        i++
+                    }
+                    // Anything else in the surrogate range is UNPAIRED.
+                    Character.isSurrogate(c) -> out.append(String.format("\\u%04x", c.code))
                     else -> out.append(c)
                 }
+                i++
             }
             out.append('"')
             return out.toString()

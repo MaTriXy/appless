@@ -304,8 +304,26 @@ public class StreamClient(
         var buffer = ""
         var sawDone = false
         var finishReason: String? = null
+        // RN stores whatever truthy `finish_reason` arrived, string or not, and
+        // `dropped` tests that raw value for truthiness. A NON-STRING truthy
+        // finish_reason (`"finish_reason":42`) therefore makes RN's stream
+        // NOT-dropped while `finishReason` above stays null, so this flag
+        // carries the truthiness separately. Without it a chunk carrying only
+        // `finish_reason:42` and no [DONE] threw "stream dropped before any
+        // content arrived" here while RN called onDone({dropped:false}).
+        var sawTruthyFinishReason = false
         var content = ""
-        val toolCalls = LinkedHashMap<Int, ToolCall>()
+        // Keyed by the RAW Double, not a narrowed Int. RN keys a JS Map by the
+        // Number, so `3.2` and `3.7` are TWO calls; `toInt()` truncated them
+        // into one, concatenating both `arguments` blobs into
+        // `{"query":"x"}{"query":"y"}`, which fails JSON.parse and degrades to
+        // args={} — one tool round instead of two, and a round-2 body that
+        // differs from RN's bytes. -0.0 is normalized to +0.0 below because a
+        // JS Map key uses SameValueZero, under which -0 and 0 are the SAME key
+        // (verified against node) while boxed `java.lang.Double.equals`
+        // separates them. NaN cannot arise: JSON has no NaN literal and the
+        // overflow case `1e999` parses to +Infinity, which keys fine.
+        val toolCalls = LinkedHashMap<Double, ToolCall>()
 
         byteStream.collect { chunk ->
             // Stop pulling chunks the moment the token is cancelled, even if the
@@ -337,38 +355,66 @@ public class StreamClient(
                 // ("", 0, false, null) are skipped, not thrown.
                 val errorValue = parsed["error"]
                 if (errorValue != null && errorValue.isJsTruthy) {
-                    val msg = errorValue.str ?: errorValue["message"]?.str
-                    throw StreamException(if (!msg.isNullOrEmpty()) msg else "stream error")
+                    // RN: `typeof chunk.error === "string" ? chunk.error :
+                    // chunk.error.message`, then `new Error(msg || "stream
+                    // error")`. `new Error` runs ToString on a non-string
+                    // argument, so `{"error":{"message":42}}` surfaces "42" and
+                    // `{"message":[1,2]}` surfaces "1,2"; reading only the
+                    // string accessor collapsed every one of those to the
+                    // generic "stream error", hiding the provider's actual
+                    // complaint.
+                    val raw = if (errorValue is JsonValue.Str) errorValue else errorValue["message"]
+                    // `msg || "stream error"`: JS truthiness, so 0/false/""/null
+                    // still fall through to the generic text.
+                    val msg = if (raw != null && raw.isJsTruthy) jsStringCoerce(raw) else "stream error"
+                    throw StreamException(msg)
                 }
                 val choice = parsed["choices"]?.get(0)
-                // RN: `if (choice?.finish_reason)` — truthy, so a NON-STRING
-                // truthy finish_reason would land there but is dropped by the
-                // string accessor here; unreachable with real providers.
-                choice?.get("finish_reason")?.str?.takeIf { it.isNotEmpty() }?.let {
-                    finishReason = it
+                // RN: `if (choice?.finish_reason)` — a TRUTHY guard over the RAW
+                // value. Only a string can ever equal "tool_calls"/"length", so
+                // `finishReason` stays string-typed, but the truthiness itself
+                // is what `dropped` consults — hence the separate flag.
+                choice?.get("finish_reason")?.takeIf { it.isJsTruthy }?.let { fr ->
+                    sawTruthyFinishReason = true
+                    fr.str?.let { finishReason = it }
                 }
                 val delta = choice?.get("delta")
-                val text = delta?.get("content")?.str
-                if (!text.isNullOrEmpty()) {
+                // RN: `if (delta?.content)` — truthy, then `content +=` and
+                // `onDelta(...)` on the RAW value, which string-concatenation
+                // coerces. `"content":5` forwards "5" and accumulates "5" into
+                // the assistant replay message; requiring a string dropped it
+                // entirely and silently shortened the next round's body.
+                delta?.get("content")?.takeIf { it.isJsTruthy }?.let { raw ->
+                    val text = jsStringCoerce(raw)
                     content += text
                     if (!token.isCancelled) onDelta(text)
                 }
                 for (tc in delta?.get("tool_calls")?.arr ?: emptyList()) {
-                    val idx = tc["index"]?.num?.toInt() ?: 0
+                    // `index` is PROVIDER-CONTROLLED. Kept as the raw Double RN
+                    // keys its Map by (see the `toolCalls` declaration);
+                    // `+ 0.0` on a zero normalizes -0.0 to +0.0 to match
+                    // SameValueZero. No narrowing happens here at all any more.
+                    val rawIdx = tc["index"]?.num ?: 0.0
+                    val idx = if (rawIdx == 0.0) 0.0 else rawIdx
                     var cur = toolCalls[idx] ?: ToolCall()
                     tc["id"]?.str?.takeIf { it.isNotEmpty() }?.let { cur = cur.copy(id = it) }
                     tc["function"]?.get("name")?.str?.takeIf { it.isNotEmpty() }?.let {
                         cur = cur.copy(name = it)
                     }
-                    tc["function"]?.get("arguments")?.str?.takeIf { it.isNotEmpty() }?.let {
-                        cur = cur.copy(arguments = cur.arguments + it)
+                    // RN: `cur.function.arguments += tc.function.arguments`
+                    // under a truthy guard — a string CONCAT, so a non-string
+                    // fragment coerces (`"arguments":9` appends "9").
+                    tc["function"]?.get("arguments")?.takeIf { it.isJsTruthy }?.let {
+                        cur = cur.copy(arguments = cur.arguments + jsStringCoerce(it))
                     }
                     toolCalls[idx] = cur
                 }
             }
         }
 
-        val dropped = !sawDone && finishReason == null
+        // RN: `!sawDone && !finishReason` over the raw value — see
+        // `sawTruthyFinishReason`.
+        val dropped = !sawDone && !sawTruthyFinishReason
         if (dropped && content.isEmpty() && toolCalls.isEmpty()) {
             throw StreamException("stream dropped before any content arrived")
         }
