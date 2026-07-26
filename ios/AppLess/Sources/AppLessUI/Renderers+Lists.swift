@@ -75,11 +75,14 @@ struct ListItemView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
 
             if p.isTruthy("trailing"), let trailing = p.text("trailing") {
+                // No `lineLimit`: RN sets `numberOfLines={1}` on the title and
+                // the subtitle (components.tsx L199, L206) but NOT on the
+                // trailing value (L213-217), so a long one wraps rather than
+                // being truncated.
                 Text(trailing)
                     .cdsTextStyle(CdsMetrics.Typography.rowTrailing)
                     .foregroundStyle(Color(ctx.theme.ink2))
                     .monospacedDigit()
-                    .lineLimit(1)
             }
 
             if showsChevron {

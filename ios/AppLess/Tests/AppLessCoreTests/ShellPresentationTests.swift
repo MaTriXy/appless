@@ -193,6 +193,27 @@ import Testing
         #expect(ScreenTreeCache.staleIds(cached: [], wanted: ["s1"]).isEmpty)
     }
 
+    /// The parse decision. Re-parsing identical text on every store
+    /// notification would redo the whole tree for every OTHER screen's token.
+    @Test func treeRefreshSkipsUnchangedTextAndClearsEmptyScreens() {
+        #expect(
+            ScreenTreeCache.refresh(cleanedText: "Card()", lastParsed: nil)
+                == .parse("Card()"))
+        #expect(
+            ScreenTreeCache.refresh(cleanedText: "Card()", lastParsed: "Card()") == .unchanged)
+        #expect(
+            ScreenTreeCache.refresh(cleanedText: "Card(x)", lastParsed: "Card()")
+                == .parse("Card(x)"))
+        // A screen with no content yet drops its tree, so the host shows the
+        // skeleton rather than the previous screen's.
+        #expect(ScreenTreeCache.refresh(cleanedText: "", lastParsed: "Card()") == .clear)
+        // …but an already-empty screen is unchanged, not cleared again - the
+        // order of the two tests is what makes that true.
+        #expect(ScreenTreeCache.refresh(cleanedText: "", lastParsed: "") == .unchanged)
+        // First sight of an empty screen still clears (nothing was parsed).
+        #expect(ScreenTreeCache.refresh(cleanedText: "", lastParsed: nil) == .clear)
+    }
+
     // MARK: - Active-screen reporting
 
     /// RN re-arms prefetch on `[topId, top?.status]`. Reporting on every store
