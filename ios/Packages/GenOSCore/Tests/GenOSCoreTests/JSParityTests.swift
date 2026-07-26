@@ -92,14 +92,19 @@ import Testing
         #expect(JSONValue.parse("\"a\u{7F}b\"") == .string("a\u{7F}b"))
     }
 
-    @Test func loneSurrogateEscapesRejectedAsSwiftStringLimit() {
-        // Known divergence (documented in JSONValue.swift): JSON.parse
-        // ACCEPTS lone-surrogate \u escapes - node: JSON.parse('"\\ud800x"')
-        // yields a 2-unit string. Swift String cannot hold a lone surrogate,
-        // so the document is rejected and the SSE chunk skipped.
-        #expect(JSONValue.parse("\"\\ud800x\"") == nil)
-        #expect(JSONValue.parse("\"\\udc00\"") == nil)
-        #expect(JSONValue.parse("\"\\ud800\\ud800\"") == nil)
+    @Test func loneSurrogateEscapesBecomeReplacementNotChunkLoss() {
+        // node: JSON.parse('"\\ud800x"') yields a 2-unit string carrying the
+        // unpaired surrogate, which degrades to U+FFFD the moment it is UTF-8
+        // encoded. Swift String cannot hold a lone surrogate at all, so we
+        // substitute U+FFFD at parse time: the same NET observable result.
+        //
+        // Rejecting the document instead (the previous behavior) was strictly
+        // worse than the divergence it was avoiding - StreamClient skips a
+        // chunk it cannot parse, so ONE bad scalar silently dropped an entire
+        // content delta while RN kept the delta and lost only that character.
+        #expect(JSONValue.parse("\"\\ud800x\"") == .string("\u{FFFD}x"))
+        #expect(JSONValue.parse("\"\\udc00\"") == .string("\u{FFFD}"))
+        #expect(JSONValue.parse("\"\\ud800\\ud800\"") == .string("\u{FFFD}\u{FFFD}"))
         // Proper pairs still decode.
         #expect(JSONValue.parse("\"\\ud83d\\ude00\"") == .string("😀"))
     }
@@ -158,11 +163,14 @@ import Testing
         // Compare UTF-8 BYTES: Swift's String == is canonical equivalence and
         // would absorb a normalization-level escaping bug.
         #expect(
-            Data(body.stringified(keyOrder: ["model", "temperature", "max_completion_tokens", "stream"]).utf8)
+            Data(body.stringified().utf8)
                 == Data(#"{"model":"gemma-4-31b","temperature":0.8,"max_completion_tokens":3072,"stream":true}"#.utf8)
         )
-        // Unhinted keys sort; nested values recurse; large/tiny numbers keep
-        // JSON.stringify formatting.
+        // Nested objects keep INSERTION order at every depth, exactly like
+        // JSON.stringify - node: JSON.stringify({zeta:1e16, alpha:1e-7,
+        // nested:{b:-0, a:[1,null]}}) === the string below. The previous
+        // expectation here sorted the nested keys, which encoded the bug this
+        // ordered representation fixes.
         let form: [(String, JSONValue)] = [
             ("zeta", .number(1e16)),
             ("alpha", .number(1e-7)),
@@ -170,7 +178,7 @@ import Testing
         ]
         #expect(
             Data(JSONValue.stringifyOrdered(form).utf8)
-                == Data(#"{"zeta":10000000000000000,"alpha":1e-7,"nested":{"a":[1,null],"b":0}}"#.utf8)
+                == Data(#"{"zeta":10000000000000000,"alpha":1e-7,"nested":{"b":0,"a":[1,null]}}"#.utf8)
         )
     }
 

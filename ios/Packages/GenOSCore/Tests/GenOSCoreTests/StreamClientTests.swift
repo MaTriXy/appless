@@ -454,8 +454,14 @@ import Testing
 
     @Test func jsonParseStrictChunksSkippedAndStreamContinues() async {
         // Chunks JSON.parse would throw on (leading-zero number, raw control
-        // char in string, lone-surrogate escape) are skipped like RN's
-        // try/catch-continue, not processed and not fatal.
+        // char in string) are skipped like RN's try/catch-continue, not
+        // processed and not fatal.
+        //
+        // A lone-surrogate escape is NOT in that set: node's JSON.parse
+        // ACCEPTS it, so RN forwards the delta and only that scalar degrades
+        // to U+FFFD at UTF-8 encoding time. We match that - the chunk is
+        // delivered as "\u{FFFD}", not dropped. Dropping it would lose a whole
+        // content delta over one bad character.
         let recorder = await run(.sse([
             "data: {\"choices\":[{\"delta\":{\"content\":01}}]}\n",
             "data: {\"choices\":[{\"delta\":{\"content\":\"a\tb\"}}]}\n",
@@ -464,7 +470,7 @@ import Testing
             sseFinish("stop"),
             sseDone,
         ]))
-        #expect(recorder.content == "ok")
+        #expect(recorder.content == "\u{FFFD}ok")
         #expect(recorder.errors.isEmpty)
         #expect(recorder.doneInfos == [StreamEndInfo(truncated: false, dropped: false)])
     }

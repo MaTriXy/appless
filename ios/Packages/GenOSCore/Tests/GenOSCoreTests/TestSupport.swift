@@ -336,7 +336,8 @@ final class StreamRecorder {
             onDelta: { [weak self] d in self?.deltas.append(d) },
             onDone: { [weak self] i in self?.doneInfos.append(i) },
             onError: { [weak self] e in
-                self?.errors.append((e as? StreamError)?.message ?? String(describing: e))
+                // Same degradation the controller applies (bare message).
+                self?.errors.append(jsErrorMessage(e))
             },
             onToolRound: { [weak self] calls in
                 guard let self else { return .abort }

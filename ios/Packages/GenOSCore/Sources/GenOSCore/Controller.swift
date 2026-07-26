@@ -100,7 +100,12 @@ public final class GenOSController {
                     }
                     return
                 }
-                let genMs = s.map { Int((self.clock.now - $0.startedAt).rounded()) }
+                // RN: Math.round(performance.now() - s.startedAt). JS ties go
+                // toward +INFINITY, so `.rounded()` (away from zero) is wrong
+                // for negative halves, and `Int(_:)` TRAPPED on NaN and on
+                // out-of-Int64 magnitudes; jsRoundToInt does both correctly and
+                // clamps, matching the Kotlin port exactly.
+                let genMs = s.map { jsRoundToInt(self.clock.now - $0.startedAt) }
                 let osCommand = s.flatMap { Lang.parseOsCommand($0.content) }
                 self.store.patch(id) {
                     $0.status = .done
@@ -114,7 +119,9 @@ public final class GenOSController {
             onError: { [weak self] error in
                 guard let self, !stale() else { return }
                 self.inflight.removeValue(forKey: id)
-                let message = (error as? StreamError)?.message ?? String(describing: error)
+                // RN emits the bare err.message; jsErrorMessage strips the
+                // type-and-case decoration String(describing:) would add.
+                let message = jsErrorMessage(error)
                 self.store.patch(id) {
                     $0.status = .error
                     $0.error = message
@@ -222,16 +229,12 @@ public final class GenOSController {
             }
         }
         let app = apps.first { $0.id == appId.lowercased() }
-        // RN: appId.charAt(0).toUpperCase() + appId.slice(1). Grapheme
-        // prefix(1)/dropFirst() is provably equivalent for every BMP input:
-        // uppercasing is scalar-wise, so "e\u{301}…" → "E\u{301}…" both ways,
-        // and surrogate halves that JS splits and rejoins unchanged come out
-        // identical too. The only divergence is a non-BMP FIRST character
-        // with a case mapping (e.g. Deseret), where JS's lone-surrogate
-        // charAt(0) can't uppercase but Swift can - kept grapheme-level
-        // deliberately, since the UTF-16 spelling would corrupt such ids
-        // into U+FFFD (Swift cannot hold JS's lone surrogates).
-        let fallbackName = appId.prefix(1).uppercased() + appId.dropFirst()
+        // RN: appId.charAt(0).toUpperCase() + appId.slice(1) - a UTF-16 CODE
+        // UNIT split, so an astral first character (Deseret) has no case
+        // mapping and is left alone. Grapheme-level prefix(1).uppercased()
+        // used to uppercase it instead, a three-way disagreement; jsCapitalizeFirst
+        // ports the UTF-16 spelling without ever materializing a lone surrogate.
+        let fallbackName = jsCapitalizeFirst(appId)
         let id = launchScreen(LaunchInput(
             appId: app?.id ?? appId.lowercased(),
             appName: app?.name ?? fallbackName,

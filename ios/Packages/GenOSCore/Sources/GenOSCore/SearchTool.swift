@@ -93,8 +93,10 @@ public struct ExaSearchTool: ToolExecuting {
         do {
             return formatWebResults(query: query, results: try await webSearch(query: query))
         } catch {
-            let message = (error as? StreamError)?.message ?? String(describing: error)
-            return "ERROR: web search failed (\(message))"
+            // RN emits the bare err.message here too - this string goes to the
+            // MODEL, so a Swift type-and-case description would be noise the
+            // Kotlin port does not send.
+            return "ERROR: web search failed (\(jsErrorMessage(error)))"
         }
     }
 
