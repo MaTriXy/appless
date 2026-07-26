@@ -6,6 +6,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextInput
 import dev.appless.app.shell.GenOSShell
 import dev.appless.app.shell.ShellHost
@@ -97,7 +98,7 @@ class ShellCompositionTest {
             handlers: StreamHandlers,
             token: StreamCancelToken,
         ) {
-            val request = messages.last().content
+            val request = messages.last().content.orEmpty()
             requests += request
             if (token.isCancelled) return
             handlers.onDelta(screens[request] ?: defaultScreen)

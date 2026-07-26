@@ -464,6 +464,41 @@ class RendererHostileInputTest {
     }
 
     /**
+     * A `Slider` whose bounds are NOT FINITE must still reach a resting state.
+     *
+     * Found by this tier: `numberOrNull()` is a faithful port of
+     * `typeof x === "number"` (NaN IS a number in JS), and RN's `<RNSlider
+     * minimumValue={NaN}>` simply draws a dead track. Compose's `Slider`
+     * instead animates its thumb toward NaN FOREVER — the composition never
+     * goes idle, which on a phone is a pinned core and a flat battery, and in
+     * this suite was an infinite hang with no indication of the cause.
+     *
+     * `Props.finiteOrNull` is the fix, applied to `min`/`max`/`step` and to the
+     * value read back out of form state. If it is ever reverted, THIS test is
+     * where the suite stops, which is what makes the failure diagnosable.
+     */
+    @Test
+    fun a_slider_with_non_finite_bounds_settles() {
+        for (bad in listOf(Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY)) {
+            host.show(
+                node(
+                    "Slider",
+                    "name" to PropValue.Str("s"),
+                    "label" to PropValue.Str("Bounded"),
+                    "min" to PropValue.Num(bad),
+                    "max" to PropValue.Num(bad),
+                    "step" to PropValue.Num(bad),
+                    "value" to arr(PropValue.Num(bad)),
+                ),
+            )
+            // Reaching here at all is the assertion that matters; the readout
+            // proves it degraded to the documented fallback (min = 0) rather
+            // than printing "NaN" or JSON's "null".
+            assertEquals("bound $bad", listOf("Bounded", "0"), compose.renderedText())
+        }
+    }
+
+    /**
      * Deeply nested children: 40 `Card`s inside each other with a marker at the
      * bottom.
      *

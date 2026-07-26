@@ -63,6 +63,20 @@ public fun PropValue?.intOrNull(): Int? = numberOrNull()?.let {
     if (it.isFinite()) it.toInt() else null
 }
 
+/**
+ * A number that can safely become a COORDINATE — finite only.
+ *
+ * `NaN` and `±Infinity` are legal JS numbers (and a partial parse can hand one
+ * to any prop), and RN tolerates them: `<RNSlider minimumValue={NaN}>` renders
+ * a degenerate track and stops there. Compose does not — a `Slider` given a
+ * non-finite value or range animates its thumb toward it FOREVER, so the
+ * composition never goes idle and the frame loop pins a core.
+ *
+ * Treating a non-finite number as ABSENT is therefore the port's rule wherever
+ * a prop reaches layout, and it is the same guard [intOrNull] already applies.
+ */
+public fun PropValue?.finiteOrNull(): Double? = numberOrNull()?.takeIf { it.isFinite() }
+
 /** The value only when it really is a boolean. */
 public fun PropValue?.boolOrNull(): Boolean? = (this as? PropValue.Bool)?.value
 

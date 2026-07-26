@@ -177,7 +177,28 @@ class NodeHost(private val rule: ComposeContentTestRule) {
         }
     }
 
-    /** Replace the composed element and settle the composition. */
+    /**
+     * Replace the composed element and settle the composition.
+     *
+     * ### The hazard `waitForIdle` carries
+     *
+     * `waitForIdle` pumps frames until the composition reports idle. A
+     * composition that never settles therefore hangs the test JVM rather than
+     * failing it — and a renderer CAN be pushed into that state by a hostile
+     * prop: Compose's `Slider` given a non-finite bound animates its thumb
+     * toward NaN forever. That is a real defect (100% CPU on a phone), so it is
+     * fixed at the source (`Props.finiteOrNull`, applied in `SliderRenderer`)
+     * rather than papered over here, and
+     * `RendererHostileInputTest.a_slider_with_non_finite_bounds_settles`
+     * is the named regression test for it.
+     *
+     * Driving the clock by hand instead was tried and rejected: with
+     * `mainClock.autoAdvance = false`, a state write that adds a NEW layout node
+     * never reaches the semantics tree, so every content assertion silently
+     * reads an empty tree — a test tier that certifies rather than probes,
+     * which is worse than a hang. The build-level backstop is the `timeout` on
+     * the `Test` task in `app/build.gradle.kts`.
+     */
     fun show(node: ElementNode?) {
         current = null
         generation += 1

@@ -175,6 +175,10 @@ dependencies {
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
     systemProperty("file.encoding", "UTF-8")
+    // A Compose composition that never reaches idle makes `waitForIdle` spin
+    // forever (see `NodeHost.show`). Without this the whole build would hang
+    // instead of failing, on CI as well as locally.
+    timeout.set(Duration.ofMinutes(20))
     // Robolectric resolves `android-all-instrumented` from Maven Central on
     // first use and caches it under ~/.m2; pinning the repo keeps a CI runner
     // from depending on whatever `mavenLocal` happens to hold.

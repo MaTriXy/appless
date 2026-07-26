@@ -48,6 +48,7 @@ import dev.appless.app.render.LocalFormStore
 import dev.appless.app.render.LocalTriggerAction
 import dev.appless.app.render.RenderNode
 import dev.appless.app.render.actionPlan
+import dev.appless.app.render.finiteOrNull
 import dev.appless.app.render.get
 import dev.appless.app.render.isTruthy
 import dev.appless.app.render.items
@@ -362,9 +363,13 @@ internal object SliderRenderer : ComposeRenderer {
     override fun Render(node: ElementNode) {
         val t = LocalMdTheme.current
         val name = node["name"].reactText()
-        val min = node["min"].numberOrNull() ?: 0.0
-        val max = node["max"].numberOrNull() ?: 1.0
-        val defaults = node["defaultValue"].items().mapNotNull { it.numberOrNull() }
+        // `finiteOrNull`, not `numberOrNull`: a NaN/Infinity bound would make
+        // Compose's Slider animate toward it forever (see the accessor's note).
+        // RN degrades to a dead track instead; both stop at "unusable bound",
+        // and falling back to the defaults keeps the readout meaningful.
+        val min = node["min"].finiteOrNull() ?: 0.0
+        val max = node["max"].finiteOrNull() ?: 1.0
+        val defaults = node["defaultValue"].items().mapNotNull { it.finiteOrNull() }
 
         // `props.value ?? props.defaultValue ?? [props.min]` — L191-195.
         val seed: PropValue = node["value"]
@@ -373,12 +378,14 @@ internal object SliderRenderer : ComposeRenderer {
         val field = rememberField(name, "Slider", seed)
 
         // `Array.isArray(field.value) ? Number(field.value[0]) : (defaultValue?.[0] ?? min)`
-        val current = field.value?.numbersValue?.firstOrNull()
+        // The seed can itself be non-finite (`Slider(…, value: [NaN])`), so the
+        // same finiteness rule applies on the way out of form state.
+        val current = field.value?.numbersValue?.firstOrNull()?.takeIf { it.isFinite() }
             ?: defaults.firstOrNull()
             ?: min
 
         val discrete = node["variant"].stringOrNull() == "discrete"
-        val step = node["step"].numberOrNull() ?: 1.0
+        val step = node["step"].finiteOrNull() ?: 1.0
         // Compose counts INTERMEDIATE stops; RN's `step` is the increment.
         val steps = if (discrete && step > 0 && max > min) {
             (((max - min) / step).roundToInt() - 1).coerceAtLeast(0)
