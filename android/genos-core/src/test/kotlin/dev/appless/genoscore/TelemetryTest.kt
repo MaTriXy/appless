@@ -1,6 +1,5 @@
 package dev.appless.genoscore
 
-import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import java.io.File
@@ -87,13 +86,13 @@ class TelemetryTest {
         var made = 0
         val newId = { made++; "generated-$made" }
 
-        val first = Telemetry.deviceId(store, backgroundScope, newId)
-        advanceUntilIdle()
+        val first = Telemetry.deviceId(store, appScope(), newId)
+        testScheduler.advanceUntilIdle()
         assertEquals("generated-1", first)
         assertEquals("generated-1", store.values[Telemetry.ID_STORAGE_KEY])
 
-        val second = Telemetry.deviceId(store, backgroundScope, newId)
-        advanceUntilIdle()
+        val second = Telemetry.deviceId(store, appScope(), newId)
+        testScheduler.advanceUntilIdle()
         assertEquals("generated-1", second)
         assertEquals(1, made)
     }
@@ -102,8 +101,8 @@ class TelemetryTest {
     fun `a failing store read degrades to a fresh id`() = runTest {
         val store = MemorySecureStore()
         store.failReads = true
-        val id = Telemetry.deviceId(store, backgroundScope) { "fresh" }
-        advanceUntilIdle()
+        val id = Telemetry.deviceId(store, appScope()) { "fresh" }
+        testScheduler.advanceUntilIdle()
         assertEquals("fresh", id)
         assertNull(store.values[Telemetry.ID_STORAGE_KEY])
     }
@@ -121,17 +120,17 @@ class TelemetryTest {
             platform = "android",
             store = store,
             http = http,
-            scope = backgroundScope,
+            scope = appScope(),
             newId = { "anon-x" },
             onDispatch = { dispatched = it },
         )
-        advanceUntilIdle()
+        testScheduler.advanceUntilIdle()
         // The write is still gated, yet the event already went out.
         assertNotNull(job)
         assertNotNull(dispatched)
         assertEquals(1, http.requests.size)
         store.releaseWrites()
-        advanceUntilIdle()
+        testScheduler.advanceUntilIdle()
         assertEquals("anon-x", store.values[Telemetry.ID_STORAGE_KEY])
     }
 
@@ -145,11 +144,11 @@ class TelemetryTest {
             platform = "ios",
             store = store,
             http = http,
-            scope = backgroundScope,
+            scope = appScope(),
             newId = { "anon-y" },
             onDispatch = { dispatched = it },
         )
-        advanceUntilIdle()
+        testScheduler.advanceUntilIdle()
         // initTelemetry returned even though the fetch never completes.
         assertNotNull(job)
         assertTrue(job.isActive)
@@ -170,7 +169,7 @@ class TelemetryTest {
             platform = "android",
             store = store,
             http = http,
-            scope = backgroundScope,
+            scope = appScope(),
             newId = { "unused" },
         )
         job?.join()
@@ -189,10 +188,10 @@ class TelemetryTest {
             platform = "android",
             store = store,
             http = http,
-            scope = backgroundScope,
+            scope = appScope(),
             newId = { "nope" },
         )
-        advanceUntilIdle()
+        testScheduler.advanceUntilIdle()
         assertNull(job)
         assertTrue(http.requests.isEmpty())
         assertTrue(store.values.isEmpty())
@@ -207,7 +206,7 @@ class TelemetryTest {
             platform = "android",
             store = store,
             http = http,
-            scope = backgroundScope,
+            scope = appScope(),
             newId = { "anon-z" },
         )
         job?.join()

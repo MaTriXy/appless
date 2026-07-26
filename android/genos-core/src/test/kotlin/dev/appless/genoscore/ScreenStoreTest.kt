@@ -1,7 +1,7 @@
 package dev.appless.genoscore
 
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
@@ -185,25 +185,25 @@ class ScreenStoreTest {
         val clock = ManualClock()
         val store = ScreenStore(clock)
         var ticks = 0
-        val collector = backgroundScope.launch { store.updates.collect { ticks++ } }
-        advanceUntilIdle()
+        val collector = appScope().launch { store.updates.collect { ticks++ } }
+        testScheduler.advanceUntilIdle()
         assertEquals(1, store.listenerCount)
 
         store.upsert(screen())
-        advanceUntilIdle()
+        testScheduler.advanceUntilIdle()
         assertEquals(1, ticks)
 
         store.append("s1", "a")
         store.append("s1", "b")
-        advanceUntilIdle()
+        testScheduler.advanceUntilIdle()
         assertEquals(1, ticks, "buffered appends do not tick")
 
         clock.advance(GenOSConstants.STREAM_FLUSH_MS)
-        advanceUntilIdle()
+        testScheduler.advanceUntilIdle()
         assertEquals(2, ticks)
 
         collector.cancel()
-        advanceUntilIdle()
+        testScheduler.advanceUntilIdle()
         assertEquals(0, store.listenerCount, "cancelling the collector unsubscribes")
     }
 
@@ -212,19 +212,29 @@ class ScreenStoreTest {
         val clock = ManualClock()
         val store = ScreenStore(clock)
         var ticks = 0
-        // Never collect anything while the burst happens: the CONFLATED buffer
-        // keeps at most one pending wake-up instead of queueing a backlog.
-        val collector = backgroundScope.launch {
+        // A deliberately slow consumer: it is suspended for the whole burst, so
+        // the CONFLATED buffer must keep at most ONE pending wake-up rather than
+        // queueing a backlog of 50 stale ticks.
+        val collector = appScope().launch {
             store.updates.collect {
                 ticks++
+                delay(1_000)
             }
         }
-        advanceUntilIdle()
+        testScheduler.advanceUntilIdle()
+        assertEquals(0, ticks)
+
         repeat(50) { store.upsert(screen("s$it")) }
-        advanceUntilIdle()
-        assertTrue(ticks in 1..50)
+        testScheduler.advanceUntilIdle()
+        // Exactly two deliveries: the one in flight when the burst started, plus
+        // the single conflated survivor. An unbounded (or even 2-deep) buffer
+        // would deliver all 50 stale wake-ups here.
+        assertEquals(2, ticks, "50 notifies collapse into one buffered wake-up")
+        assertEquals(50, store.all().size, "every upsert still landed in the store")
+
         collector.cancel()
-        advanceUntilIdle()
+        testScheduler.advanceUntilIdle()
+        assertEquals(0, store.listenerCount)
     }
 
     @Test

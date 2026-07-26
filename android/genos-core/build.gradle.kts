@@ -18,6 +18,9 @@ kotlin {
     compilerOptions {
         // The port must stay warning-clean; the phase gate greps for warnings.
         allWarningsAsErrors.set(true)
+        // `runTest`'s backgroundScope / advanceUntilIdle (test sources only in
+        // practice) are still marked experimental in coroutines 1.9.
+        optIn.add("kotlinx.coroutines.ExperimentalCoroutinesApi")
     }
 }
 

@@ -40,16 +40,29 @@ class JsParseIntTest {
     }
 
     @Test
-    fun `Char isWhitespace disagrees with the ECMAScript set in both directions`() {
-        // U+0085 NEL: JVM whitespace, NOT JS whitespace.
-        assertTrue('\u0085'.isWhitespace())
+    fun `the JS whitespace set diverges from every JVM notion of whitespace`() {
+        // U+0085 NEL is NOT JS whitespace, but Java's UNICODE_CHARACTER_CLASS
+        // `\s` accepts it — which is why the ported patterns spell the class
+        // out instead of ever reaching for `(?U)`.
         assertTrue(!isJsWhiteSpace('\u0085'))
+        assertTrue(Regex("(?U)\\A\\s\\z").matches("\u0085"))
         assertEquals("\u0085x\u0085", jsTrim("\u0085x\u0085"))
-        // U+00A0 NBSP and U+FEFF: JS whitespace, NOT JVM whitespace.
-        assertTrue(!'\u00A0'.isWhitespace())
-        assertTrue(isJsWhiteSpace('\u00A0'))
+
+        // U+FEFF IS JS whitespace, and NO JVM predicate agrees.
         assertTrue(isJsWhiteSpace('\uFEFF'))
+        assertTrue(!'\uFEFF'.isWhitespace())
+        assertTrue(!Regex("(?U)\\A\\s\\z").matches("\uFEFF"))
+
+        // U+00A0 IS JS whitespace; java.util.regex's DEFAULT `\s` (ASCII-only)
+        // misses it, even though Char.isWhitespace() happens to accept it.
+        assertTrue(isJsWhiteSpace('\u00A0'))
+        assertTrue(!Regex("\\A\\s\\z").matches("\u00A0"))
         assertEquals("x", jsTrim("\u00A0\uFEFFx\u00A0"))
+
+        // U+2028/U+2029 are LineTerminators in JS, and \v is WhiteSpace.
+        assertTrue(isJsWhiteSpace('\u2028'))
+        assertTrue(isJsWhiteSpace('\u2029'))
+        assertTrue(isJsWhiteSpace('\u000B'))
     }
 }
 

@@ -2,9 +2,11 @@ package dev.appless.genoscore
 
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.test.TestScope
 import kotlin.coroutines.coroutineContext
 
 // Manual clock
@@ -387,3 +389,15 @@ val sampleApp: AppDef = AppDef(
     tileEnd = "#007aff",
     request = "Open the \"Weather\" app home screen.",
 )
+
+/**
+ * A coroutine scope on the test dispatcher that `runTest` does NOT wait for.
+ *
+ * `runTest`'s own `backgroundScope` is deliberately excluded from
+ * `advanceUntilIdle` (foreground work only), so a fire-and-forget persist or a
+ * detached stream launched into it would never run inside an assertion window.
+ * Reusing the test's context with a FRESH `Job` keeps the tasks foreground —
+ * `advanceUntilIdle()` drains them — while detaching them from the test's job so
+ * a deliberately hung coroutine cannot stall the test.
+ */
+fun TestScope.appScope(): CoroutineScope = CoroutineScope(coroutineContext + Job())
