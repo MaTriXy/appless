@@ -3,66 +3,53 @@ import Testing
 
 @testable import AppLessCore
 
-/// The SwiftUI renderers cannot be COMPILED on Linux (no SwiftUI SDK), so
-/// nothing can register there and `conformanceReport().registeredCount` is
-/// always 0. These tests read `Sources/AppLessUI/*.swift` as text instead, so
-/// Linux CI still fails loudly when a component is left unwired - macOS CI then
-/// proves the same thing for real by asserting `report.isComplete`.
+/// The REGISTRY side of the conformance gate: the counts and the gate line,
+/// computed from the contract rather than typed.
+///
+/// The SOURCE side - which renderers `Renderers.swift` actually wires, under
+/// which contract names, reading which props, drawing which icons - lives in
+/// ``RendererSourceGateTests``, which reads `Sources/AppLessUI/*.swift` as
+/// TEXT. The three text checks that used to live here (`contains` on the
+/// guard, `contains` on each registration, and a count of
+/// `registry.register(.` occurrences) were strictly weaker and have been
+/// replaced there: a `contains` count cannot tell 30 distinct registrations
+/// from 29 distinct plus one duplicate.
+///
+/// Neither side is a type check. On Linux the SwiftUI target compiles to
+/// nothing, so `conformanceReport().registeredCount` is always 0 here and only
+/// macOS CI can assert the LIVE count.
 @Suite struct RendererWiringTests {
 
-    private static let uiDirectory = URL(fileURLWithPath: #filePath)
-        .deletingLastPathComponent()  // AppLessCoreTests
-        .deletingLastPathComponent()  // Tests
-        .deletingLastPathComponent()  // AppLess
-        .appendingPathComponent("Sources/AppLessUI")
-
-    private func uiSource(_ name: String) throws -> String {
-        try String(
-            contentsOf: Self.uiDirectory.appendingPathComponent(name), encoding: .utf8)
-    }
-
-    /// Every renderer file must compile to nothing on Linux - that is the whole
-    /// reason `swift build` is green here.
-    @Test func everyUIFileIsGuarded() throws {
-        let files = try FileManager.default
-            .contentsOfDirectory(atPath: Self.uiDirectory.path)
-            .filter { $0.hasSuffix(".swift") }
-            .sorted()
-        #expect(!files.isEmpty)
-        for file in files {
-            let source = try uiSource(file)
-            #expect(
-                source.contains("#if canImport(SwiftUI)"),
-                "\(file) is not wrapped in `#if canImport(SwiftUI)`")
+    /// 33 contract components minus the 3 structural placeholders. Derived
+    /// from the schema tables both ways, so a change to one that is not
+    /// mirrored in the other is red.
+    @Test func theRenderableSetIsThirtyAndIsDerivedNotTyped() {
+        #expect(ContractSchema.componentCount == 33)
+        #expect(ContractSchema.structuralPlaceholders.count == 3)
+        #expect(ContractSchema.renderableComponents.count == 30)
+        #expect(RenderableComponent.requiredCount == 30)
+        #expect(RenderableComponent.allCases.count == 30)
+        #expect(
+            Set(RenderableComponent.allCases.map(\.rawValue))
+                == Set(ContractSchema.renderableComponents))
+        // The placeholders are consumed by their parents, so they must NOT be
+        // representable as a renderable component.
+        for name in ContractSchema.structuralPlaceholders {
+            #expect(RenderableComponent(rawValue: name) == nil, "\(name)")
         }
     }
 
-    @Test func registerCupertinoRenderersWiresEveryContractComponent() throws {
-        let source = try uiSource("Renderers.swift")
-        for component in RenderableComponent.allCases.sorted() {
-            #expect(
-                source.contains("registry.register(.\(component.rawValue))"),
-                "registerCupertinoRenderers() never registers \(component.rawValue)")
-        }
-    }
-
-    /// One registration per component and no more - a duplicated line would
-    /// silently shadow an earlier renderer.
-    @Test func thereAreExactlyThirtyRegistrations() throws {
-        let source = try uiSource("Renderers.swift")
-        let registrations = source
-            .components(separatedBy: "registry.register(.")
-            .dropFirst()
-            .count
-        #expect(registrations == RenderableComponent.requiredCount)
-        #expect(registrations == 30)
-    }
-
-    /// The registry's own gate line, printed for CI to grep. On Linux this is
-    /// the DECLARED count; macOS CI asserts the live one equals it.
-    @Test func declaredGateLineIsComplete() {
+    /// An empty registry reports nothing registered but still DECLARES 30 -
+    /// the distinction Linux depends on, since nothing can register here. The
+    /// negative half matters: a report that claimed `isComplete` on Linux
+    /// would make the whole gate meaningless.
+    @Test func anEmptyRegistryDeclaresThirtyAndRegistersNone() {
         let report = RendererRegistry(designSystem: "cupertino").conformanceReport()
         #expect(report.declaredGateLine == "renderers registered: 30/30")
+        #expect(report.registeredCount == 0)
+        #expect(!report.isComplete)
+        #expect(report.gateLine == "renderers registered: 0/30")
+        #expect(report.gateLine != report.declaredGateLine)
         print(report.declaredGateLine)
     }
 }
