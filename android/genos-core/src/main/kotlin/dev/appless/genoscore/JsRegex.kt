@@ -216,7 +216,7 @@ internal fun jsDecodeURIComponent(s: String): String? {
         val lead = (hi shl 4) or lo
         i += 3
         if (lead < 0x80) {
-            out.append(lead.toChar())
+            out.append(Char(lead))
             continue
         }
         // Number of leading 1-bits gives the sequence length.
@@ -244,11 +244,11 @@ internal fun jsDecodeURIComponent(s: String): String? {
         if (value > 0x10FFFF) return null
         if (value in 0xD800..0xDFFF) return null
         if (value <= 0xFFFF) {
-            out.append(value.toChar())
+            out.append(Char(value))
         } else {
             val u = value - 0x10000
-            out.append((0xD800 + (u shr 10)).toChar())
-            out.append((0xDC00 + (u and 0x3FF)).toChar())
+            out.append(Char(0xD800 + (u shr 10)))
+            out.append(Char(0xDC00 + (u and 0x3FF)))
         }
     }
     return out.toString()

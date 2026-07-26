@@ -120,6 +120,7 @@ public class UnsplashCache(
             val urls = fetchCandidates(q)
             cache[q] = urls
             pending.remove(q)
+            Unit
         }
         pending[q] = task
         task.await()

@@ -149,7 +149,7 @@ internal class Utf8StreamDecoder {
 
             if (bytesNeeded == 0) {
                 when {
-                    byte <= 0x7F -> out.append(byte.toChar())
+                    byte <= 0x7F -> out.append(Char(byte))
                     byte in 0xC2..0xDF -> {
                         bytesNeeded = 1
                         codePoint = byte and 0x1F
@@ -197,18 +197,18 @@ internal class Utf8StreamDecoder {
             bytesNeeded = 0
             bytesSeen = 0
             if (scalar <= 0xFFFF) {
-                out.append(scalar.toChar())
+                out.append(Char(scalar))
             } else {
                 val u = scalar - 0x10000
-                out.append((0xD800 + (u shr 10)).toChar())
-                out.append((0xDC00 + (u and 0x3FF)).toChar())
+                out.append(Char(0xD800 + (u shr 10)))
+                out.append(Char(0xDC00 + (u and 0x3FF)))
             }
         }
         return out.toString()
     }
 
     private companion object {
-        const val REPLACEMENT = '�'
+        const val REPLACEMENT = '\uFFFD'
     }
 }
 

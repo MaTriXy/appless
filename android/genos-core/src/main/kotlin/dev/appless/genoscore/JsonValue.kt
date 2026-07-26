@@ -380,7 +380,7 @@ private class JsonParser(private val text: String) {
                 'n' -> out.append('\n')
                 'r' -> out.append('\r')
                 't' -> out.append('\t')
-                'u' -> out.append((parseHex4() ?: return null).toChar())
+                'u' -> out.append(Char(parseHex4() ?: return null))
                 else -> return null
             }
         }
