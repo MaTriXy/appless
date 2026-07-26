@@ -24,6 +24,20 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
+
+        // AppLess is BYOK: there is no key in the build. These exist so a
+        // developer can inject one locally (`-PapplessCerebrasKey=…`) exactly
+        // like the RN app's `EXPO_PUBLIC_*` env override.
+        buildConfigField(
+            "String",
+            "CEREBRAS_KEY",
+            "\"" + (providers.gradleProperty("applessCerebrasKey").orNull ?: "") + "\"",
+        )
+        buildConfigField(
+            "String",
+            "EXA_KEY",
+            "\"" + (providers.gradleProperty("applessExaKey").orNull ?: "") + "\"",
+        )
     }
 
     buildFeatures {
@@ -69,17 +83,22 @@ kotlin {
  * Failing loudly when the file is missing is deliberate: a silently absent
  * prompt would produce an app that streams garbage instead of screens.
  */
-val stageSystemPrompt by tasks.registering(Copy::class) {
-    val source = rootProject.layout.projectDirectory.file("../spec/prompt/system-prompt.generated.txt")
-    from(source) { rename { "system-prompt.txt" } }
+val stageSpecAssets by tasks.registering(Copy::class) {
+    val prompt = rootProject.layout.projectDirectory.file("../spec/prompt/system-prompt.generated.txt")
+    // The contract the parser validates against — the SAME file `:ui-core`'s
+    // ContractSchema is generated from, so the app can never drift from it.
+    val contract = rootProject.layout.projectDirectory.file("../spec/contract/genos.schema.json")
+    from(prompt) { rename { "system-prompt.txt" } }
+    from(contract)
     into(layout.buildDirectory.dir("generated/appless-assets"))
     doFirst {
-        require(source.asFile.isFile) { "missing ${source.asFile} — run spec/prompt/build-prompt.mjs" }
+        require(prompt.asFile.isFile) { "missing ${prompt.asFile} — run spec/prompt/build-prompt.mjs" }
+        require(contract.asFile.isFile) { "missing ${contract.asFile} — run spec/contract/export-schema.mjs" }
     }
 }
 
 tasks.withType<com.android.build.gradle.tasks.MergeSourceSetFolders>().configureEach {
-    dependsOn(stageSystemPrompt)
+    dependsOn(stageSpecAssets)
 }
 
 dependencies {
