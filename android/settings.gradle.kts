@@ -8,6 +8,9 @@
 
 pluginManagement {
     repositories {
+        // AGP + the Compose compiler plugin live on Google's Maven; the pure
+        // Kotlin/JVM modules never touch it.
+        google()
         mavenCentral()
         gradlePluginPortal()
     }
@@ -16,6 +19,10 @@ pluginManagement {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
     repositories {
+        // androidx (Compose, activity, lifecycle, security-crypto) is published
+        // ONLY to Google's Maven. `PREFER_SETTINGS` ignores project-level
+        // repository blocks, so `:app` cannot declare it itself.
+        google()
         mavenCentral()
     }
 }
@@ -25,3 +32,4 @@ rootProject.name = "appless-android"
 include(":openui-lang")
 include(":genos-core")
 include(":ui-core")
+include(":app")
