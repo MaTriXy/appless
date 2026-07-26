@@ -125,6 +125,18 @@ public struct GenOSShellView: View {
             )
             .opacity(ShellChrome.Minimize.opacity(at: model.minimizeProgress))
             .allowsHitTesting(!model.minimizing)
+            // iOS has no hardware back key, so RN's `BackHandler` table is
+            // bound to the left-edge swipe instead. Simultaneous, so a
+            // horizontal drag inside the screen still scrolls it.
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 24)
+                    .onEnded { value in
+                        guard value.startLocation.x < 24, value.translation.width > 60,
+                            abs(value.translation.height) < 60
+                        else { return }
+                        model.handleBackGesture()
+                    }
+            )
         }
     }
 
