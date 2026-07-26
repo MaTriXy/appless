@@ -6,17 +6,14 @@ plan is in [`NATIVE_MIGRATION_PLAN.md`](NATIVE_MIGRATION_PLAN.md); this is the
 ground truth against it.
 
 Every number below was produced by running the gate, not by reading a summary.
-Reproduce them with the commands in the "Verification" column.
+Reproduce them with the commands in §7.
 
-- Measured in the working tree at commit `f62cf0d` (`WIP checkpoint: Compose
-  switcher`) plus uncommitted changes.
+- Measured in a clean working tree at commit `fd6a706`
+  (`GenOSCore/genos-core: close the parity review against a real RN oracle`).
 - Toolchains used: Swift 6.1 (swift-6.1-RELEASE, Linux x86_64), OpenJDK
   21.0.10, Node v22.22.2.
-- Several modules are being written concurrently by different agents, so the
-  working tree moves — `android/app` went from *not compiling* at `b052036` to
-  compiling with 71 green unit tests at `f62cf0d`, during the writing of this
-  document. The counts are a snapshot; the *shape* of the table — which modules
-  are converged and which are not, and why — is the durable part.
+- The counts are a snapshot and will move; the *shape* of the table — which
+  modules are converged and which are not, and why — is the durable part.
 
 ---
 
@@ -32,46 +29,47 @@ Legend for **State**:
 | Module (path) | Language | Purpose | Verification | Count | State |
 |---|---|---|---|---|---|
 | `spec/` | Markdown + JSON | Platform-neutral source of truth: grammar (`openui-lang.md`), capability map, icon map, contract JSON Schema, prompt sections | `spec-gates.yml` | 33 contract components; **30 renderable** | converged |
-| `spec/fixtures/` | `.oui` + `.expected.json` | The golden oracle both ports are graded against | `cd spec/fixtures/generator && npm test` | **97 fixtures** (82 complete + 15 partial), all paired | converged |
+| `spec/fixtures/` | `.oui` + `.expected.json` | The golden oracle both ports are graded against | `cd spec/fixtures/generator && npm test` | **114 fixtures** (99 complete + 15 partial), all paired | converged |
 | `spec/fixtures/generator/` | Node ESM | Generates expected trees from the *real* react-lang parser; scanner + streaming-sync probes; differential-fuzz corpus generator | `npm test` (3 sub-gates: corpus integrity, determinism, scanner, streaming sync) | corpus regenerates byte-identically across two runs | converged |
-| `ios/Packages/OpenUILang/` | Swift | Streaming openui-lang parser (lexer → Pratt expressions → JS value model → materialization → streaming watermark cache) | `swift test` | **25 test functions**, one parameterized over all **97 fixtures** | converged |
-| `ios/Packages/GenOSCore/` | Swift | Models, `ScreenStore` + controller, SSE client + tool loop, Exa/Unsplash tools, key store, telemetry | `swift test` | **203 tests** | converged |
-| `ios/AppLess/Sources/AppLessCore/` | Swift (no SwiftUI) | Everything visual-but-not-SwiftUI: design tokens, icon→SF Symbol map, contract schema tables, renderer registry, chart/map/form geometry, shell decision logic, wordmark vector geometry | `cd ios/AppLess && swift test` | **220 tests** (19 source files) | converged |
-| `ios/AppLess/Sources/AppLessUI/` | SwiftUI | 30 Cupertino renderers + the OS shell (home, screen host, switcher, key gate, chrome) | `swiftc -parse` only on Linux; real compile is macOS-only | **21 files, 22 parsed units**; **0 type-checked on Linux** | **in-flight** |
-| `android/openui-lang/` | Kotlin/JVM | The Kotlin port of the same parser | `./gradlew :openui-lang:test` | **121 tests** (99 in `FixtureOracleTest` = 97 fixtures + 2 meta) | converged |
-| `android/genos-core/` | Kotlin/JVM | The Kotlin port of `GenOSCore` | `./gradlew :genos-core:test` | **279 tests** | converged |
-| `android/ui-core/` | Kotlin/JVM | The Android analog of `AppLessCore`: M3 tokens, Material Symbols map, renderer registry (30/30), platform-independent renderer logic | `./gradlew :ui-core:test` | **95 tests** | converged |
-| `android/app/` | Kotlin + Compose | Material 3 renderers, shell, switcher, key gate, `MainActivity`, OkHttp/Keystore platform layer | `./gradlew :app:assembleDebug :app:testDebugUnitTest` | compiles + assembles; **71 JVM unit tests** green | **in-flight** — see below |
+| `ios/Packages/OpenUILang/` | Swift | Streaming openui-lang parser (lexer → Pratt expressions → JS value model → materialization → streaming watermark cache), plus a JS prototype-chain object model | `swift test` | **40 test functions**, one parameterized over all **114 fixtures** | converged |
+| `ios/Packages/GenOSCore/` | Swift | Models, `ScreenStore` + controller, SSE client + tool loop, Exa/Unsplash tools, key store, telemetry | `swift test` | **237 tests** | converged |
+| `ios/AppLess/Sources/AppLessCore/` | Swift (no SwiftUI) | Everything visual-but-not-SwiftUI: design tokens, icon→SF Symbol map, contract schema tables, renderer registry, chart/map/form geometry, shell decision logic, renderer/shell presentation decisions, wordmark vector geometry | `cd ios/AppLess && swift test` | **296 tests** (23 source files) | converged |
+| `ios/AppLess/Sources/AppLessUI/` | SwiftUI | 30 Cupertino renderers + the OS shell (home, screen host, switcher, key gate, chrome) | `swiftc -parse` + a text-level source gate on Linux; real compile is macOS-only | **22 parsed units**; **0 type-checked on Linux**; 30/30 renderers read props through `AppLessCore`, 23/30 delegate a named decision to a Linux-tested Core type | **in-flight** |
+| `android/openui-lang/` | Kotlin/JVM | The Kotlin port of the same parser | `./gradlew :openui-lang:test` | **153 tests**, exercising all **114 fixtures** | converged |
+| `android/genos-core/` | Kotlin/JVM | The Kotlin port of `GenOSCore` | `./gradlew :genos-core:test` | **313 tests** | converged |
+| `android/ui-core/` | Kotlin/JVM | The Android analog of `AppLessCore`: M3 tokens, Material Symbols map, renderer registry (30/30), platform-independent renderer logic | `./gradlew :ui-core:test` | **97 tests** | converged |
+| `android/app/` | Kotlin + Compose | Material 3 renderers, shell, switcher, key gate, `MainActivity`, OkHttp/Keystore platform layer | `./gradlew :app:assembleDebug :app:testDebugUnitTest` | compiles + assembles; **183 unit tests**, of which 112 execute real compositions under Robolectric; `compose renderers executed: 30/30` | converged |
 | `src/`, `App.tsx`, `__tests__/` | TypeScript / RN | The original Expo app — **frozen behavioral reference** | `npm test` (jest-expo) | 4 suites: `render`, `render-material`, `store`, `tools` | reference (unchanged) |
 
-Totals across the two native ports in this tree: **448 Swift test functions**
-and **566 Kotlin tests**, all green.
+Totals across the two native ports in this tree: **573 Swift test functions**
+(40 + 237 + 296) and **746 Kotlin tests** (153 + 313 + 97 + 183), all green.
 
-### Why `android/app` is still "in-flight" even though it is green
+### Why `android/app` is now converged, and `AppLessUI` is not
 
-`:app:assembleDebug` now succeeds and `:app:testDebugUnitTest` reports 71 tests,
-0 failures — `RoutingTest` (27), `ShellStateTest` (25), `FormBridgeTest` (7),
-`MaterialSymbolsTest` (7), `RendererConformanceTest` (5). That is real progress
-and worth more than the equivalent iOS state, because Android's UI toolchain,
-unlike SwiftUI's, runs on Linux.
+`android/app` used to be in-flight for a specific reason: its 71 tests were all
+plain JVM unit tests, so **no `@Composable` was ever executed** — the renderers
+were compiled and never run. That is closed. A Robolectric +
+`createComposeRule()` tier now runs inside `testDebugUnitTest` on Linux with no
+emulator, and `RendererExecutionGate` composes every contract component and
+prints `compose renderers executed: 30/30`, with a companion test asserting the
+table equals `RenderableComponent.ALL` so nothing can be silently skipped. 28
+renderers are pinned by text reaching the semantics tree; `PhotoGrid` and
+`MapView` emit no text and are pinned by layout and by `ShadowWebView`; the five
+charts draw only into `Canvas` and additionally get a real draw pass, with an
+empty chart as a negative control.
 
-It is still in-flight for two reasons:
-
-1. **No Compose composable is ever executed.** All five suites are plain JVM
-   unit tests — no Robolectric, no `createComposeRule`. They test routing
-   decisions, shell state reduction, the form bridge, symbol mapping and
-   registry conformance, i.e. exactly the logic that could have lived in
-   `ui-core`. The `@Composable` functions themselves are compiled and never
-   run.
-2. **The module is uncommitted and moving.** At `b052036`,
-   `:app:compileDebugKotlin` failed on `HomeScreen.kt:167` (a `Modifier.padding`
-   overload). It was fixed while this document was being written. There is no
-   workflow gating it (see §3), so nothing yet prevents it going red again.
-
-Adding a Compose UI test tier (`createComposeRule`, or Robolectric with
-`ComposeContentTestRule`) would be the single highest-value verification
-addition on the Android side, and it is one the iOS side cannot copy — SwiftUI
-has no headless-on-Linux equivalent.
+**`AppLessUI` cannot copy any of this, and that asymmetry is now the single
+largest verification gap in the repo.** SwiftUI has no headless-on-Linux
+equivalent: `canImport(SwiftUI)` is false, the target compiles to an empty
+module, no `body` is ever type-checked let alone executed. What exists on Linux
+instead is a *text-level* gate (`RendererSourceGateTests`) that catches a
+renderer unregistered, registered twice, wired under the wrong contract name,
+declared but never wired, reading a prop the schema does not declare, or using
+an icon with no SF Symbol — plus `swiftc -parse` with the guards forced on. All
+nine of those checks were falsified by mutating the source and confirming each
+goes red. They are text checks, not type checks, and the distinction is the
+whole point: only `ios-app.yml` on macOS type-checks SwiftUI, **and it has never
+run**.
 
 ---
 
@@ -98,9 +96,14 @@ The conformance gate line is `renderers registered: N/30`:
   annotates why: "the SwiftUI layer cannot compile on Linux, so nothing
   registers here". This proves the contract is fully enumerated, not that the
   renderers exist.
-- On **macOS** (`ios-app.yml`) the same line is asserted against the *live*
-  count, i.e. that `registerCupertinoRenderers()` really did register 30. That
-  assertion has never run in this container.
+- On **macOS** (`ios-app.yml`) the gate asserts two things: that the
+  SwiftUI-guarded `AppLessUITests` suite actually COMPILED AND RAN, and that it
+  saw a *live* 30/30. The second check alone would be vacuous — `AppLessCore`
+  prints the same string on Linux, where nothing registers — so the workflow
+  greps for a test name that exists only inside `#if canImport(SwiftUI)`.
+  Neither assertion has ever run in this container.
+- On **Android** the equivalent line is genuinely live on Linux:
+  `compose renderers executed: 30/30` comes from real compositions.
 
 ---
 
@@ -108,18 +111,24 @@ The conformance gate line is `renderers registered: N/30`:
 
 | Workflow | Runner | Path filter | What it actually proves |
 |---|---|---|---|
-| `spec-gates.yml` | ubuntu | `spec/`, `patches/`, `contract.tsx`, `src/genos/generated/`, `scripts/embed-prompt.mjs`, `ios/Packages/OpenUILang/Tests/` | The fixture corpus regenerates deterministically and the committed trees are fresh; the contract schema matches `contract.tsx`; the prompt assembled from `spec/prompt/` is byte-identical to the shipped `SYSTEM_PROMPT`; every `.oui` has a valid-JSON twin and the corpus floors hold (≥60 complete, ≥12 partial — currently 82 and 15) |
+| `spec-gates.yml` | ubuntu | `spec/`, `patches/`, `contract.tsx`, `src/genos/generated/`, `scripts/embed-prompt.mjs`, `ios/Packages/OpenUILang/Tests/` | The fixture corpus regenerates deterministically and the committed trees are fresh; the contract schema matches `contract.tsx`; the prompt assembled from `spec/prompt/` is byte-identical to the shipped `SYSTEM_PROMPT`; every `.oui` has a valid-JSON twin and the corpus floors hold (≥60 complete, ≥12 partial — currently 99 and 15) |
 | `ios-app.yml` | **macos-15** | `ios/`, `spec/` | The tier Linux cannot provide. Selects Xcode ≥16.3, runs all three Swift package suites, asserts the **live** `renderers registered: 30/30`, then `xcodebuild`s `AppLessUI` for both `generic/platform=iOS` and `generic/platform=iOS Simulator`. This is the only place SwiftUI is ever type-checked. |
-| `differential-fuzz.yml` | ubuntu ×2 (one plain, one `swift:6.1-jammy`) | `ios/Packages/OpenUILang/`, `android/openui-lang/`, `spec/` | Byte-identical serialization of both ports against the JS oracle beyond the fixture corpus: a pinned campaign (39 sessions / 313 steps, seed `0xf122ed5`) plus `prefix` (~23k cumulative streaming steps), `nonmonotonic` (cache-reset paths) and `mutation` (hazard-alphabet single-code-point edits) campaigns. Two two-way comparisons against a *common* oracle, which is a three-way gate without paying for a macOS runner. |
+| `differential-fuzz.yml` | ubuntu ×2 (one plain, one `swift:6.1-jammy`) | `ios/Packages/OpenUILang/`, `android/openui-lang/`, `spec/` | Byte-identical serialization of both ports against the JS oracle beyond the fixture corpus: a pinned campaign (49 sessions / 389 steps, seed `0xf122ed5`, carrying committed oracle expectations) plus `prefix` (109/28,087 cumulative streaming steps), `nonmonotonic` (48/566, cache-reset paths), `mutation` (2,616 hazard-alphabet single-code-point edits) and `synthesis` (1,200/2,400) campaigns — **40,459 steps total**. It also runs `verify-collation.mjs` (244,650 ASCII pairs against V8 and both ports). `synthesis` is the only campaign NOT derived from the committed fixtures: it generates from a duck-typing key alphabet, and found a real bug on its first run that the hand-written fixtures had missed. Two two-way comparisons against a *common* oracle, which is a three-way gate without paying for a macOS runner. |
 | `all-gates.yml` | ubuntu ×3 | **none — every push and PR** | The umbrella. Re-runs the spec generator gates, all three Swift package suites (in `swift:6.1-jammy`), and the three pure-Kotlin Gradle modules, with no path filter, so one required check means "the Linux-runnable half of the repo is green at this commit". Deliberately excludes the macOS tier, the Android SDK tier, and the fuzz campaigns. |
 
-There is **no `android-app.yml`**. The Android SDK tier has no workflow at all,
-which is now the largest gap in CI coverage: `:app` compiles, assembles and has
-71 green unit tests locally, and *none of that is gated*. It was deliberately
-left out of `all-gates.yml`, which keeps to SDK-free jobs; it belongs in its own
-workflow (`./gradlew :app:assembleDebug :app:testDebugUnitTest` on
-`ubuntu-latest` with `android-actions/setup-android`), owned by whoever finishes
-the module.
+`android-app.yml` now exists (ubuntu, `android/**` + `spec/**`): it installs the
+pinned SDK, runs the three pure modules, runs `:app:testDebugUnitTest`, greps
+`renderers registered: 30/30` from the `:app` log **specifically** — `:ui-core`
+prints the same line for its declared count, so grepping the whole build would
+pass on a completely unwired UI — then does the real Compose compile via
+`:app:assembleDebug` and checks the APK carries the staged spec assets. It is
+deliberately kept out of `all-gates.yml`, which stays SDK-free.
+
+**Every workflow above except `spec-gates.yml` and `all-gates.yml` has never
+run**, so their green-ness is a claim about the YAML, not an observation. One
+gate was already found broken by reading: the iOS conformance step grepped a
+line `AppLessCore` also prints on Linux, and so could not distinguish a live
+registration from a declared one.
 
 ---
 
@@ -127,8 +136,8 @@ the module.
 
 Both parsers are graded against **the same fixture corpus**, generated from the
 actual `@openuidev/react-lang` runtime (v0.1.5 + `patches/@openuidev+react-lang+0.1.5.patch`)
-rather than from anyone's reading of the grammar. The Swift suite runs all 97
-fixtures through one parameterized test; the Kotlin suite runs them as 97
+rather than from anyone's reading of the grammar. The Swift suite runs all 114
+fixtures through one parameterized test; the Kotlin suite runs them as
 individual cases. A contract or grammar change must add fixtures first.
 
 This is not redundancy. Cross-checking two independent ports against one oracle
@@ -201,6 +210,37 @@ originally found by *ad-hoc* differential fuzzing during review.
 `differential-fuzz.yml` promotes that into a standing gate, so the next one is
 found by CI rather than by someone thinking to look.
 
+### Adversarial review rounds, and what they cost
+
+Both port pairs were then scored by independent adversarial reviewers held to a
+99/100 bar, each required to author its own probes rather than re-run the
+suites. Neither passed on the first attempt, and the findings are instructive
+about where verification was weakest:
+
+- **Parsers scored 84/100.** Three divergences present *identically in both
+  ports*, all in the serializer's duck-typing layer: `serializeStep` ignored
+  JS's `Object.keys(step)` semantics, `valueAST` was wrapped by value type
+  instead of by key name, and element identity was not read through the
+  prototype chain. **31,269 differential-fuzz steps had missed all three; 61
+  hand-written probe steps found them** — because every campaign was derived
+  from the committed fixtures by mutation. That is what the `synthesis`
+  campaign now fixes, and on its first run it found a further bug the
+  hand-written fixtures had missed.
+- **Cores scored 73/100**, including a **remotely-triggerable process abort**:
+  `StreamClient` narrowed the provider-controlled `tool_calls[].index` with
+  Swift's `Int(_: Double)`, which *traps* rather than clamps, so one SSE chunk
+  containing `{"index":1e300}` killed the app. The package already shipped the
+  correct clamping helper; it simply was not called. The same review found a
+  Swift string-corruption bug (`NSString.replacingCharacters` rounds ranges to
+  grapheme boundaries) reachable from every model-generated screen.
+
+The recurring pattern across all rounds is worth stating plainly: **the exact
+line that was fixed gets pinned by a test, while the identical hazard one line
+away stays untested.** The grapheme-rounding bug on the *closing* code fence
+was found, fixed and pinned — while the same hazard on the opening fence was
+not. Fixes are therefore now required to test the hazard *class*, and every new
+test is falsified (broken, confirmed red, restored) before it is trusted.
+
 Both ports also document their deviations in prose:
 `ios/Packages/OpenUILang/README.md` §KNOWN-DEVIATIONS and
 `android/openui-lang/README.md` §KNOWN-DEVIATIONS (plus a "JVM-vs-JS notes"
@@ -217,20 +257,23 @@ This section is the point of the document. Be blunt about it.
 1. **SwiftUI has never been type-checked in this container, and until
    `ios-app.yml` runs on a real macOS runner it has never been type-checked at
    all.** `swift build` / `swift test` on Linux compile every
-   `#if canImport(SwiftUI)` file to *nothing*. All 21 files of `AppLessUI` —
-   the 30 renderers and the entire OS shell — produce an empty module here.
-   What Linux *can* say is limited to two weak signals: a text-scanning test
-   asserting that all 30 registrations and the `canImport` guards are present,
-   and `swiftc -parse` over every UI file with the guards forced on (22 files
-   parsed). Both are syntax-level. Neither catches a type error, a missing
-   argument label, a wrong `ViewBuilder` shape, or a `@State` misuse.
+   `#if canImport(SwiftUI)` file to *nothing*; `AppLessUI` — the 30 renderers
+   and the entire OS shell — produces an empty module here. What Linux *can*
+   say has been strengthened but is still only two syntax-level signals: a
+   text-scanning source gate (registration present, not duplicated, not
+   misnamed, no undeclared prop read, no unmapped icon, nothing escaping the
+   `canImport` guard — all nine checks falsified by mutation), and
+   `swiftc -parse` over every UI file with the guards forced on (22 units).
+   Neither catches a type error, a missing argument label, a wrong
+   `ViewBuilder` shape, or a `@State` misuse. What *did* change is how much
+   logic is left in those bodies: all 30 renderers now read props through
+   `AppLessCore`, and 23/30 delegate a named decision to a Core type with
+   Linux tests behind it.
 
-2. **No Compose composable has ever been executed.** `android/app` compiles and
-   assembles a debug APK, and its 71 unit tests are green — but every one of
-   them is a plain JVM test of surrounding logic. There is no Robolectric and no
-   `createComposeRule`, so the Material 3 renderers, shell, chrome and key gate
-   are compiled and never run. Additionally, nothing in CI gates the module at
-   all (there is no `android-app.yml`), so its green state is local only.
+2. **~~No Compose composable has ever been executed.~~ CLOSED.** All 30
+   renderers plus the shell now execute in real Robolectric compositions
+   (`compose renderers executed: 30/30`), gated by `android-app.yml`. The
+   equivalent gap on iOS remains fully open and cannot be closed on Linux.
 
 3. **No simulator or device has ever run either native app.** Layout,
    scrolling, animation curves (the RN launch/push/pop transitions),
@@ -273,10 +316,10 @@ definitions and their exit criteria. Summary:
 | 0. Spec & fixtures | **done** |
 | 1. Swift parser | **done** |
 | 2. Swift core | **done** |
-| 3. iOS app | **in-flight** — code complete, verification blocked on macOS CI |
-| 4. iOS parity & hardening | **not started** |
+| 3. iOS app | **in-flight** — code complete; decision logic extracted into 296 Linux-tested `AppLessCore` cases, but SwiftUI type-checking is still blocked on macOS CI |
+| 4. iOS parity & hardening | **in-flight** — six RN divergences found and fixed by source-level audit (see §4); the manual side-by-side checklist is still not executed |
 | 5. Kotlin parser + core | **done** (parser, `genos-core`, and `ui-core`) |
-| 6. Android app | **in-flight** — `:app` compiles, assembles and passes 71 JVM unit tests, but no Compose code is executed by a test and no workflow gates it |
+| 6. Android app | **done** — `:app` compiles, assembles a real APK, and passes 183 tests, 112 of which execute real Compose compositions (`compose renderers executed: 30/30`); gated by `android-app.yml` |
 | 7. Wrap-up | **in-flight** — this document, the README rewrite and `all-gates.yml` |
 
 ---
@@ -290,21 +333,26 @@ export PATH=/opt/swift/usr/bin:$PATH
 cd spec/fixtures/generator && npm ci && npm test
 
 # iOS — the Linux-runnable half
-cd ios/Packages/OpenUILang && swift test    #  25 test functions / 97 fixtures
-cd ios/Packages/GenOSCore   && swift test   # 203 tests
-cd ios/AppLess              && swift test   # 220 tests (AppLessCore only)
-python3 ios/AppLess/Scripts/parse-swiftui.py  # 22 files parsed, not type-checked
+cd ios/Packages/OpenUILang && swift test    #  40 test functions / 114 fixtures
+cd ios/Packages/GenOSCore   && swift test   # 237 tests
+cd ios/AppLess              && swift test   # 296 tests (AppLessCore only)
+python3 ios/AppLess/Scripts/parse-swiftui.py  # 22 files parsed, NOT type-checked
 
 # Android — the pure JVM modules
 cd android && ./gradlew :openui-lang:test :genos-core:test :ui-core:test --console=plain
-#   openui-lang 121 · genos-core 279 · ui-core 95
+#   openui-lang 153 · genos-core 313 · ui-core 97
 
-# Android — the app module (needs the Android SDK; not gated by any workflow)
+# Android — the app module (needs the Android SDK; gated by android-app.yml)
 cd android && ./gradlew :app:assembleDebug :app:testDebugUnitTest --console=plain
-#   71 unit tests, 0 failures — but no Compose composable is executed
+#   183 unit tests, 0 failures — 112 of them execute real Compose compositions
+#   under Robolectric; prints `compose renderers executed: 30/30`
 
 # Cross-port differential fuzzing (local three-way, in one process)
-cd spec/fixtures/generator && node probes/run-differential.mjs
+cd spec/fixtures/generator
+node probes/run-differential.mjs --campaign-file probes/fuzz-campaign-pinned.json
+node probes/run-differential.mjs --campaign prefix,nonmonotonic,mutation,synthesis
+#   49/389 and 4,198/40,459 steps, 0 divergences
+node probes/verify-collation.mjs            # 244,650 ASCII pairs vs V8
 
 # The RN reference app
 npm install && npm test
