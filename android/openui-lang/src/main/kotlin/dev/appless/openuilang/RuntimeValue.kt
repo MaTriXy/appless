@@ -16,9 +16,31 @@ internal class RtObject() {
         for ((k, v) in pairs) put(k, v)
     }
 
-    val keys: List<String> get() = map.keys.toList()
-    val entries: List<Pair<String, RtValue>> get() = map.entries.map { it.key to it.value }
-    val values: List<RtValue> get() = map.values.toList()
+    /**
+     * The object's `[[Prototype]]`. A plain object literal starts at
+     * `Object.prototype`; [assign]ing `"__proto__"` re-points it, and
+     * [RtValue.Null] means a genuinely prototype-less object.
+     *
+     * This slot is what makes lang-core's duck-typing (`isASTNode`,
+     * `isElementNode`, `containsDynamicValue`, the serializer's `isAstNode`)
+     * see through a `{"__proto__": …}` entry — see [JsObjects].
+     */
+    var prototype: RtValue = JsObjects.OBJECT_PROTOTYPE
+
+    /**
+     * Own keys in `Object.keys(o)` / `OrdinaryOwnPropertyKeys` order — every
+     * canonical array index FIRST in ascending numeric order, then the rest in
+     * insertion order.
+     *
+     * This is the runtime object, and its key order IS tree-observable: an
+     * `@Each` template that captures a row object runs it through
+     * `toLiteralAST` → `Obj.entries` → the `$ast` entries ARRAY, which the
+     * serializer emits verbatim (arrays are never sorted). Fixture
+     * `083-runtime-object-key-order`.
+     */
+    val keys: List<String> get() = jsOwnPropertyKeys(map.keys.toList())
+    val entries: List<Pair<String, RtValue>> get() = keys.map { it to map.getValue(it) }
+    val values: List<RtValue> get() = keys.map { map.getValue(it) }
     val isEmpty: Boolean get() = map.isEmpty()
 
     operator fun get(key: String): RtValue? = map[key]
@@ -36,23 +58,37 @@ internal class RtObject() {
      * defining an own property.
      *
      * A fresh `{}` inherits `Object.prototype`'s `__proto__` ACCESSOR, so
-     * `o["__proto__"] = v` invokes that setter: it either re-points `o`'s
-     * prototype (object/null `v`) or does nothing at all (primitive `v`).
-     * Either way `"__proto__"` never becomes an own property and never shows
-     * up in `Object.keys` / `JSON.stringify` (fixture `080-proto-object-key`).
+     * `o["__proto__"] = v` invokes that setter, and the setter does NOT merely
+     * drop the key: for an object (or `null`) `v` it RE-POINTS the receiver's
+     * `[[Prototype]]`, which the whole duck-typing layer then reads through
+     * (fixtures `080-proto-object-key`, `084`–`087`). For a primitive `v` it
+     * does nothing at all. Either way `"__proto__"` never becomes an own
+     * property, so it never shows up in `Object.keys` / `JSON.stringify`.
+     *
+     * When the receiver no longer inherits that accessor (its chain was cut
+     * with `"__proto__": null`), assignment falls back to creating an ordinary
+     * own property — so the second write in
+     * `{"__proto__": null, "__proto__": {…}}` really does produce a
+     * `"__proto__"` key.
      *
      * Use this at every site whose JS original is an assignment. Sites whose
      * original is `Object.fromEntries` / `CreateDataPropertyOrThrow` must keep
      * using [put] — those DO create an own `__proto__` (evaluator.js:40).
      */
     fun assign(key: String, value: RtValue) {
-        if (key == PROTO_KEY) return
+        if (key == PROTO_KEY && JsObjects.inheritsProtoAccessor(RtValue.Obj(this))) {
+            // ES 20.1.2.11 set Object.prototype.__proto__: object or null
+            // re-points the prototype, anything else is a silent no-op.
+            if (value.isObjectOrFunction) prototype = value
+            else if (value is RtValue.Null) prototype = RtValue.Null
+            return
+        }
         put(key, value)
     }
 
     companion object {
-        /** The one key JS object ASSIGNMENT silently swallows. */
-        const val PROTO_KEY: String = "__proto__"
+        /** The one key JS object ASSIGNMENT never turns into an own property. */
+        const val PROTO_KEY: String = JsObjects.PROTO_KEY
 
         /** Own key that shadows `Object.prototype.toString` (see [jsToString]). */
         const val PROTO_KEY_TO_STRING: String = "toString"
@@ -94,15 +130,38 @@ internal sealed interface RtValue {
 
     /** A leftover AST node (builtin call, runtime expression, deferred slot). */
     data class Ast(val node: AstNode) : RtValue
+
+    /**
+     * A native function value, reachable by inheriting one from a prototype
+     * (`$obj.toString`, `$obj.constructor`). `typeof` is `"function"`, not
+     * `"object"`, and `JSON.stringify` drops it exactly like `undefined`.
+     */
+    data class Func(val name: String, val arity: Int) : RtValue
+
+    /**
+     * One of the intrinsic prototype objects, reachable through the
+     * `Object.prototype.__proto__` GETTER (`$obj.__proto__`).
+     */
+    data class Proto(val kind: JsProtoKind) : RtValue
 }
 
 internal val RtValue.isNullish: Boolean
     get() = this is RtValue.Undefined || this is RtValue.Null
 
-/** `typeof v === "object" && v !== null` in JS terms. */
+/**
+ * `typeof v === "object" && v !== null` in JS terms.
+ *
+ * A [RtValue.Func] is deliberately EXCLUDED: `typeof fn` is `"function"`, which
+ * is what gates `containsDynamicValue`, `evaluatePropCore`'s early return and
+ * its plain-object `needsEval` scan.
+ */
 internal val RtValue.isObjectLike: Boolean
-    get() = this is RtValue.Arr || this is RtValue.Obj ||
-        this is RtValue.Element || this is RtValue.Ast
+    get() = this is RtValue.Arr || this is RtValue.Obj || this is RtValue.Element ||
+        this is RtValue.Ast || this is RtValue.Proto
+
+/** `Type(v) is Object` — [isObjectLike] plus functions (ES "is an Object"). */
+internal val RtValue.isObjectOrFunction: Boolean
+    get() = isObjectLike || this is RtValue.Func
 
 /**
  * Convert a plain JSON value (e.g. a schema `default`) into the runtime value

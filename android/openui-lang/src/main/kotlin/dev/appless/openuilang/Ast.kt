@@ -36,6 +36,31 @@ internal sealed interface AstNode {
     data class Ph(val n: String) : AstNode
 }
 
+/**
+ * The node's `k` discriminant — the own property lang-core's duck-typing reads
+ * (`isASTNode`, `evaluate`'s switch, the serializer's `isAstNode`).
+ */
+internal val AstNode.kindTag: String
+    get() = when (this) {
+        is AstNode.Str -> "Str"
+        is AstNode.Num -> "Num"
+        is AstNode.Bool -> "Bool"
+        is AstNode.Null -> "Null"
+        is AstNode.Arr -> "Arr"
+        is AstNode.Obj -> "Obj"
+        is AstNode.Comp -> "Comp"
+        is AstNode.Ref -> "Ref"
+        is AstNode.StateRef -> "StateRef"
+        is AstNode.RuntimeRef -> "RuntimeRef"
+        is AstNode.BinOp -> "BinOp"
+        is AstNode.UnaryOp -> "UnaryOp"
+        is AstNode.Ternary -> "Ternary"
+        is AstNode.Member -> "Member"
+        is AstNode.Index -> "Index"
+        is AstNode.Assign -> "Assign"
+        is AstNode.Ph -> "Ph"
+    }
+
 /** Runtime expression nodes that survive parser lowering (`isRuntimeExpr`). */
 internal val AstNode.isRuntimeExpr: Boolean
     get() = when (this) {
