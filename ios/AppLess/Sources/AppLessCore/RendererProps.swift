@@ -405,7 +405,11 @@ public enum GenosProps {
 
     /// `Math.round(current * 100) / 100` - the read-out next to the track.
     /// `forms.tsx` L208.
+    ///
+    /// `JSNumber.round`, not Swift's `rounded()`: JS rounds a half toward
+    /// +infinity, so a slider whose range dips below zero reports
+    /// `Math.round(-0.5) === -0` where `(-0.5).rounded()` is `-1`.
     public static func sliderReadout(_ value: Double) -> Double {
-        (value * 100).rounded() / 100
+        JSNumber.round(value * 100) / 100
     }
 }

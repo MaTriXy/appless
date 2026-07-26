@@ -35,6 +35,23 @@ import OpenUILang
 /// naive exact-expansion port diverges.
 public enum JSNumber {
 
+    /// `Math.round(x)` - which is NOT Swift's `rounded()`.
+    ///
+    /// JS rounds a half UP (toward +∞): `Math.round(-0.5)` is `-0` and
+    /// `Math.round(-2.5)` is `-2`. Swift's default rounding rule is
+    /// `.toNearestOrAwayFromZero`, so it answers `-1` and `-3`. The two agree
+    /// for every non-negative input, which is why the difference only shows up
+    /// on a slider whose range goes below zero.
+    public static func round(_ x: Double) -> Double {
+        if x.isNaN || x.isInfinite || x == 0 { return x }
+        // The two half-open intervals the spec calls out separately, which
+        // also keeps `0.49999999999999994 + 0.5` (which rounds UP to exactly
+        // 1.0 in binary) from answering 1.
+        if x > 0, x < 0.5 { return 0 }
+        if x < 0, x >= -0.5 { return -0.0 }
+        return (x + 0.5).rounded(.down)
+    }
+
     /// `String(n)`. `NaN` / `±Infinity` stringify as themselves (unlike
     /// `JSON.stringify`, which emits `null`), because that is what React would
     /// paint into a `<Text>`.
