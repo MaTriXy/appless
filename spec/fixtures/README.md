@@ -14,7 +14,7 @@ contract: [`../contract/genos.schema.json`](../contract/genos.schema.json)
 
 ```
 spec/fixtures/
-├── NNN-name.oui            complete-program fixtures (001–075)
+├── NNN-name.oui            complete-program fixtures (001–082)
 ├── NNN-name.expected.json  GENERATED — never edit by hand
 ├── partial/                prefix-truncated streaming snapshots (101–115)
 │   ├── NNN-name.oui        NO trailing newline — the cut point is the last byte
@@ -147,6 +147,7 @@ Notes for implementers:
 | 065–069 | single-fixture-component hardening: ImageBlock explicit `null` caption vs omitted; Bubbles messages with `me`/`time` omitted per-message; AreaChart `"step"` + single series; LineChart `"natural"` + xLabel/yLabel; HorizontalBarChart `"stacked"`. All five positional args are passed on the charts, so the `variant` **prop** is actually populated (in 054 the 3rd positional lands in `xLabel` — contract order is labels, series, xLabel, yLabel, variant) |
 | 070–072 | serializer/runtime edge cases: `{k: ...}` data object duck-typed as `$ast` (070); `Number::toString` boundaries (071); Unicode NFC/NFD code-unit semantics — `==`/`!=` on canonically-equivalent strings, `@Filter` `contains`, distinct precomposed/decomposed object keys surviving into `state`, code-unit key sort (072) |
 | 075 | serializer key ORDER: `Object.keys(v).sort()` is not what `JSON.stringify` emits — canonical array-index keys (`"0"`–`"4294967294"`, `ToString(ToUint32(k)) === k`) are hoisted ahead of every string key in ascending NUMERIC order by `OrdinaryOwnPropertyKeys`, so `"10"` follows `"2"` and `"4294967295"` stays in the string group. Exercised in both key-sorting paths: a plain-object KVList row (props) and a `$state` declaration |
+| 076–082 | runtime-evaluator quirks the ports must not "simplify": `evaluate`'s THIRD `schemaCtx` argument is absent on the action-plan path, so a bare `$state` prop inside `Action([...])` stays a raw `{"$ast": {"k": "StateRef"}}` (076 direct + nested-element step; 077 the same through `@Each`); `isReservedCall` is `name in RESERVED_CALLS`, so `Object.prototype`'s twelve own names are reserved calls too — `@toString(...)` DECLARES, inline `@constructor(...)` reports `inline-reserved` (078); the `@Each` iterator guard is `if (!varName)`, so an EMPTY name aborts the lazy path in BOTH the materializer and the evaluator (079); `__proto__` written with `o[k] = v` hits `Object.prototype`'s setter and never becomes an own key (080); `String(obj)` THROWS when the object shadows `toString`, and `evaluate-tree.js` catches per prop — keeping the RAW `$ast` value and recording the only reachable `runtimeErrors` entry (081), which is attributed to the OUTER element/prop when the throw happens inside an inline nested evaluation (082) |
 | partial/101–115 | streaming snapshots: cut mid-string, mid-call, mid-array, before root, mid-escape (lone `\`), inside a comment, partial/unclosed fence, mid-object, mid-ternary, mid-statement-name, pending duplicate id (ignored), mid-action message, mid-number exponent (NaN), comment-with-apostrophe glue hazard |
 
 ## Coverage matrix (33 contract components × fixtures)

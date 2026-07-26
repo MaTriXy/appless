@@ -96,10 +96,11 @@ canonical equivalence. What did NOT come for free:
 ## KNOWN-DEVIATIONS
 
 The port aims for byte parity with the JS oracle. The following deviations are
-known and deliberate, and none is observable in the current fixture corpus —
-but "not in the corpus" is not "not reachable": #1 in particular diverges on
-ordinary hyphenated ASCII input and is a live correctness risk for
-model-generated programs.
+known and deliberate, and none is observable in the current fixture corpus
+(#3 is a residual SCOPE limit, not a live divergence — the throw the corpus
+does reach is reproduced) — but "not in the corpus" is not "not reachable":
+#1 in particular diverges on ordinary hyphenated ASCII input and is a live
+correctness risk for model-generated programs.
 
 1. **`localeCompare` approximation** (`Evaluator.sortCompare`) — the widest
    deviation on this list, and it bites **plain ASCII data**. `@Sort`'s string
@@ -145,10 +146,22 @@ model-generated programs.
    references; this port has value semantics and no stable identities. The
    materializer never routes the same JS object instance to both sides, so the
    oracle produces `false` too.
-3. **`runtimeErrors` is always empty** (`Pipeline.run`). The JS
-   `evaluateElementProps` errors array is only appended to from code paths
-   AppLess never reaches (no QueryManager, no tool providers), and the oracle
-   emits `[]` across the whole corpus.
+3. **Only `TypeError`s from `ToPrimitive` reach `runtimeErrors`**
+   (`Evaluator.evaluateElementProps`, `RuntimeValue.JsTypeError`). This
+   REPLACES the former "`runtimeErrors` is always empty" deviation, which was
+   wrong: `evaluate-tree.js` wraps every prop in try/catch, and JS
+   `String(obj)` THROWS `TypeError: Cannot convert object to primitive value`
+   whenever the object shadows `toString` — reachable from ordinary source
+   (`$s = { toString: 1 }` then `"t" + $s`), and observable twice over,
+   because the caught prop also keeps its RAW `$ast` value instead of an
+   evaluated one (fixtures `081-tostring-shadow-throws`,
+   `082-runtime-error-outer-prop`). The port now models exactly that throw and
+   records the entry with the reference's message text. What it does NOT model
+   is any OTHER JS runtime throw inside prop evaluation — there is no other
+   reachable one in this value model (there are no callable values, `toNumber`
+   never throws, and lang-core's own pushes into `errors` come from
+   QueryManager/tool-provider paths AppLess never reaches). A future contract
+   that adds throwing paths must extend the catch.
 4. **Property access on an element returns `undefined`**
    (`Evaluator.propertyGet`). In JS an `ElementNode` is a plain object, so
    `someElement.typeName` / `.props` / `.partial` / `.hasDynamicProps` /
@@ -190,6 +203,38 @@ encoder replace them with `?`. Verified against the JS oracle with a
 - **Serializer duck-typing**: any object with a `steps` array serializes as
   `{"$action": …}`; any plain object with a string-valued `k` serializes as
   `{"$ast": …}` (mirrors `spec/fixtures/generator/lib/serialize.mjs`).
+- **`isReservedCall` is prototype-chain aware** (`Builtins.isReservedCall`).
+  lang-core writes `RESERVED_CALLS = { Query, Mutation }` and tests membership
+  with `name in RESERVED_CALLS` — the `in` operator, which walks the prototype
+  chain, so all twelve `Object.prototype` own names (`toString`, `valueOf`,
+  `constructor`, `hasOwnProperty`, `isPrototypeOf`, `propertyIsEnumerable`,
+  `toLocaleString`, `__proto__`, `__defineGetter__`, `__defineSetter__`,
+  `__lookupGetter__`, `__lookupSetter__`) answer `true` too. `@ident` lexes to
+  a BUILTIN token with ANY name, so `q = @toString("tool")` is a reserved-call
+  DECLARATION — it resolves to a `RuntimeRef` (undefined here) rather than an
+  `unknown-component` error, and an inline `@constructor(...)` reports
+  `inline-reserved` (fixture `078-reserved-call-prototype-names`).
+- **Falsy, not null, iterator-name guard** (`Materialize.materializeLazyBuiltin`,
+  `Evaluator.evaluateLazyBuiltin`). Both JS sites write `if (!varName)`, so an
+  EMPTY-string iterator (`@Each(items, "", …)`) aborts the lazy path: the
+  template's refs resolve as ordinary refs (and land in `meta.unresolved`) and
+  the loop yields `[]` rather than iterating (fixture
+  `079-each-empty-iterator-name`).
+- **`__proto__` vanishes on ASSIGNMENT but survives `Object.fromEntries`**
+  (`RtObject.assign`, `Materialize`, `Pipeline.jsAssign`). A plain `{}`
+  inherits `Object.prototype`'s `__proto__` accessor, so `o[k] = v` never
+  creates that own key — which is what `materialize.js`'s object case,
+  `evaluate-prop.js`'s plain-object recursion and every `serialize.mjs` output
+  object do. `evaluator.js`'s `Obj` case uses `Object.fromEntries` (a define,
+  not an assignment) and DOES keep it, so the port keeps it there too; the
+  serializer drops it again on the way out (fixture `080-proto-object-key`).
+- **The `schemaCtx` argument's PRESENCE is threaded, not hardcoded**
+  (`Evaluator.SchemaCtx`). See "Schema context" below.
+- **`PropObject` iteration is `Object.keys` order**
+  (`StringJs.jsOwnPropertyKeys`) — canonical array indices first in ascending
+  numeric order, then the rest in insertion order. Distinct from the
+  serializer's order, which additionally sorts the string group; pinned by
+  `PropObjectKeyOrderTest`.
 - **Serializer key ORDER is `JSON.stringify`'s, not `Array.prototype.sort`'s**
   (`StringJs.JS_OWN_KEY_ORDER`). The reference serializer sorts keys and
   re-inserts them into a fresh object, but the bytes come from
@@ -204,6 +249,41 @@ encoder replace them with `?`. Verified against the JS oracle with a
   declares no defaults; this is future-proofing.
 - **CRLF and combining-mark adjacency** parse exactly like JS because every
   scanner is code-unit based (fixtures 073, 074).
+
+## Schema context (`evaluate`'s third argument)
+
+`evaluator.js` takes `evaluate(node, context, schemaCtx)` and branches on
+schemaCtx's PRESENCE at four sites. The port threads a `SchemaCtx?` marker to
+exactly the same places rather than hardcoding the "present" branch:
+
+| evaluator.js | What presence controls | Port |
+|---|---|---|
+| 61 | catalog def lookup feeding the reactive-prop test one line below | modelled but inert — the GenOS contract marks no prop `reactive()`, so evaluator.js:65 is dead in BOTH states |
+| 75 | `props[key] = schemaCtx ? context.getState(val.n) : val` — a bare `$state` prop is READ or PRESERVED as a raw `StateRef` AST | `Evaluator.evaluateComp` mappedProps loop |
+| 89 | nested ElementNodes in props are re-evaluated inline, or left as the recursion already built them | same function, gated on `schemaCtx != null` |
+| 421 | the `@Each` per-item element re-evaluation gate | `Evaluator.evaluateLazyBuiltin` |
+
+The load-bearing consequence is the ACTION path: `evaluateActionCall` calls the
+TWO-argument form (`evaluate(args[0], context)`, evaluator.js:264), so every
+step inside `Action([…])` is evaluated WITHOUT schema context and keeps its
+`$state` props as `{"$ast": {"k": "StateRef", …}}` for click-time evaluation.
+Fixtures `076-action-staterefs-preserved` (direct + nested-element step) and
+`077-action-each-staterefs` (`@Each` inside an `Action`).
+
+Every other recursion in `evaluator.js` — array elements, object entries,
+operator operands, ternary branches, member/index receivers, eager builtin
+arguments — calls the two-argument form as well, so the port passes `null`
+there. Those drops converge back because `evaluate-prop.js` re-enters
+`evaluateElementProps` on any element/array result, but they are reproduced
+literally rather than assumed harmless.
+
+`evaluate-tree.js`'s `evaluateElementProps` (per-prop try/catch) and
+`evaluator.js`'s `evaluateElementInline` (no catch) are DIFFERENT functions in
+the reference, and the port keeps them separate for the same reason: a throw
+raised while inline-evaluating a nested element must escape to the OUTER prop's
+catch, so the recorded `runtimeErrors` entry names the outer component and the
+outer prop key (fixture `082-runtime-error-outer-prop`: the error is reported
+against `Card`'s `children`, not against the inner `ListItem`).
 
 ## Phase 2 handoff
 
