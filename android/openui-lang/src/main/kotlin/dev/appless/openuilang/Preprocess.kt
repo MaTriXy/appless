@@ -14,8 +14,13 @@ package dev.appless.openuilang
  * `Number(string)`'s *StrWhiteSpace* is the same set, so [jsStringToNumber]
  * trims with [jsTrim]. U+0085 NEL, U+200B ZWSP and U+180E are NOT whitespace
  * to JS and are correctly absent here.
+ *
+ * The membership list is hand-typed, so it is pinned by an EXHAUSTIVE
+ * differential sweep over all 65536 BMP code units in `WhitespaceSemanticsTest`
+ * — a single wrong or missing scalar would otherwise pass the whole fixture
+ * corpus unnoticed.
  */
-private val JS_WHITESPACE: Set<Char> = hashSetOf(
+internal val JS_WHITESPACE: Set<Char> = hashSetOf(
     '\u0009', '\u000A', '\u000B', '\u000C', '\u000D', '\u0020',
     '\u00A0', '\u1680',
     '\u2000', '\u2001', '\u2002', '\u2003', '\u2004', '\u2005',

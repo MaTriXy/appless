@@ -23,3 +23,5 @@ dependencyResolutionManagement {
 rootProject.name = "appless-android"
 
 include(":openui-lang")
+include(":genos-core")
+include(":ui-core")
