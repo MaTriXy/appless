@@ -91,8 +91,8 @@ public object MapGeometry {
      * Note the zoom here is the RAW prop value with only the `?? 15` default
      * applied (RN never clamps); [zoom] clamping is a native-span concern only.
      */
-    public fun embedUrl(placeName: String?, rawZoom: Int?): String {
-        val place = placeName(placeName)
+    public fun embedUrl(rawPlaceName: String?, rawZoom: Int?): String {
+        val place = placeName(rawPlaceName)
         val z = rawZoom ?: NEIGHBORHOOD_ZOOM
         return "https://maps.google.com/maps?q=${encodeUriComponent(place)}&z=$z&output=embed"
     }
