@@ -25,6 +25,46 @@ import Testing
         #expect(recorder.errors.isEmpty)
     }
 
+    /// `tool_calls[].index` is PROVIDER-CONTROLLED, and Swift's
+    /// `Int(_: Double)` initializer TRAPS - it does not clamp - for magnitudes
+    /// >= 2^63 and for +/-Infinity:
+    ///
+    ///     $ swift -e 'print(Int(1e300))'
+    ///     Fatal error: Double value cannot be converted to Int because the
+    ///     result would be greater than Int.max
+    ///
+    /// so a single hostile SSE chunk used to abort the whole process. Note
+    /// `1e999` is not a typo: `JSON.parse` yields `Infinity` for it, which
+    /// traps on the same path.
+    ///
+    /// RN keys a JS `Map` by the raw Number and simply carries on, so the
+    /// stream must survive. Every other tool-call test in this file uses the
+    /// literal index `0`, which is why this went unnoticed.
+    @Test func hostileToolCallIndicesDoNotTrapTheProcess() async {
+        for index in ["1e300", "1e999", "-1e300", "3.7", "-0"] {
+            let http = ScriptedHTTP()
+            await http.enqueue(.sse([
+                "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":\(index),"
+                    + "\"id\":\"call_1\",\"function\":{\"name\":\"web_search\","
+                    + "\"arguments\":\"{}\"}}]}}]}\n",
+                sseFinish("tool_calls"),
+                sseDone,
+            ]))
+            await http.enqueue(.sse([sseContent("second round"), sseFinish("stop"), sseDone]))
+
+            let recorder = StreamRecorder()
+            let client = makeStreamClient(http: http)
+            await client.streamScreen(
+                messages: [ChatMessage(role: .user, content: "q")],
+                handlers: recorder.handlers(),
+                token: StreamCancelToken()
+            )
+            // The point is that we REACH this line for every index.
+            #expect(recorder.errors.isEmpty, "index \(index) surfaced an error")
+            #expect(recorder.deltas == ["second round"], "index \(index)")
+        }
+    }
+
     @Test func requestBodyCarriesParityConstants() async throws {
         let http = ScriptedHTTP()
         await http.enqueue(.sse([sseContent("x"), sseDone]))

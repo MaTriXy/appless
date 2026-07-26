@@ -378,7 +378,12 @@ public final class StreamClient: ScreenStreaming {
                     if !token.isCancelled { onDelta(text) }
                 }
                 for tc in delta?["tool_calls"]?.arrayValue ?? [] {
-                    let idx = tc["index"]?.numberValue.map { Int($0) } ?? 0
+                    // `index` is PROVIDER-CONTROLLED, so it must not reach the
+                    // trapping `Int(_: Double)` initializer: that aborts the
+                    // process for |x| >= 2^63 and for +/-Infinity, and
+                    // `{"index":1e999}` parses to Infinity. `jsRoundToInt`
+                    // clamps instead - it exists for exactly this reason.
+                    let idx = tc["index"]?.numberValue.map { jsRoundToInt($0) } ?? 0
                     var cur = toolCalls[idx] ?? ToolCall()
                     if let id = tc["id"]?.stringValue, !id.isEmpty { cur.id = id }
                     if let name = tc["function"]?["name"]?.stringValue, !name.isEmpty { cur.name = name }
