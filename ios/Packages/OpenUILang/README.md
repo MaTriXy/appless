@@ -28,8 +28,9 @@ cd ios/Packages/OpenUILang && swift test
 The port aims for byte parity with the JS oracle, and the fixture corpus plus
 differential probes hold it there. The following deviations from the reference
 implementation are known and deliberate. None of them is observable in the
-current fixture corpus; each is listed with the condition under which it
-*would* become observable.
+current fixture corpus (#4 is a residual SCOPE limit, not a live divergence —
+the throw the corpus does reach is reproduced); each is listed with the
+condition under which it *would* become observable.
 
 1. **`localeCompare` approximation** (`Evaluator.swift`, `sortCompare`).
    `@Sort`'s string comparator in JS is `String.prototype.localeCompare`
